@@ -1,0 +1,8 @@
+# Depoda satir sonlari daima LF; calisma kopyasinda isletim sistemine birakilir.
+* text=auto eol=lf
+
+# Ikili dosyalar dokunulmasin
+*.db      binary
+*.png     binary
+*.jpg     binary
+*.ico     binary
