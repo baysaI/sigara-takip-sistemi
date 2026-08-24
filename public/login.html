@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giriş — Sigara Takip Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" id="loginForm" autocomplete="on">
+      <span class="login-logo">🚬</span>
+      <h1>Sigara Takip Sistemi</h1>
+      <p class="sub">Devam etmek için sigaracı hesabınızla giriş yapın</p>
+
+      <div class="alert error" id="loginError"></div>
+
+      <div class="field">
+        <label for="username">Kullanıcı Adı <span class="req">*</span></label>
+        <input type="text" id="username" name="username" autocomplete="username"
+               placeholder="ör. sigaraci1" required autofocus />
+      </div>
+
+      <div class="field">
+        <label for="password">Şifre <span class="req">*</span></label>
+        <input type="password" id="password" name="password" autocomplete="current-password"
+               placeholder="••••••••" required />
+      </div>
+
+      <button type="submit" class="btn-primary" id="loginBtn">Giriş Yap</button>
+
+      <p class="login-hint">
+        Hesabınız yoksa yöneticiden talep edin.<br />
+        Yaptığınız her kayıt adınıza işlenir.
+      </p>
+    </form>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/login.js"></script>
+</body>
+</html>

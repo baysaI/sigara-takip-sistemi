@@ -1,0 +1,752 @@
+/* ============================================================
+   Sigara Takip Sistemi — mobile-first stil
+   Kirilma noktalari:  <640 telefon | 640-1023 tablet | >=1024 masaustu
+   ============================================================ */
+:root {
+  /* Yuzey katmanlari: arkadan one dogru acilir */
+  --bg:        #0a0e13;
+  --bg-soft:   #111820;
+  --panel:     #151e27;
+  --panel-2:   #1b2733;
+  --panel-3:   #223040;
+
+  --border:      #263444;
+  --border-soft: #1d2836;
+
+  --text:       #e9eff6;
+  --text-dim:   #90a3b8;
+  --text-faint: #63768c;
+
+  --accent:     #f5a623;
+  --accent-dk:  #c9820e;
+  --accent-soft: rgba(245, 166, 35, .12);
+
+  --ok:        #2ea043;
+  --ok-soft:   rgba(46, 160, 67, .13);
+  --danger:    #e5484d;
+  --danger-soft: rgba(229, 72, 77, .13);
+
+  --radius-sm: 8px;
+  --radius:    12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, .3);
+  --shadow:    0 6px 22px rgba(0, 0, 0, .38);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, .6);
+
+  /* Kart ustundeki ince isik cizgisi — derinlik hissi verir */
+  --edge: inset 0 1px 0 rgba(255, 255, 255, .045);
+
+  /* Dokunma hedefi alt siniri (WCAG 2.5.5) */
+  --touch: 44px;
+  /* Mobilde alt gezinme cubugunun kapladigi yer */
+  --navbar-h: 58px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: Inter, "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  font-size: 15px;
+  overflow-x: hidden;              /* yatay tasma olmasin */
+  -webkit-font-smoothing: antialiased;
+  /* Sayfanin ustune dogru hafif bir isik: duz siyahliktan kurtarir */
+  background-image: radial-gradient(900px 420px at 50% -160px, rgba(245, 166, 35, .05), transparent 70%);
+  background-attachment: fixed;
+}
+
+img, svg, video { max-width: 100%; height: auto; }
+
+/* Rakamlar hizali kalsin (sayac, stok, istatistik) */
+.mono, .stat .value, .cooldown-timer, .stock-pill, td.mono { font-variant-numeric: tabular-nums; }
+
+::selection { background: rgba(245, 166, 35, .28); }
+
+/* ============================================================
+   GIRIS EKRANI
+   ============================================================ */
+.login-wrap {
+  min-height: 100vh;
+  min-height: 100dvh;              /* mobil tarayici cubuklarini hesaba kat */
+  display: grid;
+  place-items: center;
+  padding: 20px 16px;
+  background:
+    radial-gradient(680px 340px at 50% 8%, rgba(245, 166, 35, .10), transparent 70%),
+    radial-gradient(1200px 600px at 50% -10%, #16212c 0%, var(--bg) 62%);
+}
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 30px 22px;
+  box-shadow: var(--shadow-lg), var(--edge);
+}
+.login-card h1 { font-size: 20px; text-align: center; margin-bottom: 4px; letter-spacing: -.2px; }
+.login-card .sub { text-align: center; color: var(--text-dim); font-size: 13px; margin-bottom: 22px; }
+.login-logo {
+  font-size: 38px; text-align: center; display: block; margin-bottom: 10px;
+  filter: drop-shadow(0 4px 14px rgba(245, 166, 35, .35));
+}
+.login-hint {
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-soft);
+  font-size: 12px; color: var(--text-faint); text-align: center; line-height: 1.7;
+}
+@media (min-width: 640px) {
+  .login-card { padding: 34px 30px; }
+  .login-card h1 { font-size: 22px; }
+}
+
+/* ============================================================
+   UST BAR
+   ============================================================ */
+/* Ust bar + gezinmeyi birlikte tutan sticky sarmalayici.
+   Gezinmenin konumu sabit bir piksel degerine degil, ust barin
+   gercek yuksekligine bagli kalir. */
+.app-header {
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .5), 0 6px 20px rgba(0, 0, 0, .22);
+}
+
+.topbar {
+  background: linear-gradient(180deg, #16202a, var(--bg-soft));
+  border-bottom: 1px solid var(--border-soft);
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.topbar .brand {
+  font-weight: 700; font-size: 15px;
+  display: flex; align-items: center; gap: 7px;
+  min-width: 0;                                  /* tasma yerine kisalt */
+  letter-spacing: -.2px;
+}
+.topbar .brand .brand-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .brand small { font-weight: 500; color: var(--text-faint); font-size: 12px; }
+.topbar .spacer { flex: 1; }
+
+.who { text-align: right; font-size: 12px; line-height: 1.3; min-width: 0; }
+.who strong { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who span { color: var(--text-faint); }
+
+/* Ust bardaki cikis sik kullanilan bir hedef: dokunma sinirinin altina dusmesin */
+.topbar #logoutBtn { min-height: var(--touch); flex-shrink: 0; }
+
+/* Telefonda marka alt yazisini ve rol satirini gizle: yer kazan */
+@media (max-width: 480px) {
+  .topbar .brand small { display: none; }
+  .who span { display: none; }
+}
+@media (min-width: 640px) {
+  .topbar { padding: 12px 20px; gap: 16px; }
+  .topbar .brand { font-size: 16px; }
+}
+
+/* ============================================================
+   GEZINME
+   Telefon: ekranin altinda sabit sekme cubugu (basparmak erisimi)
+   Masaustu: ust barin altinda yatay sekmeler
+   ============================================================ */
+.app-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 60;
+  display: flex;
+  background: rgba(17, 24, 32, .96);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-soft);
+  padding-bottom: env(safe-area-inset-bottom);   /* iPhone alt cubugu */
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, .3);
+}
+.app-nav a {
+  flex: 1;
+  min-height: var(--navbar-h);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  color: var(--text-faint);
+  text-decoration: none;
+  font-size: 11px; font-weight: 600;
+  padding: 6px 2px;
+  border-top: 2px solid transparent;
+  transition: color .16s ease, background .16s ease;
+}
+.app-nav a .ico { font-size: 18px; line-height: 1; transition: transform .16s ease; }
+.app-nav a.active {
+  color: var(--accent);
+  border-top-color: var(--accent);
+  background: linear-gradient(180deg, var(--accent-soft), transparent 70%);
+}
+.app-nav a.active .ico { transform: translateY(-1px) scale(1.06); }
+.app-nav a:active { background: rgba(255, 255, 255, .05); }
+
+/* Alt cubuk icerigi ortmesin */
+body.has-nav { padding-bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom)); }
+
+@media (min-width: 768px) {
+  .app-nav {
+    /* Sarmalayici zaten sticky; gezinme normal akista ust barin altinda durur */
+    position: static;
+    background: var(--bg-soft);
+    backdrop-filter: none;
+    border-top: none; border-bottom: 1px solid var(--border-soft);
+    padding: 0 20px;
+    gap: 4px;
+    box-shadow: none;
+  }
+  .app-nav a {
+    flex: 0 0 auto;
+    flex-direction: row; gap: 7px;
+    min-height: 46px;
+    font-size: 13.5px;
+    padding: 0 15px;
+    border-top: none;
+    border-bottom: 2px solid transparent;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+  .app-nav a .ico { font-size: 15px; }
+  .app-nav a:hover { color: var(--text); background: rgba(255, 255, 255, .035); }
+  .app-nav a.active { border-bottom-color: var(--accent); }
+  .app-nav a.active .ico { transform: none; }
+  body.has-nav { padding-bottom: 0; }
+}
+
+/* ============================================================
+   DUZEN
+   ============================================================ */
+.container { width: 100%; max-width: 1280px; margin: 0 auto; padding: 16px 14px 24px; }
+@media (min-width: 640px) { .container { padding: 22px 20px 30px; } }
+
+.page-head { margin-bottom: 18px; }
+.page-head h1 {
+  font-size: 20px; display: flex; align-items: center; gap: 9px;
+  letter-spacing: -.4px; font-weight: 700;
+}
+.page-head p { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+@media (min-width: 640px) { .page-head h1 { font-size: 23px; } }
+
+/* Iki sutunlu duzen: telefonda tek sutuna iner */
+.split { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1024px) {
+  .split { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; }
+}
+
+.card {
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 42%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm), var(--edge);
+}
+.card > h2 {
+  font-size: 12.5px; text-transform: uppercase; letter-spacing: .9px;
+  padding: 13px 15px; border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  color: #cfdcea; font-weight: 700;
+}
+.card > h2 .badge-count {
+  margin-left: auto; font-size: 11px; color: var(--text-faint);
+  text-transform: none; letter-spacing: 0; font-weight: 600;
+}
+.card-body { padding: 15px; }
+
+/* Icinde acilir liste barindiran kartlar listeyi kirpmamali */
+.card.card-overflow { overflow: visible; }
+@media (min-width: 640px) {
+  .card > h2 { padding: 14px 18px; font-size: 13px; }
+  .card-body { padding: 18px; }
+}
+
+/* ============================================================
+   YONETIM SAYFASI DUZENI
+   ============================================================ */
+/* Telefonda tek sutun, genis ekranda iki sutun.
+   admin-wide sinifli kart her zaman tam genislik kaplar. */
+.admin-grid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1024px) {
+  .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .admin-grid .admin-wide { grid-column: 1 / -1; }
+}
+
+/* Onay kutusu satiri */
+.check {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13.5px; color: var(--text-dim); font-weight: 600;
+  cursor: pointer; min-height: var(--touch);
+}
+.check input[type="checkbox"] {
+  width: 18px; height: 18px; min-height: 0; flex: 0 0 auto;
+  accent-color: var(--accent); cursor: pointer;
+}
+
+/* Satir ici sifre sifirlama / esik duzenleme alani */
+.inline-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.inline-form input { min-width: 0; flex: 1 1 150px; }
+.inline-form button { flex: 0 0 auto; }
+
+/* ============================================================
+   ISTATISTIK KARTLARI — telefonda 2 sutun
+   ============================================================ */
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+@media (min-width: 640px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+@media (min-width: 1024px) { .stats { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+.stat {
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 13px 14px; min-width: 0;
+  box-shadow: var(--shadow-sm), var(--edge);
+  overflow: hidden;
+}
+/* Ustte ince renkli cizgi — kartlari birbirinden ayirir */
+.stat::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 2px;
+  background: linear-gradient(90deg, var(--text-faint), transparent 70%);
+  opacity: .5;
+}
+.stat.accent::before { background: linear-gradient(90deg, var(--accent), transparent 70%); opacity: .9; }
+.stat.danger::before { background: linear-gradient(90deg, var(--danger), transparent 70%); opacity: .9; }
+
+.stat .label {
+  font-size: 10.5px; color: var(--text-faint); text-transform: uppercase;
+  letter-spacing: .7px; line-height: 1.35; font-weight: 700;
+}
+.stat .value {
+  font-size: 23px; font-weight: 700; margin-top: 4px; letter-spacing: -.6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.15;
+}
+.stat .value.sm { font-size: 14px; letter-spacing: 0; }
+.stat.accent .value { color: var(--accent); }
+.stat.danger .value { color: var(--danger); }
+
+/* ============================================================
+   FORM
+   ============================================================ */
+.field { margin-bottom: 14px; }
+label {
+  display: block; font-size: 12px; color: var(--text-dim);
+  margin-bottom: 6px; font-weight: 600; letter-spacing: .2px;
+}
+label .req { color: var(--danger); }
+
+input, select, textarea {
+  width: 100%;
+  padding: 11px 12px;
+  background: #0e151d;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  /* 16px alti degerler iOS Safari'de odaklanunca sayfayi zoomlar - 16px sabit */
+  font-size: 16px;
+  min-height: var(--touch);
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) {
+  border-color: #32455a;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--accent);
+  background: #0c1219;
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, .15);
+}
+input:disabled, select:disabled, textarea:disabled {
+  opacity: .55; cursor: not-allowed; background: #0b1118;
+}
+input::placeholder, textarea::placeholder { color: #55677c; }
+textarea { resize: vertical; min-height: 68px; line-height: 1.55; }
+select option { background: var(--panel-2); }
+
+/* Iki alani yan yana koy; cok dar ekranda alt alta insin */
+.row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 420px) { .row { grid-template-columns: 1fr 1fr; } }
+
+button {
+  font-family: inherit; font-size: 15px; font-weight: 650;
+  min-height: var(--touch);
+  padding: 11px 16px; border: 1px solid transparent; border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter .15s, opacity .15s, transform .08s, box-shadow .15s, background .15s;
+}
+button:hover:not(:disabled) { filter: brightness(1.08); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245, 166, 35, .35); }
+button:disabled { opacity: .42; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(180deg, #ffb731, var(--accent));
+  color: #2a1c00; width: 100%; padding: 13px; font-size: 16px;
+  box-shadow: 0 3px 12px rgba(245, 166, 35, .22), inset 0 1px 0 rgba(255, 255, 255, .3);
+}
+.btn-primary:hover:not(:disabled) { box-shadow: 0 5px 18px rgba(245, 166, 35, .3), inset 0 1px 0 rgba(255, 255, 255, .3); }
+.btn-ghost {
+  background: var(--panel-3); color: var(--text); border-color: var(--border);
+  box-shadow: var(--edge);
+}
+.btn-ghost:hover:not(:disabled) { background: #283848; border-color: #33455a; }
+.btn-sm { min-height: 38px; padding: 8px 13px; font-size: 13px; }
+.btn-block { width: 100%; }
+
+/* Telefonda kucuk dugmeler de dokunma sinirini gecmeli (WCAG 2.5.5) */
+@media (max-width: 767px) { .btn-sm { min-height: var(--touch); } }
+
+/* ============================================================
+   OTOMATIK TAMAMLAMA (uzun garson listesi)
+   ============================================================ */
+.ac { position: relative; }
+
+/* Secili durum: yesil kenarlik + saginda onay isareti */
+input.ac-ok {
+  border-color: var(--ok);
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232ea043' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px;
+}
+input.ac-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(229, 72, 77, .13); }
+
+.ac-list {
+  position: absolute; z-index: 40;
+  top: calc(100% + 5px); left: 0; right: 0;
+  max-height: 260px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--panel-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  list-style: none; margin: 0; padding: 5px;
+  animation: ac-in .13s ease-out;
+}
+@keyframes ac-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ac-item {
+  padding: 11px 12px;
+  min-height: var(--touch);
+  display: flex; align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1.3;
+  transition: background .12s;
+}
+.ac-item b { color: var(--accent); font-weight: 700; }
+.ac-item.active { background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(245, 166, 35, .3); }
+.ac-item:hover { background: rgba(255, 255, 255, .05); }
+.ac-empty {
+  padding: 11px 12px; color: var(--text-faint);
+  font-size: 12.5px; text-align: center;
+}
+
+/* Telefonda liste daha kisa: klavye acikken ekrani kaplamasin */
+@media (max-width: 640px) { .ac-list { max-height: 210px; } }
+
+/* ============================================================
+   MODUL 7 — OZEL ONAY / UYARI EKRANI
+   ============================================================ */
+.gate-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(4, 7, 10, .84);
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+  animation: gate-in .16s ease-out;
+}
+@keyframes gate-in { from { opacity: 0; } to { opacity: 1; } }
+
+.gate-box {
+  width: 100%; max-width: 520px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 2px solid var(--warn-line, var(--danger));
+  border-radius: var(--radius-lg);
+  padding: 22px 20px;
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, .04);
+  margin: auto;
+  animation: gate-pop .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+@keyframes gate-pop { from { transform: scale(.96) translateY(8px); } to { transform: none; } }
+
+.gate-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.gate-icon { font-size: 32px; line-height: 1; flex: 0 0 auto; }
+.gate-head h2 {
+  font-size: clamp(16px, 4.6vw, 21px);
+  letter-spacing: .4px;
+  color: var(--warn-line, var(--danger));
+  line-height: 1.25;
+}
+.gate-player {
+  font-size: 12px; color: var(--text-faint);
+  letter-spacing: .8px; margin-bottom: 12px; text-transform: uppercase; font-weight: 700;
+}
+.gate-player b { color: var(--text); font-size: 17px; letter-spacing: 0; }
+
+/* Uyari metni: buyuk harf ve buyuk punto — sigaracinin gozunden kacmasin */
+.gate-note {
+  background: #0d141c;
+  border-left: 5px solid var(--warn-line, var(--danger));
+  border-radius: var(--radius-sm);
+  padding: 15px 16px;
+  margin-bottom: 16px;
+  font-size: clamp(15px, 4vw, 17px);
+  font-weight: 700;
+  line-height: 1.55;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  word-break: break-word;
+}
+.gate-hint { font-size: 14px; color: var(--text-dim); line-height: 1.6; margin-bottom: 16px; }
+.gate-check { margin: 4px 0 16px; color: var(--text); }
+.gate-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.gate-actions button { flex: 1 1 140px; }
+
+/* Seviyeye gore renk */
+.gate-warning  { --warn-line: var(--accent); }
+.gate-approval { --warn-line: #ef8f16; }
+.gate-blocked  { --warn-line: var(--danger); }
+
+/* Kayit formundaki kalici uyari serifi */
+.flag-banner {
+  margin-top: 9px; padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--warn-line, var(--danger));
+  background: rgba(229, 72, 77, .1);
+  animation: ac-in .16s ease-out;
+}
+.flag-banner.flag-warning  { --warn-line: var(--accent); background: rgba(245, 166, 35, .1); }
+.flag-banner.flag-approval { --warn-line: #ef8f16;       background: rgba(239, 143, 22, .12); }
+.flag-banner.flag-blocked  { --warn-line: var(--danger); background: rgba(229, 72, 77, .12); }
+.flag-banner-head {
+  font-weight: 700; font-size: 12.5px; letter-spacing: .5px;
+  color: var(--warn-line); margin-bottom: 5px;
+}
+.flag-banner-note {
+  font-size: 12.5px; line-height: 1.55; color: var(--text);
+  text-transform: uppercase; font-weight: 600; word-break: break-word;
+}
+
+/* Stok rozetleri */
+.stock-ok       { color: #6fe093; }
+.stock-critical { color: var(--accent); }
+.stock-out      { color: var(--danger); }
+
+/* ============================================================
+   4 SAAT GOSTERGESI
+   ============================================================ */
+.cooldown-box {
+  margin-top: 9px; padding: 13px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px; border: 1px solid transparent;
+  display: none;
+  animation: ac-in .16s ease-out;
+}
+.cooldown-box.show { display: block; }
+.cooldown-box.ok {
+  background: linear-gradient(180deg, rgba(46, 160, 67, .16), var(--ok-soft));
+  border-color: rgba(46, 160, 67, .55); color: #86e8a8;
+}
+.cooldown-box.blocked {
+  background: linear-gradient(180deg, rgba(229, 72, 77, .16), var(--danger-soft));
+  border-color: rgba(229, 72, 77, .55); color: #ffa8ab;
+}
+.cooldown-box.loading { background: var(--panel-3); border-color: var(--border); color: var(--text-dim); }
+.cooldown-head { display: flex; align-items: flex-start; gap: 8px; font-weight: 700; line-height: 1.4; }
+.cooldown-timer {
+  font-family: ui-monospace, Consolas, "SF Mono", monospace;
+  /* Ekran genisligiyle olcekle: dar telefonda tasmaz, genis ekranda buyuk durur */
+  font-size: clamp(26px, 8vw, 34px);
+  font-weight: 700; letter-spacing: 1px;
+  margin: 8px 0 2px; color: #ff6b6f;
+  text-shadow: 0 0 24px rgba(229, 72, 77, .35);
+}
+.cooldown-meta { font-size: 12px; color: var(--text-dim); line-height: 1.65; word-break: break-word; }
+.cooldown-meta b { color: var(--text); font-weight: 600; }
+
+.progress {
+  height: 6px; background: rgba(255, 255, 255, .07);
+  border-radius: 3px; overflow: hidden; margin-top: 9px;
+}
+.progress > i {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--danger), #ff8a5c);
+  transition: width 1s linear;
+}
+
+/* ============================================================
+   TABLO
+   Telefon (<768): her satir bir karta donusur (data-label ile)
+   Masaustu: klasik tablo
+   ============================================================ */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th {
+  text-align: left; padding: 11px 12px; background: var(--panel-3);
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px;
+  color: var(--text-faint); border-bottom: 1px solid var(--border); white-space: nowrap;
+  font-weight: 700;
+}
+td { padding: 11px 12px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+tbody tr { transition: background .12s; }
+tbody tr:hover { background: rgba(255, 255, 255, .028); }
+tbody tr:last-child td { border-bottom: none; }
+td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim); }
+
+@media (max-width: 767px) {
+  table.responsive thead { display: none; }
+  table.responsive, table.responsive tbody, table.responsive tr, table.responsive td { display: block; width: 100%; }
+  table.responsive tr {
+    background: #0f161e;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 4px 2px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  table.responsive tr:last-child { margin-bottom: 0; }
+  table.responsive td {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border-bottom: 1px solid rgba(38, 52, 68, .5);
+    padding: 9px 12px;
+    text-align: right;
+  }
+  table.responsive td:last-child { border-bottom: none; }
+  /* Basliklar hucrenin soluna etiket olarak yazilir */
+  table.responsive td::before {
+    content: attr(data-label);
+    color: var(--text-faint);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px;
+    font-weight: 700; text-align: left; flex-shrink: 0;
+  }
+  table.responsive td.empty { display: block; text-align: center; }
+  table.responsive td.empty::before { content: none; }
+  .info-cell { max-width: none; }
+
+  /* Satir ici eylem dugmeleri telefonda dokunma sinirini gecmeli */
+  table.responsive td .btn-sm { min-height: var(--touch); }
+  /* Ayni hucrede birden fazla dugme varsa sarsin, sikismasin */
+  table.responsive td:has(.btn-sm) { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  table.responsive td .inline-form { flex-basis: 100%; }
+}
+
+.pill {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .3px;
+  background: var(--panel-3); border: 1px solid var(--border); color: var(--text-dim);
+}
+.pill.player { background: var(--accent-soft); border-color: rgba(245, 166, 35, .45); color: var(--accent); }
+.pill.qty    { background: var(--ok-soft); border-color: rgba(46, 160, 67, .45); color: #6fe093; }
+.pill.locked { background: var(--danger-soft); border-color: rgba(229, 72, 77, .45); color: #ff9ea1; }
+.pill.free   { background: var(--ok-soft); border-color: rgba(46, 160, 67, .45); color: #6fe093; }
+.info-cell { color: var(--text-faint); font-style: italic; max-width: 220px; }
+.empty { text-align: center; padding: 32px 16px; color: var(--text-faint); line-height: 1.7; }
+
+/* ============================================================
+   FILTRELER — telefon 1, tablet 2, masaustu esnek sutun
+   ============================================================ */
+.filters { display: grid; grid-template-columns: 1fr; gap: 11px; }
+@media (min-width: 480px) { .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .filters { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+.filters .field { margin-bottom: 0; min-width: 0; }
+.filter-actions { display: flex; gap: 9px; align-items: flex-end; }
+.filter-actions button { flex: 1; }
+/* Rapor sayfasindaki hizli tarih dugmeleri: dar ekranda 2x2, genis ekranda tek satir */
+.quick-range { flex-wrap: wrap; grid-column: 1 / -1; }
+.quick-range button { flex: 1 1 calc(50% - 5px); }
+@media (min-width: 640px) { .quick-range button { flex: 1 1 auto; } }
+@media (min-width: 1024px) { .filter-actions button { flex: 0 0 auto; } }
+
+/* Sayfalama: telefonda butonlar tam genislik, bilgi ustte */
+.pager {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 12px 15px; border-top: 1px solid var(--border-soft);
+  background: rgba(0, 0, 0, .16);
+}
+.pager .info { color: var(--text-faint); font-size: 12.5px; width: 100%; text-align: center; line-height: 1.6; }
+.pager button { flex: 1; }
+@media (min-width: 640px) {
+  .pager { padding: 12px 18px; flex-wrap: nowrap; }
+  .pager .info { width: auto; margin-right: auto; text-align: left; }
+  .pager button { flex: 0 0 auto; }
+}
+
+/* ============================================================
+   UYARI / BILDIRIM
+   ============================================================ */
+.alert { padding: 11px 13px; border-radius: var(--radius-sm); font-size: 13.5px; margin-bottom: 14px; display: none; }
+.alert.show { display: block; animation: ac-in .16s ease-out; }
+.alert.error   { background: var(--danger-soft); border: 1px solid rgba(229, 72, 77, .55); color: #ffa8ab; }
+.alert.success { background: var(--ok-soft);     border: 1px solid rgba(46, 160, 67, .55); color: #86e8a8; }
+
+/* Telefonda bildirim alt gezinme cubugunun ustunde, tam genislikte */
+#toasts {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 12px);
+  z-index: 999; display: flex; flex-direction: column; gap: 9px;
+  pointer-events: none;
+}
+.toast {
+  background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+  border: 1px solid var(--border); border-left-width: 4px;
+  border-radius: var(--radius); padding: 12px 15px;
+  box-shadow: var(--shadow-lg); font-size: 13.5px; line-height: 1.5;
+  animation: slide-up .22s ease-out;
+}
+.toast.success { border-left-color: var(--ok); }
+.toast.error   { border-left-color: var(--danger); }
+.toast.info    { border-left-color: var(--accent); }
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (min-width: 768px) {
+  #toasts { left: auto; right: 18px; bottom: 18px; max-width: 380px; }
+  .toast { min-width: 260px; animation: slide-in .22s ease-out; }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* ============================================================
+   YARDIMCI SINIFLAR
+   ============================================================ */
+.hidden { display: none !important; }
+.muted { color: var(--text-faint); font-size: 12.5px; }
+.mt { margin-top: 14px; }
+.center { text-align: center; }
+
+/* Hareket azaltma tercihi olan kullanicilar icin animasyonlari kis */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ============================================================
+   YAZDIRMA — gun sonu raporu kagida dokulurken
+   ============================================================ */
+@media print {
+  .topbar, .app-nav, .app-header, #toasts, .card-overflow, .pager button { display: none !important; }
+  body { background: #fff; color: #000; padding: 0; background-image: none; }
+  body.has-nav { padding-bottom: 0; }
+  .card, .stat {
+    background: #fff; border: 1px solid #999; box-shadow: none;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .card > h2 { background: #eee; color: #000; }
+  .stat::before { display: none; }
+  .container { max-width: none; padding: 0; }
+  th { background: #eee; color: #000; }
+  td, .muted, .stat .label, .pager .info, td.mono { color: #000; }
+  .pill { border-color: #999; color: #000; background: #fff; }
+  a[href]::after { content: ''; }
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#161c24" />
+  <title>Gün Sonu Raporu — Sigara Takip Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <main class="container">
+
+    <div class="page-head">
+      <h1>📊 Gün Sonu Raporu</h1>
+      <p id="rangeLabel">Bugünün dökümü yükleniyor...</p>
+    </div>
+
+    <section class="card card-overflow">
+      <h2>Tarih Aralığı</h2>
+      <div class="card-body">
+        <div class="filters">
+          <div class="field">
+            <label for="rFrom">Başlangıç</label>
+            <input type="date" id="rFrom" />
+          </div>
+          <div class="field">
+            <label for="rTo">Bitiş</label>
+            <input type="date" id="rTo" />
+          </div>
+          <div class="filter-actions quick-range">
+            <button class="btn-ghost btn-sm" id="todayBtn">Bugün</button>
+            <button class="btn-ghost btn-sm" id="yesterdayBtn">Dün</button>
+            <button class="btn-ghost btn-sm" id="week7Btn">Son 7 gün</button>
+            <button class="btn-primary btn-sm" id="printBtn">Yazdır</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Özet -->
+    <section class="stats">
+      <div class="stat">        <div class="label">Toplam İşlem</div>  <div class="value" id="sIslem">-</div></div>
+      <div class="stat accent"> <div class="label">Dağıtılan Paket</div><div class="value" id="sPaket">-</div></div>
+      <div class="stat">        <div class="label">Farklı Oyuncu</div> <div class="value" id="sOyuncu">-</div></div>
+      <div class="stat">        <div class="label">Garson</div>        <div class="value" id="sGarson">-</div></div>
+      <div class="stat">        <div class="label">Sigaracı</div>      <div class="value" id="sSigaraci">-</div></div>
+      <div class="stat danger"> <div class="label">Özel Onaylı</div>   <div class="value" id="sOnayli">-</div></div>
+    </section>
+
+    <div class="split">
+
+      <!-- Marka bazlı -->
+      <section class="card">
+        <h2>🚬 Marka Bazlı Dağıtım</h2>
+        <div class="table-scroll">
+          <table class="responsive">
+            <thead><tr><th>Sigara Türü</th><th>Paket</th><th>İşlem</th></tr></thead>
+            <tbody id="brandBody"><tr><td colspan="3" class="empty">—</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Garson bazlı -->
+      <section class="card">
+        <h2>👤 Garson Bazlı Dağılım</h2>
+        <div class="table-scroll">
+          <table class="responsive">
+            <thead><tr><th>Garson</th><th>Paket</th><th>İşlem</th><th>Oyuncu</th></tr></thead>
+            <tbody id="waiterBody"><tr><td colspan="4" class="empty">—</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Sigaracı bazlı -->
+    <section class="card">
+      <h2>🔑 Sigaracı Bazlı İşlemler</h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead><tr><th>Sigaracı</th><th>İşlem</th><th>Paket</th><th>İlk İşlem</th><th>Son İşlem</th></tr></thead>
+          <tbody id="operatorBody"><tr><td colspan="5" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Özel onaylı işlemler -->
+    <section class="card">
+      <h2>⚠️ Özel Onay / Uyarı ile Verilenler <span class="badge-count" id="approvalCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr><th>Saat</th><th>Oyuncu</th><th>Durum</th><th>Uyarı Notu</th><th>Onaylayan</th><th>Onay Notu</th><th>Sigaracı</th></tr>
+          </thead>
+          <tbody id="approvalBody"><tr><td colspan="7" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Kalan stok -->
+    <section class="card">
+      <h2>📦 Kalan Stok Raporu <span class="badge-count" id="stockCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead><tr><th>Sigara Türü</th><th>Kalan Paket</th><th>Kritik Eşik</th><th>Durum</th></tr></thead>
+          <tbody id="stockBody"><tr><td colspan="4" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="info" id="restockInfo">—</span>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/rapor.js"></script>
+</body>
+</html>

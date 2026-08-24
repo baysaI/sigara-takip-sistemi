@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#161c24" />
+  <title>Stok — Sigara Takip Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <main class="container">
+
+    <div class="page-head">
+      <h1>📦 Stok Paneli</h1>
+      <p>Her sigara türünün güncel paket sayısı. Kayıt açıldıkça otomatik düşer.</p>
+    </div>
+
+    <!-- Özet kartları -->
+    <section class="stats">
+      <div class="stat">        <div class="label">Sigara Türü</div>  <div class="value" id="stTypes">-</div></div>
+      <div class="stat accent"> <div class="label">Toplam Paket</div> <div class="value" id="stTotal">-</div></div>
+      <div class="stat danger"> <div class="label">Kritik Seviye</div><div class="value" id="stCritical">-</div></div>
+      <div class="stat danger"> <div class="label">Tükenen</div>      <div class="value" id="stOut">-</div></div>
+    </section>
+
+    <div class="split">
+
+      <!-- İkmal -->
+      <section class="card">
+        <h2>➕ Stok Ekle (İkmal)</h2>
+        <div class="card-body">
+          <div class="field">
+            <label for="addType">Sigara Türü <span class="req">*</span></label>
+            <select id="addType"><option value="">— Seçiniz —</option></select>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="addAmount">Paket Adedi <span class="req">*</span></label>
+              <input type="number" id="addAmount" min="1" max="100000" value="10" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label for="addNote">Not <span class="muted">(opsiyonel)</span></label>
+              <input type="text" id="addNote" maxlength="120" placeholder="ör. 2 koli geldi" />
+            </div>
+          </div>
+          <button class="btn-primary" id="addStockBtn">Stoğa Ekle</button>
+
+          <div class="field mt">
+            <label for="setType">Sayım Düzeltmesi <span class="muted">(mevcudu hedefe getirir)</span></label>
+            <select id="setType"><option value="">— Seçiniz —</option></select>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="setTarget">Sayılan Miktar</label>
+              <input type="number" id="setTarget" min="0" max="100000" value="0" inputmode="numeric" />
+            </div>
+            <div class="field" style="display:flex;align-items:flex-end">
+              <button class="btn-ghost btn-block" id="setStockBtn">Düzelt</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stok kartları -->
+      <section class="card">
+        <h2>Stok Kartları <span class="badge-count" id="cardCount"></span></h2>
+        <div class="table-scroll">
+          <table class="responsive">
+            <thead>
+              <tr><th>Sigara Türü</th><th>Kalan</th><th>Kritik Eşik</th><th>Durum</th></tr>
+            </thead>
+            <tbody id="stockBody">
+              <tr><td colspan="4" class="empty">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span class="info">Kritik eşiğin altına düşen türler kırmızı gösterilir.</span>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Hareket geçmişi -->
+    <section class="card">
+      <h2>🧾 Son Stok Hareketleri</h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr><th>Tarih</th><th>Tür</th><th>Hareket</th><th>Kalan</th><th>Sebep</th><th>Kullanıcı</th><th>Not</th></tr>
+          </thead>
+          <tbody id="moveBody">
+            <tr><td colspan="7" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/stok.js"></script>
+</body>
+</html>

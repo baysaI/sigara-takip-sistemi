@@ -1,0 +1,396 @@
+# 🚬 Sigara Takip Sistemi
+
+Rol yapma sunucusu (veya benzeri işletme) için sigara dağıtım takip uygulaması.
+Her oyuncu **4 saatte bir** sigara alabilir; kural hem arayüzde canlı geri sayımla,
+hem de sunucu tarafında zorunlu olarak uygulanır.
+
+## Kurulum
+
+```bash
+npm install
+```
+
+```bash
+npm run seed
+```
+
+```bash
+npm start
+```
+
+Tarayıcıdan `http://localhost:3000` adresine gidin.
+
+### İlk adım: sistemi kendiniz kurun
+
+**Sistem tamamen boş gelir** — hazır garson, sigara türü veya sigaracı hesabı yoktur.
+Yalnızca bir yönetici hesabı oluşturulur; geri kalanını siz tanımlarsınız.
+
+`admin` hesabıyla girip **Yönetim** sekmesinden sırasıyla:
+
+1. **Garsonlar** — tek tek ya da toplu (her satıra bir ad)
+2. **Sigara türleri** — tek tek ya da toplu
+3. **Sigaracı hesapları** — kullanıcı adı + şifre belirleyip oluşturun
+
+Garson ve sigara türü tanımlanana kadar kayıt açılamaz; Hızlı Kayıt sayfası
+eksik olanı adıyla söyler ve yöneticiyi Yönetim sayfasına yönlendirir.
+
+### İlk kurulum hesabı
+
+| Kullanıcı | Şifre | Rol |
+|---|---|---|
+| `admin` | `ADMIN_SIFRESI` | yönetici |
+
+> ⚠️ İlk girişten sonra bu şifreyi **Yönetim → Sigaracı Hesapları → Şifre** ile değiştirin
+> ve `.env` içinde uzun rastgele bir `SESSION_SECRET` tanımlayın
+> (`.env.example` dosyasını kopyalayın).
+
+Sigaracı hesaplarını bu hesapla girip siz oluşturursunuz; sistemde kendi kendine
+kayıt olma yoktur.
+
+## Yapılandırma (`.env`)
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `PORT` | `3000` | Sunucu portu |
+| `COOLDOWN_HOURS` | `4` | Sigara kuralı (saat). Değiştirince arayüz de otomatik uyum sağlar |
+| `SESSION_SECRET` | — | Oturum çerezi imzalama anahtarı |
+| `NODE_ENV` | `development` | `production` yapılırsa çerez `secure` (HTTPS) olur |
+
+## Dosya yapısı
+
+```
+sigara/
+├── server.js              Express giriş noktası, oturum, sayfa korumaları
+├── config.js              Ortam değişkenleri + 4 saat kuralı sabitleri
+├── db/
+│   ├── database.js        SQLite bağlantısı + şema (CREATE TABLE)
+│   └── seed.js            Başlangıç verisi (garson, tür, kullanıcı)
+├── services/
+│   ├── cooldown.js        4 SAAT KURALI — tek kaynak
+│   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
+│   └── stock.js           Modül 8 — stok hareketleri
+├── middleware/
+│   └── auth.js            requireAuth / requireAdmin
+├── routes/
+│   ├── auth.js            /api/auth/*
+│   ├── lookups.js         /api/waiters, /api/cigarette-types
+│   ├── users.js           /api/users — hesap yönetimi
+│   ├── flags.js           /api/flags — oyuncu uyarıları
+│   ├── stock.js           /api/stock — stok paneli
+│   └── reports.js         /api/reports — gün sonu raporu
+│   └── records.js         /api/records/*
+├── public/
+│   ├── login.html         Giriş
+│   ├── kayit.html         Hızlı kayıt + özet (giriş sonrası ana sayfa)
+│   ├── arsiv.html         Filtreli arşiv
+│   ├── sorgu.html         ID sorgulama
+│   ├── stok.html          Stok paneli
+│   ├── rapor.html         Gün sonu raporu (admin)
+│   ├── yonetim.html       Garson / tür yönetimi (admin)
+│   ├── css/style.css      Mobile-first responsive stil
+│   └── js/
+│       ├── api.js         Fetch sarmalayıcı, biçimleyiciler, toast
+│       ├── autocomplete.js Uzun listeler için yazarak seçim bileşeni
+│       ├── approval.js    Modül 7 — engel / onay ekranı
+│       ├── layout.js      Ortak kabuk: üst bar, gezinme, oturum
+│       ├── login.js  kayit.js  arsiv.js  sorgu.js  yonetim.js
+└── data/                  SQLite dosyaları (git'e girmez)
+```
+
+## Sayfalar
+
+| Adres | İçerik | Erişim |
+|---|---|---|
+| `/login.html` | Giriş | herkes |
+| `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
+| `/arsiv.html` | Filtreler + tam arşiv + sayfalama | oturum |
+| `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
+| `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
+| `/rapor.html` | Gün sonu raporu | **admin** |
+| `/yonetim.html` | Garson, tür, hesap ve uyarı yönetimi | **admin** |
+
+Oturumsuz erişim `/login.html` adresine yönlendirilir; `/yonetim.html` sigaracı
+hesaplarında hem gezinme çubuğunda gizlenir hem de doğrudan açılamaz.
+
+## Garson seçimi
+
+Kadro kalabalık olabileceği için "Alan Garson" alanı açılır liste değil,
+**yazarak seçim** alanıdır:
+
+- Alana tıklayınca tüm garsonlar listelenir; yazdıkça daralır.
+- Önce **adı o harflerle başlayanlar**, sonra içinde geçenler sıralanır;
+  eşleşen harfler vurgulanır.
+- Türkçe karakterlere duyarlıdır — `ILK` yazınca `Ilker`, `ıspanak` ile `Ispanak` eşleşir.
+- Ok tuşları + Enter, ya da dokunma/tıklama ile seçilir.
+- **Serbest metin kabul edilmez.** Listede olmayan bir ad yazılırsa alan kırmızıya döner
+  ve kayıt gönderilmez; sunucu da geçersiz garson id'sini `400` ile reddeder.
+- Tam ad yazılıp alandan çıkılırsa (ya da tek eşleşme kalırsa) otomatik seçilir —
+  `zeynep` yazıp geçmek `Zeynep`'i seçer.
+- Seçilen garson kayıttan sonra korunur; aynı vardiyada arka arkaya kayıt hızlanır.
+
+Aynı alan Arşiv sayfasındaki garson filtresinde de kullanılır.
+
+### Garson ekleme
+
+Sistem **boş garson listesiyle** gelir; kadronuzu Yönetim sayfasından siz oluşturursunuz:
+
+- **Tek tek:** ad yazıp *Ekle*.
+- **Toplu:** her satıra bir ad yazıp *Listeyi Ekle*. Boş satırlar ve tekrarlar atlanır,
+  sonuç `3 eklendi, 1 zaten kayıtlı` biçiminde özetlenir.
+
+Aynı ad iki kez eklenemez (büyük/küçük harf farkı da aynı sayılır).
+
+Kalıcı bir başlangıç kadrosu isterseniz [db/seed.js](db/seed.js) içindeki
+`DEFAULT_WAITERS` dizisine adları yazın; `npm run seed` çalıştırıldığında eklenirler.
+Dizi varsayılan olarak boştur.
+
+Bir garson işten ayrılırsa **pasife alın** — silmeyin. Pasif garson kayıt formunda
+görünmez ama geçmiş kayıtları olduğu gibi kalır (kayıtlarda ad snapshot olarak tutulur).
+
+### Garson veya tür tanımlı değilken
+
+Hızlı Kayıt sayfasında ilgili alan devre dışı kalır ve 4 saat kuralı uygun olsa bile
+*Kaydı Oluştur* düğmesi açılmaz. İpucu satırı eksik olanı adıyla söyler
+(`Önce sisteme garson ve sigara türü eklenmeli.`). Yönetici uyarıdan doğrudan Yönetim
+sayfasına geçebilir; sigaracıya yöneticiye başvurması söylenir.
+
+## Yönetim sayfası
+
+Yalnızca yönetici erişir. Üç bölümden oluşur:
+
+**Garsonlar** — tek tek veya toplu ekleme, aktif/pasif.
+
+**Sigara türleri** — aynı şekilde. Pasif tür kayıt formunda görünmez,
+geçmiş kayıtlar etkilenmez.
+
+**Sigaracı hesapları** — kullanıcı adı, ad soyad, şifre ve yetki (sigaracı / yönetici)
+belirleyip hesap oluşturursunuz. *Şifreyi göster* kutusuyla yazdığınızı doğrulayıp
+sigaracıya iletirsiniz. Her satırdaki **Şifre** düğmesi unutulan şifreyi sıfırlar.
+
+Kural ve sınırlar:
+
+- Kullanıcı adı 3–30 karakter; harf, rakam, nokta, tire, alt çizgi. Büyük/küçük harf
+  farkı aynı sayılır (`Ahmet` ile `ahmet` çakışır).
+- Şifre en az 6 karakter, `bcrypt` ile saklanır.
+- Kendi hesabınızı pasife alamaz, kendi yönetici yetkinizi kaldıramazsınız.
+- **Sistemde en az bir aktif yönetici kalmalıdır** — son yöneticiyi düşüren işlem reddedilir.
+- Pasif hesap giriş yapamaz (`403`), ama geçmiş kayıtları arşivde durur.
+- Hesap silme yoktur; ayrılan personeli pasife alın.
+
+## Özel onay ve uyarı mekanizması (Modül 7)
+
+Bazı oyuncular için önceden uyarı tanımlanabilir. **4 saatlik süre dolmuş ve sistem
+yeşil yanıyor olsa bile**, bu oyuncularda kayıt açılmadan önce sigaracının önüne
+engel ekranı çıkar.
+
+Üç seviye vardır:
+
+| Seviye | Ekranda | Geçiş şartı |
+|---|---|---|
+| **Uyarı** | `DİKKAT — UYARI KAYDI VAR` | Sigaracı uyarıyı okuduğunu onaylar |
+| **Yetkili onayı** | `YETKİLİ ONAYI GEREKLİ` | Onayı veren yetkilinin **adı** girilir |
+| **Bloke** | `BLOKE — SİGARA VERİLEMEZ` | **Geçiş yok** — onay düğmesi hiç görünmez |
+
+Nasıl işler:
+
+1. Sigaracı Oyuncu ID'yi yazar yazmaz, uyarı metni formda **büyük harflerle** bir şerit
+   olarak belirir — kaydet düğmesine basmadan önce görür.
+2. *Kaydı Oluştur*'a basınca tam ekran engel ekranı açılır. Uyarı notu büyük punto ve
+   büyük harflerle, sayfanın ortasında durur.
+3. *Yetkili onayı* seviyesinde onaylayan adı girilmeden ve "okudum" kutusu
+   işaretlenmeden onay düğmesi açılmaz.
+4. Onay verilirse kayıt oluşur; **onaylayan kişi, onay notu ve uyarı metni kayda
+   snapshot olarak işlenir.** Uyarı sonradan kaldırılsa bile arşivde durur.
+5. Kural sunucu tarafında da uygulanır: onaysız istek `428`, bloke oyuncu `423` döner.
+   Tarayıcı engeli aşılsa bile kayıt açılamaz.
+
+Uyarılar Yönetim sayfasından tanımlanır, kaldırılır ve geri getirilir. Her oyuncu için
+tek aktif uyarı tutulur; aynı ID'ye yeniden tanımlama yapılırsa mevcut kayıt güncellenir.
+
+## Stok yönetimi (Modül 8)
+
+Her sigara türü bir **stok kartıdır**. Stok Paneli tüm türleri tek ekranda listeler.
+
+- **Otomatik düşüş:** kayıt onaylanıp oluşturulduğunda verilen paket adedi ilgili
+  karttan anında düşer. Düşüş, kayıt ekleme ile **aynı veritabanı işlemi** içindedir —
+  kayıt başarısız olursa stok da düşmez.
+- **Stok yetersizse kayıt açılamaz.** İstenen miktar mevcuttan fazlaysa sunucu `409`
+  döndürür ve hangi türden kaç paket kaldığını bildirir.
+- **İkmal:** yeni koli geldiğinde Stok Paneli'nden mevcut stoğun üzerine eklenir.
+  Sigaracılar da ikmal girebilir.
+- **Sayım düzeltmesi:** fiziksel sayım farkı için stok doğrudan hedef değere ayarlanır.
+- **Kritik uyarı:** stok kritik eşiğin altına düşünce kart kırmızı `KRİTİK`, sıfırlanınca
+  `TÜKENDİ` gösterir. Kayıt sonrası sigaracıya ayrıca bildirim çıkar. Eşik tür başına
+  ayarlanır (varsayılan 5 paket), yönetici tablodan tıklayarak değiştirir.
+- **Hareket geçmişi:** her giriş/çıkış/düzeltme kim tarafından, ne zaman, hangi bakiyeyle
+  yapıldığı ile birlikte `stock_movements` tablosunda tutulur.
+
+> Birim **pakettir**: kayıttaki "adet" alanı kaç paket verildiğini gösterir ve stoktan
+> o kadar düşer.
+
+## Gün sonu raporu (Modül 9)
+
+Yalnızca yöneticiye açıktır. Varsayılan olarak bugünü gösterir; *Dün*, *Son 7 gün*
+düğmeleri veya tarih aralığı ile değiştirilir. *Yazdır* düğmesi sayfayı sade,
+beyaz zeminli bir çıktıya dönüştürür.
+
+Bölümler:
+
+1. **Özet** — toplam işlem, dağıtılan paket, farklı oyuncu, garson, sigaracı, özel onaylı
+2. **Marka bazlı dağıtım** — hangi türden kaç paket, kaç işlem
+3. **Garson bazlı dağılım** — her garsonun dağıttığı paket, işlem ve oyuncu sayısı
+4. **Sigaracı bazlı işlemler** — kim kaç işlem girdi, ilk ve son işlem saati
+5. **Özel onay ile verilenler** — hangi oyuncu, hangi uyarı, **kimin onayıyla**, hangi not
+6. **Kalan stok raporu** — anlık paket sayıları, kritik eşikler ve dönem içi ikmaller
+
+## Responsive davranış
+
+Arayüz mobile-first kurulmuştur; 320 px genişliğe kadar yatay taşma yoktur.
+
+| Genişlik | Gezinme | Tablolar | Özet kartları | Form |
+|---|---|---|---|---|
+| < 640 px | Ekran altında sabit sekme çubuğu | Satırlar karta dönüşür, başlıklar etiket olur | 2 sütun | tek sütun |
+| 640–1023 px | 768 px'den itibaren üstte yatay sekmeler | Normal tablo | 3 sütun | iki sütun |
+| ≥ 1024 px | Üstte yatay sekmeler | Normal tablo | 6 sütun | iki sütun |
+
+Ayrıntılar:
+
+- **Dokunma hedefleri** en az 44 px yüksekliğinde (WCAG 2.5.5).
+- **Form alanları 16 px** yazı boyutunda — daha küçük değerler iOS Safari'de
+  odaklanınca sayfayı otomatik yakınlaştırır.
+- **Geri sayım sayacı** `clamp()` ile ekran genişliğine göre 26–34 px arasında ölçeklenir.
+- Üst bar ve gezinme tek bir yapışkan sarmalayıcıdadır; sayfa kaydırılınca birbirine girmez.
+- Bildirimler telefonda alt sekme çubuğunun üstünde, masaüstünde sağ altta belirir.
+- iPhone çentik/alt çubuk alanı `env(safe-area-inset-*)` ile hesaba katılır.
+- `prefers-reduced-motion` tercihi olan kullanıcılarda animasyonlar kapanır.
+
+
+## Veritabanı şeması
+
+| Tablo | Amaç |
+|---|---|
+| `users` | Sigaracılar ve yöneticiler (bcrypt şifre) |
+| `waiters` | Önceden tanımlı garsonlar — form dropdown kaynağı |
+| `cigarette_types` | Sigara türleri — form dropdown kaynağı |
+| `records` | Dağıtım arşivi (onay bilgisi snapshot'ı dahil) |
+| `player_flags` | Oyuncu bazlı özel uyarı / onay / bloke tanımları |
+| `stock_movements` | Her stok hareketi (ikmal, çıkış, düzeltme) |
+
+`records` tablosunda garson adı ve sigaracı kullanıcı adı **snapshot** olarak da
+tutulur: bir garson sonradan pasife alınsa veya adı değişse bile geçmiş kayıtlar bozulmaz.
+
+Zaman damgaları ISO-8601 UTC (`2026-08-23T15:04:05.123Z`) saklanır. Bu format hem
+kronolojik hem sözlüksel sıralandığı için tarih aralığı filtresi doğrudan
+`created_at BETWEEN ?` ile çalışır. Arayüz saatleri kullanıcının yerel saat dilimine çevirir.
+
+## API
+
+Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
+
+| Metot | Uç | Açıklama |
+|---|---|---|
+| `POST` | `/api/auth/login` | Giriş |
+| `POST` | `/api/auth/logout` | Çıkış |
+| `GET` | `/api/auth/me` | Oturumdaki kullanıcı |
+| `GET` | `/api/config` | Kural süresi + sunucu saati |
+| `GET` | `/api/waiters` | Garson listesi (dropdown) |
+| `POST` | `/api/waiters` | Garson ekle *(admin)* |
+| `PATCH` | `/api/waiters/:id` | Garson aktif/pasif *(admin)* |
+| `GET` | `/api/cigarette-types` | Sigara türleri |
+| `PATCH` | `/api/cigarette-types/:id` | Tür aktif/pasif *(admin)* |
+| `GET` | `/api/users` | Yöneticiye tam liste, diğerlerine yalnızca adlar |
+| `POST` | `/api/users` | Hesap oluştur *(admin)* |
+| `PATCH` | `/api/users/:id` | Aktif/pasif, şifre sıfırlama, rol *(admin)* |
+| `GET` | `/api/flags` | Tanımlı oyuncu uyarıları |
+| `GET` | `/api/flags/:playerId` | Tek oyuncunun uyarısı |
+| `POST` | `/api/flags` | Uyarı tanımla / güncelle *(admin)* |
+| `PATCH` | `/api/flags/:id` | Uyarıyı kaldır / geri getir *(admin)* |
+| `GET` | `/api/stock` | Stok kartları + özet |
+| `GET` | `/api/stock/movements` | Son stok hareketleri |
+| `POST` | `/api/stock/add` | İkmal (stok ekleme) |
+| `POST` | `/api/stock/set` | Sayım düzeltmesi |
+| `PATCH` | `/api/stock/:id/critical` | Kritik eşik *(admin)* |
+| `GET` | `/api/reports/daily?from=&to=` | Gün sonu raporu *(admin)* |
+| `POST` | `/api/cigarette-types` | Tür ekle *(admin)* |
+| `GET` | `/api/records/check?playerId=X` | **4 saat kontrolü** — kalan süre, son alım |
+| `POST` | `/api/records` | Yeni kayıt (kural ihlalinde `409`) |
+| `GET` | `/api/records` | Filtreli arşiv + sayfalama |
+| `GET` | `/api/records/stats` | Panel özet kartları |
+
+### Arşiv filtre parametreleri
+
+`playerId` (kısmi arama), `waiter`, `type`, `user`, `from`, `to` (ISO tarih-saat),
+`page`, `pageSize` (varsayılan 50, en fazla 500).
+
+### `/api/records/check` yanıtı
+
+```json
+{
+  "ok": true,
+  "status": {
+    "playerId": "1247",
+    "allowed": false,
+    "firstTime": false,
+    "remainingMs": 14382738,
+    "lastAt": "2026-08-23T15:15:23.328Z",
+    "nextAvailableAt": "2026-08-23T19:15:23.328Z",
+    "lastRecord": { "cigarette_type": "Marlboro Kirmizi", "quantity": 2, "waiter_name": "Furkan", "username": "sigaraci1" },
+    "totalRecords": 1,
+    "cooldownHours": 4,
+    "serverTime": "2026-08-23T15:15:40.590Z"
+  }
+}
+```
+
+## 4 saat kuralı nasıl işliyor?
+
+1. Sigaracı **Oyuncu ID** alanına yazdıkça, 350 ms gecikmeyle (debounce)
+   `GET /api/records/check` çağrılır.
+2. Süre dolmadıysa **kırmızı gösterge** çıkar, `03:57:12` biçiminde **canlı geri sayım**
+   ve ilerleme çubuğu döner, kayıt butonu kilitlenir. Son alımın türü, adedi, garsonu ve
+   kaydı yapan sigaracı da gösterilir.
+3. Süre dolduysa veya ID ilk kez alıyorsa **yeşil onay** çıkar, buton açılır.
+4. Geri sayım sıfırlandığı anda sunucuya yeniden sorulur — arada başka bir sigaracı
+   kayıt açmış olabilir.
+5. Kayıt gönderilirken sunucu kuralı **tekrar** doğrular; ihlal varsa `409` döner.
+   Yani tarayıcı tarafındaki engel atlansa bile kural korunur.
+
+Geri sayım, sunucudan gelen `remainingMs` üzerinden yerel saat eksenine çevrilir;
+böylece istemci ile sunucu saatleri arasındaki fark sayacı bozmaz.
+
+## Sorun giderme
+
+**`Failed to fetch` / ekranda hiçbir veri yok** — bu bir veritabanı arızası değil,
+tarayıcı sunucuya hiç ulaşamıyor demektir. İki nedeni olur:
+
+1. **Sunucu kapalı.** Terminalde `npm start` çalışır durumda olmalı; pencereyi kapatmak
+   veya `Ctrl+C` sunucuyu durdurur. Uygulama artık bu durumda "Sunucuya ulaşılamıyor"
+   uyarısı ve *Yeniden dene* düğmesi gösterir.
+2. **Sayfa dosyadan açıldı.** `kayit.html` dosyasına çift tıklarsanız adres çubuğunda
+   `file:///...` yazar ve hiçbir API çağrısı çalışmaz. Her zaman `npm start` çalıştırıp
+   tarayıcıdan `http://localhost:3000` adresine gidin. (Bu durumda da açıklayıcı bir
+   uyarı ekranı çıkar.)
+
+**`EADDRINUSE: address already in use :::3000`** — 3000 portunda zaten bir sunucu var.
+Genellikle uygulama başka bir pencerede açık kalmıştır; önce `http://localhost:3000`
+adresini deneyin. Kapatmak için:
+
+```bash
+netstat -ano | findstr :3000
+```
+
+Çıktının son sütunundaki PID ile:
+
+```bash
+taskkill /F /PID 13960
+```
+
+Alternatif olarak `.env` dosyasına `PORT=3001` yazıp farklı portta çalıştırabilirsiniz.
+
+## Notlar
+
+- Oyuncu ID'leri kaydedilirken kırpılır ve büyük harfe çevrilir; `" 1247 "` ile `"1247"`
+  aynı oyuncu sayılır.
+- Oturumlar `data/sessions.db` içinde saklanır, sunucu yeniden başlayınca düşmez.
+  Çerez ömrü 12 saat (bir vardiya).
+- Kullanıcı verisi arayüze basılırken kaçışlanır (XSS koruması).
