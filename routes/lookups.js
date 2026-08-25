@@ -52,6 +52,20 @@ router.get('/cigarette-types', asyncHandler((req, res) => {
   res.json({ ok: true, types: rows });
 }));
 
+/** DELETE /api/waiters/:id - garsonu tamamen sil (admin).
+ *  Gecmis kayitlar bozulmaz: records.waiter_name snapshot olarak tutulur,
+ *  waiter_id ise ON DELETE SET NULL ile bosaltilir. */
+router.delete('/waiters/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const garson = db.prepare('SELECT name FROM waiters WHERE id = ?').get(id);
+  if (!garson) return res.status(404).json({ ok: false, error: 'Garson bulunamadi.' });
+
+  const kayit = db.prepare('SELECT COUNT(*) c FROM records WHERE waiter_id = ?').get(id).c;
+  db.prepare('DELETE FROM waiters WHERE id = ?').run(id);
+
+  res.json({ ok: true, deleted: garson.name, affectedRecords: kayit });
+}));
+
 /** GET /api/cigarette-types?all=1 - pasifler dahil (yonetim ekrani) */
 const listAllTypes = db.prepare('SELECT id, name, is_active FROM cigarette_types ORDER BY is_active DESC, name COLLATE NOCASE');
 
@@ -77,6 +91,19 @@ router.post('/cigarette-types', requireAdmin, asyncHandler((req, res) => {
     }
     throw err;
   }
+}));
+
+/** DELETE /api/cigarette-types/:id - sigara turunu sil (admin).
+ *  Stok karti ve hareket gecmisindeki bagi da kopar; arsivdeki tur adi kalir. */
+router.delete('/cigarette-types/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const tur = db.prepare('SELECT name, stock FROM cigarette_types WHERE id = ?').get(id);
+  if (!tur) return res.status(404).json({ ok: false, error: 'Sigara turu bulunamadi.' });
+
+  const kayit = db.prepare('SELECT COUNT(*) c FROM records WHERE cigarette_type_id = ?').get(id).c;
+  db.prepare('DELETE FROM cigarette_types WHERE id = ?').run(id);
+
+  res.json({ ok: true, deleted: tur.name, lostStock: tur.stock, affectedRecords: kayit });
 }));
 
 module.exports = router;

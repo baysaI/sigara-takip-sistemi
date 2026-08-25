@@ -14,6 +14,12 @@ let waiterAC = null;
 const refilter = () => { state.page = 1; loadArchive(); };
 
 App.ready(async () => {
+  // Yonetici satir basina silme yapabilir; basligi ona gore ekle
+  if (App.user.role === 'admin') {
+    document.querySelector('#archiveBody')
+      .closest('table').querySelector('thead tr')
+      .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
+  }
   await loadFilterOptions();
   await loadArchive();
   bindEvents();
@@ -63,7 +69,7 @@ async function loadArchive() {
     const data = await API.get('/api/records', currentFilters());
     renderArchive(data);
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="7" class="empty">Arşiv yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty">Arşiv yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -71,7 +77,7 @@ function renderArchive({ records, pagination, summary }) {
   const body = $('archiveBody');
 
   if (!records.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty">Bu filtrelerle kayıt bulunamadı.</td></tr>';
+    body.innerHTML = `<tr><td colspan="${App.user.role === 'admin' ? 8 : 7}" class="empty">Bu filtrelerle kayıt bulunamadı.</td></tr>`;
   } else {
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
     body.innerHTML = records.map((r) => `
@@ -87,7 +93,17 @@ function renderArchive({ records, pagination, summary }) {
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
         <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
+        ${App.user.role === 'admin' ? `
+        <td data-label="İşlem">
+          <button class="btn-danger btn-sm" data-del="${r.id}"
+                  data-ozet="${esc(r.player_id)} — ${esc(r.cigarette_type)} ×${r.quantity}">Sil</button>
+        </td>` : ''}
       </tr>`).join('');
+
+    if (App.user.role === 'admin') {
+      body.querySelectorAll('[data-del]').forEach((btn) =>
+        btn.addEventListener('click', () => silKayit(btn.dataset.del, btn.dataset.ozet)));
+    }
   }
 
   $('archiveCount').textContent = `${summary.total} kayıt · ${summary.totalQuantity} adet`;
@@ -96,6 +112,27 @@ function renderArchive({ records, pagination, summary }) {
   $('prevPage').disabled = pagination.page <= 1;
   $('nextPage').disabled = pagination.page >= pagination.totalPages;
   state.page = pagination.page;
+}
+
+/** Tek kaydi siler. Varsayilan olarak stok iade edilir. */
+async function silKayit(id, ozet) {
+  const onay = await confirmDelete({
+    title: 'Kaydı sil',
+    body: `<b>${esc(ozet)}</b> kaydı arşivden silinecek.<br />
+           Verilen paketler <b>stoğa geri eklenir</b> ve bu bir düzeltme hareketi olarak loglanır.`
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.request(`/api/records/${id}`, { method: 'DELETE' });
+    await loadArchive();
+    toast(
+      r.restocked
+        ? `Kayıt silindi. ${r.restocked.type} stoğu ${r.restocked.balance} pakete çıktı.`
+        : 'Kayıt silindi.',
+      'success'
+    );
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 function bindEvents() {

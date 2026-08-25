@@ -77,7 +77,8 @@ sigara/
 │   ├── users.js           /api/users — hesap yönetimi
 │   ├── flags.js           /api/flags — oyuncu uyarıları
 │   ├── stock.js           /api/stock — stok paneli
-│   └── reports.js         /api/reports — gün sonu raporu
+│   ├── reports.js         /api/reports — gün sonu raporu
+│   └── admin.js           /api/admin — toplu silme / sıfırlama
 │   └── records.js         /api/records/*
 ├── public/
 │   ├── login.html         Giriş
@@ -92,6 +93,7 @@ sigara/
 │       ├── api.js         Fetch sarmalayıcı, biçimleyiciler, toast
 │       ├── autocomplete.js Uzun listeler için yazarak seçim bileşeni
 │       ├── approval.js    Modül 7 — engel / onay ekranı
+│       ├── danger.js      Silme ve sıfırlama onay pencereleri
 │       ├── layout.js      Ortak kabuk: üst bar, gezinme, oturum
 │       ├── login.js  kayit.js  arsiv.js  sorgu.js  yonetim.js
 └── data/                  SQLite dosyaları (git'e girmez)
@@ -144,8 +146,9 @@ Kalıcı bir başlangıç kadrosu isterseniz [db/seed.js](db/seed.js) içindeki
 `DEFAULT_WAITERS` dizisine adları yazın; `npm run seed` çalıştırıldığında eklenirler.
 Dizi varsayılan olarak boştur.
 
-Bir garson işten ayrılırsa **pasife alın** — silmeyin. Pasif garson kayıt formunda
-görünmez ama geçmiş kayıtları olduğu gibi kalır (kayıtlarda ad snapshot olarak tutulur).
+Bir garson işten ayrılırsa **Sil** düğmesiyle listeden kaldırın. Geçmiş kayıtlar
+bozulmaz — kayıtlarda garson adı snapshot olarak tutulduğu için arşivde görünmeye
+devam eder.
 
 ### Garson veya tür tanımlı değilken
 
@@ -271,6 +274,55 @@ Bölümler:
 5. **Özel onay ile verilenler** — hangi oyuncu, hangi uyarı, **kimin onayıyla**, hangi not
 6. **Kalan stok raporu** — anlık paket sayıları, kritik eşikler ve dönem içi ikmaller
 
+## Veri silme ve sıfırlama
+
+Yönetici her veriyi silebilir. **Silme geri alınamaz**, bu yüzden her yıkıcı işlem
+onay ister.
+
+### Tek tek silme
+
+| Nerede | Ne silinir | Sonuç |
+|---|---|---|
+| Yönetim → Garsonlar | Garson | Geçmiş kayıtlarda adı kalır |
+| Yönetim → Sigara Türleri | Tür | **Stok kartı ve kalan paketler de gider**; arşivde tür adı kalır |
+| Yönetim → Sigaracı Hesapları | Hesap | Kişi bir daha giremez; açtığı kayıtlar arşivde adıyla kalır |
+| Yönetim → Oyuncu Uyarıları | Uyarı | Tamamen silinir |
+| Arşiv → satır sonundaki **Sil** | Tek kayıt | **Verilen paketler stoğa geri eklenir** (düzeltme hareketi olarak loglanır) |
+
+Her birinde ne olacağını anlatan bir onay penceresi çıkar.
+
+### Toplu sıfırlama
+
+Yönetim sayfasının altındaki **Veri Sıfırlama** bölümü hangi veriden kaç kayıt
+olduğunu gösterir ve iki düğme sunar:
+
+- **Seçerek Sil** — hangi kapsamların silineceğini siz işaretlersiniz
+- **Her Şeyi Sıfırla** — tüm kapsamlar baştan işaretli gelir
+
+Kapsamlar: kayıt arşivi, stok hareket geçmişi, stok sayaçları, oyuncu uyarıları,
+garsonlar, sigara türleri, diğer hesaplar.
+
+Onay penceresinde **`SIFIRLA`** kelimesini yazmadan silme düğmesi açılmaz. Sunucu da
+aynı kelimeyi ister (`428` döner) — yani yanlışlıkla yapılan bir API çağrısı veri silemez.
+
+### Korumalar
+
+- Tüm silme uçları yalnızca **yöneticiye** açıktır (sigaracı denerse `403`)
+- **Kendi hesabınızı** silemez veya pasife alamazsınız
+- **Son aktif yönetici** silinemez — sistem yöneticisiz kalamaz
+- Sıfırlamada kendi hesabınız her zaman korunur
+
+### Yedek alma
+
+Silmeden önce sunucudaki veritabanını kopyalayın:
+
+```bash
+copy data\sigara.db data\yedek-sigara.db
+```
+
+Geri yüklemek için uygulamayı durdurup dosyayı geri kopyalayın (`.db-wal` ve `.db-shm`
+dosyalarını silin).
+
 ## Responsive davranış
 
 Arayüz mobile-first kurulmuştur; 320 px genişliğe kadar yatay taşma yoktur.
@@ -329,6 +381,13 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/users` | Yöneticiye tam liste, diğerlerine yalnızca adlar |
 | `POST` | `/api/users` | Hesap oluştur *(admin)* |
 | `PATCH` | `/api/users/:id` | Aktif/pasif, şifre sıfırlama, rol *(admin)* |
+| `DELETE` | `/api/users/:id` | Hesabı sil *(admin)* |
+| `DELETE` | `/api/waiters/:id` | Garsonu sil *(admin)* |
+| `DELETE` | `/api/cigarette-types/:id` | Türü sil *(admin)* |
+| `DELETE` | `/api/flags/:id` | Uyarıyı sil *(admin)* |
+| `DELETE` | `/api/records/:id` | Kaydı sil, stoğu iade et *(admin)* |
+| `GET` | `/api/admin/overview` | Hangi veriden kaç kayıt var *(admin)* |
+| `POST` | `/api/admin/reset` | Toplu sıfırlama, `confirm: "SIFIRLA"` *(admin)* |
 | `GET` | `/api/flags` | Tanımlı oyuncu uyarıları |
 | `GET` | `/api/flags/:playerId` | Tek oyuncunun uyarısı |
 | `POST` | `/api/flags` | Uyarı tanımla / güncelle *(admin)* |

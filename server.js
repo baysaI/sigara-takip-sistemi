@@ -16,6 +16,7 @@ const userRoutes = require('./routes/users');
 const flagRoutes = require('./routes/flags');
 const stockRoutes = require('./routes/stock');
 const reportRoutes = require('./routes/reports');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +80,7 @@ app.use('/api/records', recordRoutes);
 app.use('/api/flags', flagRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
 
 
 /* --------------------------- Hata yakalama -------------------------- */

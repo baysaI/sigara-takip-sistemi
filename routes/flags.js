@@ -72,4 +72,14 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true });
 }));
 
+/** DELETE /api/flags/:id - uyari kaydini tamamen sil (admin) */
+router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const flag = db.prepare('SELECT player_id FROM player_flags WHERE id = ?').get(id);
+  if (!flag) return res.status(404).json({ ok: false, error: 'Uyari kaydi bulunamadi.' });
+
+  db.prepare('DELETE FROM player_flags WHERE id = ?').run(id);
+  res.json({ ok: true, deleted: flag.player_id });
+}));
+
 module.exports = router;

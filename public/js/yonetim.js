@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 App.ready(async () => {
   if (App.user.role !== 'admin') return showDenied();
 
-  await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadFlags()]);
+  await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadFlags(), loadOverview()]);
   bindEvents();
 });
 
@@ -91,23 +91,31 @@ async function loadWaiters() {
           <span class="pill ${w.is_active ? 'free' : 'locked'}">${w.is_active ? 'AKTİF' : 'PASİF'}</span>
         </td>
         <td data-label="İşlem">
-          <button class="btn-ghost btn-sm" data-waiter="${w.id}" data-active="${w.is_active ? 0 : 1}">
-            ${w.is_active ? 'Pasife al' : 'Aktifleştir'}
-          </button>
+          <button class="btn-danger btn-sm" data-waiter-del="${w.id}" data-name="${esc(w.name)}">Sil</button>
         </td>
       </tr>`).join('');
 
-    body.querySelectorAll('[data-waiter]').forEach((btn) =>
-      btn.addEventListener('click', async () => {
-        try {
-          await API.patch(`/api/waiters/${btn.dataset.waiter}`, { is_active: btn.dataset.active === '1' });
-          await loadWaiters();
-          toast(btn.dataset.active === '1' ? 'Garson aktifleştirildi.' : 'Garson pasife alındı.', 'success');
-        } catch (err) { toast(err.message, 'error'); }
-      }));
+    body.querySelectorAll('[data-waiter-del]').forEach((btn) =>
+      btn.addEventListener('click', () => silGarson(btn.dataset.waiterDel, btn.dataset.name)));
   } catch (err) {
     body.innerHTML = `<tr><td colspan="3" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
+}
+
+/** Garsonu tamamen siler. Gecmis kayitlarda adi snapshot olarak kalir. */
+async function silGarson(id, ad) {
+  const onay = await confirmDelete({
+    title: 'Garsonu sil',
+    body: `<b>${esc(ad)}</b> garson listesinden tamamen silinecek.<br />
+           Geçmiş kayıtlarda adı görünmeye devam eder, arşiv bozulmaz.`
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.request(`/api/waiters/${id}`, { method: 'DELETE' });
+    await Promise.all([loadWaiters(), loadOverview()]);
+    toast(`${r.deleted} silindi.`, 'success');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function addWaiter() {
@@ -160,6 +168,7 @@ async function loadTypes() {
           <button class="btn-ghost btn-sm" data-type="${t.id}" data-active="${t.is_active ? 0 : 1}">
             ${t.is_active ? 'Pasife al' : 'Aktifleştir'}
           </button>
+          <button class="btn-danger btn-sm" data-type-del="${t.id}" data-name="${esc(t.name)}">Sil</button>
         </td>
       </tr>`).join('');
 
@@ -171,9 +180,27 @@ async function loadTypes() {
           toast(btn.dataset.active === '1' ? 'Tür aktifleştirildi.' : 'Tür pasife alındı.', 'success');
         } catch (err) { toast(err.message, 'error'); }
       }));
+    body.querySelectorAll('[data-type-del]').forEach((btn) =>
+      btn.addEventListener('click', () => silTur(btn.dataset.typeDel, btn.dataset.name)));
   } catch (err) {
     body.innerHTML = `<tr><td colspan="3" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
+}
+
+/** Sigara turunu siler - stok karti da gider. */
+async function silTur(id, ad) {
+  const onay = await confirmDelete({
+    title: 'Sigara türünü sil',
+    body: `<b>${esc(ad)}</b> silinecek. <b>Stok kartı ve kalan paket sayısı da gider.</b><br />
+           Geçmiş kayıtlarda tür adı görünmeye devam eder.`
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.request(`/api/cigarette-types/${id}`, { method: 'DELETE' });
+    await Promise.all([loadTypes(), loadOverview()]);
+    toast(`${r.deleted} silindi.`, 'success');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function addType() {
@@ -224,7 +251,8 @@ async function loadUsers() {
           ${kendisi ? '' : `
             <button class="btn-ghost btn-sm" data-user="${u.id}" data-active="${u.is_active ? 0 : 1}">
               ${u.is_active ? 'Pasife al' : 'Aktifleştir'}
-            </button>`}
+            </button>
+            <button class="btn-danger btn-sm" data-user-del="${u.id}" data-name="${esc(u.username)}">Sil</button>`}
         </td>
       </tr>`;
     }).join('');
@@ -240,9 +268,28 @@ async function loadUsers() {
 
     body.querySelectorAll('[data-pw]').forEach((btn) =>
       btn.addEventListener('click', () => showPasswordReset(btn)));
+
+    body.querySelectorAll('[data-user-del]').forEach((btn) =>
+      btn.addEventListener('click', () => silKullanici(btn.dataset.userDel, btn.dataset.name)));
   } catch (err) {
     body.innerHTML = `<tr><td colspan="5" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
+}
+
+/** Hesabi tamamen siler. Gecmis kayitlarda kullanici adi snapshot olarak kalir. */
+async function silKullanici(id, ad) {
+  const onay = await confirmDelete({
+    title: 'Hesabı sil',
+    body: `<b>${esc(ad)}</b> hesabı tamamen silinecek ve bir daha giriş yapamayacak.<br />
+           Bu kişinin açtığı kayıtlar arşivde adıyla kalır.`
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.request(`/api/users/${id}`, { method: 'DELETE' });
+    await Promise.all([loadUsers(), loadOverview()]);
+    toast(`${r.deleted} hesabı silindi.`, 'success');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 /** Satirin altinda kucuk bir sifre sifirlama formu acar. */
@@ -342,6 +389,7 @@ async function loadFlags() {
           <button class="btn-ghost btn-sm" data-flag="${f.id}" data-active="${f.is_active ? 0 : 1}">
             ${f.is_active ? 'Kaldır' : 'Geri getir'}
           </button>
+          <button class="btn-danger btn-sm" data-flag-del="${f.id}" data-name="${esc(f.player_id)}">Sil</button>
         </td>
       </tr>`).join('');
 
@@ -353,9 +401,24 @@ async function loadFlags() {
           toast(btn.dataset.active === '1' ? 'Uyarı geri getirildi.' : 'Uyarı kaldırıldı.', 'success');
         } catch (err) { toast(err.message, 'error'); }
       }));
+    body.querySelectorAll('[data-flag-del]').forEach((btn) =>
+      btn.addEventListener('click', () => silUyari(btn.dataset.flagDel, btn.dataset.name)));
   } catch (err) {
     body.innerHTML = `<tr><td colspan="5" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
+}
+
+async function silUyari(id, oyuncu) {
+  const onay = await confirmDelete({
+    title: 'Uyarıyı sil',
+    body: `<b>${esc(oyuncu)}</b> için tanımlı uyarı kaydı tamamen silinecek.`
+  });
+  if (!onay) return;
+  try {
+    await API.request(`/api/flags/${id}`, { method: 'DELETE' });
+    await Promise.all([loadFlags(), loadOverview()]);
+    toast('Uyarı silindi.', 'success');
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function addFlag() {
@@ -391,9 +454,61 @@ function bindEvents() {
 
   $('addUserBtn').addEventListener('click', addUser);
   $('addFlagBtn').addEventListener('click', addFlag);
+
+  // Tehlikeli bolge
+  $('resetPickBtn')?.addEventListener('click', () => runReset([]));
+  $('resetAllBtn')?.addEventListener('click', () => runReset(resetScopes.map((s) => s.key)));
   $('newPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') addUser(); });
 
   $('showPassword').addEventListener('change', (e) => {
     $('newPassword').type = e.target.checked ? 'text' : 'password';
   });
+}
+
+/* ============================================================
+   VERI SIFIRLAMA (tehlikeli bolge)
+   ============================================================ */
+let resetScopes = [];
+let resetWord = 'SIFIRLA';
+
+/** Hangi veriden kac kayit var — sifirlama karti icin. */
+async function loadOverview() {
+  const body = $('overviewBody');
+  if (!body) return;
+
+  try {
+    const { scopes, confirmWord, dbSize } = await API.get('/api/admin/overview');
+    resetScopes = scopes;
+    resetWord = confirmWord;
+
+    $('dbSize').textContent = `veritabanı ${Math.round(dbSize / 1024)} KB`;
+    body.innerHTML = scopes.map((s) => `
+      <tr>
+        <td data-label="Veri">${esc(s.label)}</td>
+        <td data-label="Kayıt">
+          <span class="pill ${s.count ? 'player' : ''}">${s.count}</span>
+        </td>
+      </tr>`).join('');
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="2" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+/** Sifirlama penceresini acar; preselect ile bastan isaretli gelir. */
+async function runReset(preselect) {
+  const secim = await confirmReset(resetScopes, resetWord, preselect);
+  if (!secim) return;
+
+  try {
+    const r = await API.post('/api/admin/reset', secim);
+    const ozet = Object.values(r.result)
+      .filter((x) => x.deleted > 0)
+      .map((x) => `${x.label}: ${x.deleted}`)
+      .join(' · ');
+
+    await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadFlags(), loadOverview()]);
+    toast(ozet ? `Silindi — ${ozet}` : 'Silinecek kayıt bulunamadı.', 'success', 7000);
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+  }
 }

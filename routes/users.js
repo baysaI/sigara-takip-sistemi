@@ -127,4 +127,25 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true, user: byId.get(id) });
 }));
 
+/** DELETE /api/users/:id - hesabi tamamen sil (admin).
+ *  Kendi hesabini ve son aktif yoneticiyi silmek engellidir.
+ *  Gecmis kayitlarda username snapshot olarak kalir. */
+router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const user = byId.get(id);
+  if (!user) return res.status(404).json({ ok: false, error: 'Kullanici bulunamadi.' });
+
+  if (id === req.session.user.id) {
+    return res.status(400).json({ ok: false, error: 'Kendi hesabinizi silemezsiniz.' });
+  }
+  if (user.role === 'admin' && activeAdminCount(id) === 0) {
+    return res.status(400).json({ ok: false, error: 'Sistemde en az bir aktif yonetici kalmalidir.' });
+  }
+
+  const kayit = db.prepare('SELECT COUNT(*) c FROM records WHERE user_id = ?').get(id).c;
+  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+
+  res.json({ ok: true, deleted: user.username, affectedRecords: kayit });
+}));
+
 module.exports = router;

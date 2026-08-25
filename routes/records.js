@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, asyncHandler } = require('../middleware/auth');
+const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
 const { getCooldownStatus, normalizePlayerId } = require('../services/cooldown');
 const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
@@ -297,6 +297,47 @@ router.get('/stats', asyncHandler((req, res) => {
       topWaiter: topWaiter ? `${topWaiter.waiter_name} (${topWaiter.c})` : '-',
       allTime: db.prepare('SELECT COUNT(*) AS c FROM records').get().c
     }
+  });
+}));
+
+/* ------------------------------------------------------------------ */
+/* DELETE /api/records/:id - kaydi sil (admin)                         */
+/* Varsayilan olarak stok iade edilir: yanlis girilen kayit silinince  */
+/* sigara da verilmemis sayilir. ?restock=0 ile iade kapatilabilir.    */
+/* ------------------------------------------------------------------ */
+router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const record = recordByIdStmt.get(id);
+  if (!record) return res.status(404).json({ ok: false, error: 'Kayit bulunamadi.' });
+
+  const iade = req.query.restock !== '0';
+  let stokSonuc = null;
+
+  const sil = db.transaction(() => {
+    // Kayda bagli stok hareketinin bagi kopar (kayit gecmisi bozulmasin)
+    db.prepare('UPDATE stock_movements SET record_id = NULL WHERE record_id = ?').run(id);
+    db.prepare('DELETE FROM records WHERE id = ?').run(id);
+
+    if (iade && record.cigarette_type_id) {
+      const tur = db.prepare('SELECT id FROM cigarette_types WHERE id = ?').get(record.cigarette_type_id);
+      if (tur) {
+        stokSonuc = applyMovement({
+          typeId: record.cigarette_type_id,
+          delta: record.quantity,
+          reason: 'duzeltme',
+          note: `Kayit silindi (#${id}, ${record.player_id}) — stok iadesi`,
+          user: req.session.user
+        });
+      }
+    }
+  });
+
+  sil();
+
+  res.json({
+    ok: true,
+    deleted: { id, player_id: record.player_id, quantity: record.quantity },
+    restocked: stokSonuc ? { type: stokSonuc.type.name, balance: stokSonuc.balanceAfter } : null
   });
 }));
 
