@@ -150,6 +150,8 @@ Bir garson işten ayrılırsa **Sil** düğmesiyle listeden kaldırın. Geçmiş
 bozulmaz — kayıtlarda garson adı snapshot olarak tutulduğu için arşivde görünmeye
 devam eder.
 
+Garsonlarda aktif/pasif ayrımı yoktur; listede olan herkes kayıt formunda seçilebilir.
+
 ### Garson veya tür tanımlı değilken
 
 Hızlı Kayıt sayfasında ilgili alan devre dışı kalır ve 4 saat kuralı uygun olsa bile

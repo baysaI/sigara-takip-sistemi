@@ -72,12 +72,10 @@ async function loadWaiters() {
   const body = $('waiterBody');
   try {
     const { waiters } = await API.get('/api/waiters', { all: '1' });
-    $('waiterCount').textContent = waiters.length
-      ? `${waiters.filter((w) => w.is_active).length} aktif / ${waiters.length} toplam`
-      : 'boş';
+    $('waiterCount').textContent = waiters.length ? `${waiters.length} garson` : 'boş';
 
     if (!waiters.length) {
-      body.innerHTML = `<tr><td colspan="3" class="empty">
+      body.innerHTML = `<tr><td colspan="2" class="empty">
         Henüz garson eklenmemiş.<br />
         <span class="muted">Yukarıdaki alandan tek tek, ya da toplu ekleme ile oluşturun.</span>
       </td></tr>`;
@@ -87,9 +85,6 @@ async function loadWaiters() {
     body.innerHTML = waiters.map((w) => `
       <tr>
         <td data-label="Garson"><b>${esc(w.name)}</b></td>
-        <td data-label="Durum">
-          <span class="pill ${w.is_active ? 'free' : 'locked'}">${w.is_active ? 'AKTİF' : 'PASİF'}</span>
-        </td>
         <td data-label="İşlem">
           <button class="btn-danger btn-sm" data-waiter-del="${w.id}" data-name="${esc(w.name)}">Sil</button>
         </td>
@@ -98,7 +93,7 @@ async function loadWaiters() {
     body.querySelectorAll('[data-waiter-del]').forEach((btn) =>
       btn.addEventListener('click', () => silGarson(btn.dataset.waiterDel, btn.dataset.name)));
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="3" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="2" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 

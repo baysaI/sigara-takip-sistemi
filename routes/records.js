@@ -11,7 +11,7 @@ const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, COOLDOWN_HOURS } = require('../config'
 const router = express.Router();
 router.use(requireAuth);
 
-const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ? AND is_active = 1');
+const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
 
 const insertRecordStmt = db.prepare(`
   INSERT INTO records
@@ -67,7 +67,7 @@ router.post('/', asyncHandler((req, res) => {
 
   const waiter = waiterByIdStmt.get(waiterId);
   if (!waiter) {
-    return res.status(400).json({ ok: false, error: 'Secilen garson gecersiz veya pasif durumda.' });
+    return res.status(400).json({ ok: false, error: 'Secilen garson bulunamadi.' });
   }
 
   /* --- 4 SAAT KURALI ---

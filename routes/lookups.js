@@ -10,8 +10,10 @@ const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth'
 const router = express.Router();
 router.use(requireAuth);
 
-const listWaiters = db.prepare('SELECT id, name, is_active FROM waiters WHERE is_active = 1 ORDER BY name COLLATE NOCASE');
-const listAllWaiters = db.prepare('SELECT id, name, is_active FROM waiters ORDER BY is_active DESC, name COLLATE NOCASE');
+// Garsonlarda aktif/pasif ayrimi yoktur: ayrilan garson silinir.
+// (is_active sutunu eski kurulumlarla uyum icin duruyor, filtrelenmez.)
+const listWaiters = db.prepare('SELECT id, name, is_active FROM waiters ORDER BY name COLLATE NOCASE');
+const listAllWaiters = listWaiters;
 const listTypes = db.prepare('SELECT id, name FROM cigarette_types WHERE is_active = 1 ORDER BY name COLLATE NOCASE');
 
 /** GET /api/waiters  (?all=1 -> pasifler de gelir, admin ekrani icin) */
