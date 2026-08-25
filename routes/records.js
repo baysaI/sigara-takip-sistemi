@@ -16,10 +16,12 @@ const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ? AND
 const insertRecordStmt = db.prepare(`
   INSERT INTO records
     (player_id, cigarette_type, cigarette_type_id, quantity, waiter_id, waiter_name,
-     user_id, username, info, created_at, flag_level, flag_note, approved_by, approval_note)
+     user_id, username, info, created_at, flag_level, flag_note, approved_by, approval_note,
+     early_release, early_remaining_ms, early_approved_by, early_note)
   VALUES
     (@player_id, @cigarette_type, @cigarette_type_id, @quantity, @waiter_id, @waiter_name,
-     @user_id, @username, @info, @created_at, @flag_level, @flag_note, @approved_by, @approval_note)
+     @user_id, @username, @info, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
+     @early_release, @early_remaining_ms, @early_approved_by, @early_note)
 `);
 
 const recordByIdStmt = db.prepare('SELECT * FROM records WHERE id = ?');
@@ -68,14 +70,43 @@ router.post('/', asyncHandler((req, res) => {
     return res.status(400).json({ ok: false, error: 'Secilen garson gecersiz veya pasif durumda.' });
   }
 
-  // --- 4 SAAT KURALI: sunucu tarafi son soz ---
+  /* --- 4 SAAT KURALI ---
+     Sure dolmadiysa kayit dogrudan reddedilmez: yuksek oynama miktariyla
+     hak kazanan oyuncular icin yetkili onayiyla erken alim yapilabilir.
+     Onay yoksa 409, onaylayan adi eksikse 428 doner. */
   const status = getCooldownStatus(playerId);
+  let early = null;
+
   if (!status.allowed) {
-    return res.status(409).json({
-      ok: false,
-      error: `${playerId} icin ${COOLDOWN_HOURS} saat kurali dolmadi.`,
-      status
-    });
+    const onaylandi = req.body.early_approved === true;
+    const onaylayan = String(req.body.early_approved_by || '').trim();
+
+    if (!onaylandi) {
+      return res.status(409).json({
+        ok: false,
+        error: `${playerId} icin ${COOLDOWN_HOURS} saat kurali dolmadi.`,
+        status,
+        canOverride: true            // arayuz onay ekrani acabilir
+      });
+    }
+    if (onaylayan.length < 2) {
+      return res.status(428).json({
+        ok: false,
+        error: 'Erken alim icin onayi veren yetkilinin adi girilmelidir.',
+        status,
+        canOverride: true
+      });
+    }
+    if (onaylayan.length > 60) {
+      return res.status(400).json({ ok: false, error: 'Onaylayan adi cok uzun.' });
+    }
+
+    const not = String(req.body.early_note || '').trim();
+    if (not.length > 255) {
+      return res.status(400).json({ ok: false, error: 'Erken alim notu en fazla 255 karakter olabilir.' });
+    }
+
+    early = { remainingMs: status.remainingMs, by: onaylayan, note: not || null };
   }
 
   // --- MODUL 7: ozel uyari / onay kontrolu ---
@@ -125,7 +156,12 @@ router.post('/', asyncHandler((req, res) => {
       flag_level: flag ? flag.level : null,
       flag_note: flag ? flag.note : null,
       approved_by: flag ? (String(req.body.approved_by || '').trim() || null) : null,
-      approval_note: flag ? (String(req.body.approval_note || '').trim() || null) : null
+      approval_note: flag ? (String(req.body.approval_note || '').trim() || null) : null,
+      // Erken alim snapshot'i
+      early_release: early ? 1 : 0,
+      early_remaining_ms: early ? early.remainingMs : null,
+      early_approved_by: early ? early.by : null,
+      early_note: early ? early.note : null
     });
 
     const recordId = result.lastInsertRowid;
@@ -152,7 +188,8 @@ router.post('/', asyncHandler((req, res) => {
       remaining: hareket.balanceAfter,
       state: hareket.state,
       critical: type.critical_level
-    }
+    },
+    early: early ? { remainingMs: early.remainingMs, by: early.by } : null
   });
 }));
 
@@ -205,7 +242,8 @@ router.get('/', asyncHandler((req, res) => {
   `).get(params);
 
   const rows = db.prepare(`
-    SELECT id, player_id, cigarette_type, quantity, waiter_name, username, info, created_at
+    SELECT id, player_id, cigarette_type, quantity, waiter_name, username, info, created_at,
+           flag_level, approved_by, early_release, early_remaining_ms, early_approved_by
     FROM records
     ${whereSql}
     ORDER BY created_at DESC, id DESC

@@ -154,6 +154,34 @@ Hızlı Kayıt sayfasında ilgili alan devre dışı kalır ve 4 saat kuralı uy
 (`Önce sisteme garson ve sigara türü eklenmeli.`). Yönetici uyarıdan doğrudan Yönetim
 sayfasına geçebilir; sigaracıya yöneticiye başvurması söylenir.
 
+## Erken alım — süresi dolmadan verme
+
+4 saat kuralı **sert engel değildir**. Yüksek oynama miktarı gibi gerekçelerle hak
+kazanan oyunculara, süresi dolmadan da sigara verilebilir — ancak yetkili onayıyla
+ve iz bırakarak.
+
+Akış:
+
+1. Süresi dolmamış bir ID girildiğinde gösterge turuncu olur ve kalan süreyi sayar,
+   ama **kayıt düğmesi açık kalır**. İpucu satırı ne olacağını söyler:
+   *"Süre dolmadı — kaydetmek isterseniz yetkili onayı istenecek."*
+2. *Kaydı Oluştur*'a basılınca **onay ekranı** açılır: oyuncunun ID'si, **kalan süre
+   canlı sayaçla**, normal alım saati ve son alım bilgisi görünür.
+3. Devam etmek için **onayı veren yetkilinin adı** zorunludur; gerekçe alanı opsiyoneldir.
+   "Süresinin dolmadığını gördüm" kutusu işaretlenmeden onay düğmesi açılmaz.
+4. Onaylanırsa kayıt oluşur; **kim onayladı, o an ne kadar süre kalmıştı ve gerekçe**
+   kayda işlenir.
+5. Vazgeçilirse kayıt oluşmaz.
+
+Kural sunucu tarafında da uygulanır: onaysız istek `409` (`canOverride: true` ile),
+onaylayan adı eksikse `428` döner.
+
+**Bloke oyuncular istisnadır** — Modül 7'deki `blocked` seviyesi erken alımla da
+aşılamaz, çünkü uyarı kontrolü süre kontrolünden sonra çalışır.
+
+Erken alımlar arşivde ve son kayıtlar listesinde **ERKEN** rozetiyle işaretlenir,
+gün sonu raporunda *"Süresi Dolmadan Verilenler"* başlığı altında ayrı listelenir.
+
 ## Yönetim sayfası
 
 Yalnızca yönetici erişir. Üç bölümden oluşur:
@@ -313,7 +341,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/reports/daily?from=&to=` | Gün sonu raporu *(admin)* |
 | `POST` | `/api/cigarette-types` | Tür ekle *(admin)* |
 | `GET` | `/api/records/check?playerId=X` | **4 saat kontrolü** — kalan süre, son alım |
-| `POST` | `/api/records` | Yeni kayıt (kural ihlalinde `409`) |
+| `POST` | `/api/records` | Yeni kayıt (süre dolmadıysa `409`; `early_approved` + `early_approved_by` ile erken alım) |
 | `GET` | `/api/records` | Filtreli arşiv + sayfalama |
 | `GET` | `/api/records/stats` | Panel özet kartları |
 
@@ -346,14 +374,15 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 
 1. Sigaracı **Oyuncu ID** alanına yazdıkça, 350 ms gecikmeyle (debounce)
    `GET /api/records/check` çağrılır.
-2. Süre dolmadıysa **kırmızı gösterge** çıkar, `03:57:12` biçiminde **canlı geri sayım**
-   ve ilerleme çubuğu döner, kayıt butonu kilitlenir. Son alımın türü, adedi, garsonu ve
-   kaydı yapan sigaracı da gösterilir.
+2. Süre dolmadıysa **turuncu gösterge** çıkar, `03:57:12` biçiminde **canlı geri sayım**
+   ve ilerleme çubuğu döner. Son alımın türü, adedi, garsonu ve kaydı yapan sigaracı da
+   gösterilir. Kayıt düğmesi kilitlenmez — basılırsa erken alım onay ekranı açılır
+   (bkz. *Erken alım*).
 3. Süre dolduysa veya ID ilk kez alıyorsa **yeşil onay** çıkar, buton açılır.
 4. Geri sayım sıfırlandığı anda sunucuya yeniden sorulur — arada başka bir sigaracı
    kayıt açmış olabilir.
-5. Kayıt gönderilirken sunucu kuralı **tekrar** doğrular; ihlal varsa `409` döner.
-   Yani tarayıcı tarafındaki engel atlansa bile kural korunur.
+5. Kayıt gönderilirken sunucu kuralı **tekrar** doğrular; onay yoksa `409` döner.
+   Yani tarayıcı tarafındaki akış atlansa bile onaysız erken alım yapılamaz.
 
 Geri sayım, sunucudan gelen `remainingMs` üzerinden yerel saat eksenine çevrilir;
 böylece istemci ile sunucu saatleri arasındaki fark sayacı bozmaz.

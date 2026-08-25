@@ -150,4 +150,12 @@ addColumn('records', 'approval_note', 'TEXT');
 // Stok dususunu dogru karta islemek icin tur kimligi
 addColumn('records', 'cigarette_type_id', 'INTEGER');
 
+// Erken alim: 4 saat dolmadan, yetkili onayiyla verilen sigaralar.
+// Kural delinmez, izlenebilir olur — kimin onayiyla ve ne kadar sure
+// kalmisken verildigi kayda islenir.
+addColumn('records', 'early_release', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('records', 'early_remaining_ms', 'INTEGER');
+addColumn('records', 'early_approved_by', 'TEXT');
+addColumn('records', 'early_note', 'TEXT');
+
 module.exports = { db, DB_PATH };

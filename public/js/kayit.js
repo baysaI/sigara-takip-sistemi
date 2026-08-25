@@ -6,7 +6,7 @@
 const $ = (id) => document.getElementById(id);
 
 /** Aktif geri sayim durumu */
-const cd = { playerId: '', allowed: false, deadline: 0, lastAt: null, lastRecord: null, flag: null };
+const cd = { playerId: '', allowed: false, deadline: 0, lastAt: null, lastRecord: null, totalRecords: 0, flag: null };
 let timer = null;
 
 /** Garson otomatik tamamlama bileseni */
@@ -109,7 +109,10 @@ async function loadRecent() {
     body.innerHTML = records.map((r) => `
       <tr>
         <td data-label="Tarih" class="mono">${formatDateTime(r.created_at)}</td>
-        <td data-label="Oyuncu ID"><span class="pill player">${esc(r.player_id)}</span></td>
+        <td data-label="Oyuncu ID">
+          <span class="pill player">${esc(r.player_id)}</span>
+          ${r.early_release ? '<span class="pill early">ERKEN</span>' : ''}
+        </td>
         <td data-label="Sigara Türü">${esc(r.cigarette_type)}</td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
@@ -160,6 +163,7 @@ function applyStatus(status) {
   cd.deadline = Date.now() + status.remainingMs;
   cd.lastAt = status.lastAt;
   cd.lastRecord = status.lastRecord;
+  cd.totalRecords = status.totalRecords || 0;
 
   if (status.allowed) {
     stopTimer();
@@ -195,14 +199,16 @@ function renderBlocked() {
 
   box().className = 'cooldown-box show blocked';
   box().innerHTML = `
-    <div class="cooldown-head">⛔ ${App.cooldownHours} saat dolmadı — kayıt engellendi</div>
+    <div class="cooldown-head">⏳ ${App.cooldownHours} saat dolmadı — yetkili onayı gerekir</div>
     <div class="cooldown-timer" id="cdTimer">${formatCountdown(remaining)}</div>
     <div class="progress"><i id="cdBar" style="width:${pct}%"></i></div>
     <div class="cooldown-meta" style="margin-top:7px">
       Tekrar alabileceği saat: <b>${formatDateTime(new Date(cd.deadline).toISOString())}</b><br />
       ${last}
     </div>`;
-  setSubmit(false, 'Kalan süre dolmadan kayıt yapılamaz.');
+  // Sure dolmadi ama kayit tamamen engellenmiyor: yuksek oynama miktari gibi
+  // gerekcelerle yetkili onayiyla erken alim yapilabilir (onay ekrani cikar).
+  setSubmit(true, 'Süre dolmadı — kaydetmek isterseniz yetkili onayı istenecek.');
 }
 
 function startTimer() {
@@ -296,8 +302,29 @@ async function submitRecord(e) {
   if (!payload.player_id || !payload.cigarette_type || !payload.quantity) {
     return toast('Oyuncu ID, sigara türü ve adet zorunludur.', 'error');
   }
-  if (!cd.allowed || cd.playerId !== payload.player_id.toUpperCase()) {
-    return toast(`Bu ID için ${App.cooldownHours} saat kuralı doğrulanmadı.`, 'error');
+  if (cd.playerId !== payload.player_id.toUpperCase()) {
+    return toast('Oyuncu ID doğrulanmadı, lütfen tekrar girin.', 'error');
+  }
+
+  /* --- 4 saat dolmadiysa: erken alim onayi --- */
+  if (!cd.allowed) {
+    const erken = await showEarlyGate({
+      playerId: cd.playerId,
+      remainingMs: Math.max(0, cd.deadline - Date.now()),
+      nextAvailableAt: new Date(cd.deadline).toISOString(),
+      lastAt: cd.lastAt,
+      lastRecord: cd.lastRecord,
+      totalRecords: cd.totalRecords
+    });
+
+    if (!erken) return toast('Erken alım onaylanmadı, kayıt oluşturulmadı.', 'error');
+
+    // Ekran acikken sure dolduysa onaya gerek kalmaz
+    if (!erken.expired) {
+      payload.early_approved = true;
+      payload.early_approved_by = erken.early_approved_by;
+      payload.early_note = erken.early_note;
+    }
   }
 
   /* --- MODUL 7: uyari kaydi varsa once onay ekrani --- */
@@ -335,6 +362,9 @@ async function submitRecord(e) {
     if (st && st.state === 'out') {
       toast(`⛔ ${st.name} tükendi. Stok girilmeden yeni kayıt açılamaz.`, 'error', 7000);
     }
+    if (res.early) {
+      toast(`⏳ Erken alım — ${res.early.by} onayıyla kaydedildi.`, 'info', 6000);
+    }
 
     // Garson secimi vardiya boyunca ayni kaldigi icin korunur
     $('cigaretteType').value = '';
@@ -346,6 +376,10 @@ async function submitRecord(e) {
   } catch (err) {
     toast(err.message, 'error');
 
+    // Sunucu erken alim onayi istiyorsa durumu tazele
+    if (err.payload?.canOverride && err.payload?.status) {
+      applyStatus(err.payload.status);
+    }
     // Sunucu onay sarti dondurduyse ekrani ac (istemci engeli atlanmis olabilir)
     if (err.payload?.flag && err.status === 428) {
       cd.flag = err.payload.flag;
@@ -354,7 +388,9 @@ async function submitRecord(e) {
     if (err.payload?.status) applyStatus(err.payload.status);
   } finally {
     btn.textContent = 'Kaydı Oluştur';
-    btn.disabled = !(cd.allowed && waitersReady && typesReady);
+    // Sure dolmamis olsa bile dugme acik kalir; basildiginda erken alim
+    // onay ekrani cikar. Yalnizca garson/tur eksikse kilitli birakilir.
+    btn.disabled = !(waitersReady && typesReady);
   }
 }
 

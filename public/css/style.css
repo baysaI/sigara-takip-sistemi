@@ -507,6 +507,20 @@ input.ac-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(229, 
 .gate-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .gate-actions button { flex: 1 1 140px; }
 
+/* Erken alim ekrani: kalan sureyi one cikaran blok */
+.gate-early { --warn-line: #4a9eff; }
+.early-count {
+  background: #0d141c;
+  border-left: 5px solid var(--warn-line);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px; margin-bottom: 4px; text-align: center;
+}
+.early-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--text-faint); font-weight: 700;
+}
+.early-count .cooldown-timer { color: #6fb6ff; text-shadow: 0 0 24px rgba(74, 158, 255, .35); margin: 6px 0 4px; }
+
 /* Seviyeye gore renk */
 .gate-warning  { --warn-line: var(--accent); }
 .gate-approval { --warn-line: #ef8f16; }
@@ -644,6 +658,7 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 .pill.qty    { background: var(--ok-soft); border-color: rgba(46, 160, 67, .45); color: #6fe093; }
 .pill.locked { background: var(--danger-soft); border-color: rgba(229, 72, 77, .45); color: #ff9ea1; }
 .pill.free   { background: var(--ok-soft); border-color: rgba(46, 160, 67, .45); color: #6fe093; }
+.pill.early  { background: rgba(74, 158, 255, .14); border-color: rgba(74, 158, 255, .5); color: #6fb6ff; }
 .info-cell { color: var(--text-faint); font-style: italic; max-width: 220px; }
 .empty { text-align: center; padding: 32px 16px; color: var(--text-faint); line-height: 1.7; }
 

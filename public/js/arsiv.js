@@ -77,7 +77,11 @@ function renderArchive({ records, pagination, summary }) {
     body.innerHTML = records.map((r) => `
       <tr>
         <td data-label="Tarih" class="mono">${formatDateTime(r.created_at)}</td>
-        <td data-label="Oyuncu ID"><span class="pill player">${esc(r.player_id)}</span></td>
+        <td data-label="Oyuncu ID">
+          <span class="pill player">${esc(r.player_id)}</span>
+          ${r.early_release ? '<span class="pill early" title="Süresi dolmadan, yetkili onayıyla verildi">ERKEN</span>' : ''}
+          ${r.flag_level ? '<span class="pill locked" title="Özel uyarı/onay ile verildi">ONAYLI</span>' : ''}
+        </td>
         <td data-label="Sigara Türü">${esc(r.cigarette_type)}</td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>

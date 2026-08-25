@@ -94,6 +94,15 @@ router.get('/daily', asyncHandler((req, res) => {
     ORDER BY created_at DESC
   `).all(p).map((r) => ({ ...r, flag_label: LEVEL_LABELS[r.flag_level] || r.flag_level }));
 
+  /* --- Erken alimlar: 4 saat dolmadan yetkili onayiyla verilenler --- */
+  const erkenler = db.prepare(`
+    SELECT id, player_id, cigarette_type, quantity, waiter_name, username,
+           early_remaining_ms, early_approved_by, early_note, created_at
+    FROM records
+    WHERE created_at BETWEEN @from AND @to AND early_release = 1
+    ORDER BY created_at DESC
+  `).all(p);
+
   /* --- Donem icindeki stok hareketleri --- */
   const stokHareket = db.prepare(`
     SELECT
@@ -119,6 +128,7 @@ router.get('/daily', asyncHandler((req, res) => {
       garson: ozet.garson,
       sigaraci: ozet.sigaraci,
       onayli: onaylilar.length,
+      erken: erkenler.length,
       stokGiris: stokHareket.giris,
       stokCikis: stokHareket.cikis
     },
@@ -126,6 +136,7 @@ router.get('/daily', asyncHandler((req, res) => {
     waiters: garsonlar,
     operators: sigaracilar,
     approvals: onaylilar,
+    earlyReleases: erkenler,
     restocks: ikmaller,
     // Kalan stok raporu her zaman ANLIK durumu gosterir
     stock: { cards: listStock(), summary: stockSummary() },

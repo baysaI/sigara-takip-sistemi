@@ -110,6 +110,126 @@ function showApprovalGate(flag) {
   });
 }
 
+/**
+ * ERKEN ALIM ONAYI — 4 saat dolmadan kayit acmak istendiginde cikar.
+ * Kalan sure canli sayacla gosterilir, onaylayan yetkilinin adi zorunludur.
+ *
+ * @param {object} status  /api/records/check veya 409 yanitindaki cooldown durumu
+ * @returns {Promise<null | {early_approved_by:string, early_note:string}>}
+ */
+function showEarlyGate(status) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + status.remainingMs;
+    const r = status.lastRecord;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay gate-early';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'earlyTitle');
+
+    overlay.innerHTML = `
+      <div class="gate-box">
+        <div class="gate-head">
+          <span class="gate-icon" aria-hidden="true">⏳</span>
+          <h2 id="earlyTitle">SÜRESİ HENÜZ DOLMADI</h2>
+        </div>
+
+        <p class="gate-player">OYUNCU: <b>${esc(status.playerId)}</b></p>
+
+        <div class="early-count">
+          <div class="early-label">Sigara alabilmesi için kalan süre</div>
+          <div class="cooldown-timer" id="earlyTimer">${formatCountdown(status.remainingMs)}</div>
+          <div class="cooldown-meta">
+            Normal alım saati: <b id="earlyNext">${formatDateTime(status.nextAvailableAt)}</b>
+          </div>
+        </div>
+
+        <div class="cooldown-meta mt">
+          ${r ? `Son alım: <b>${formatDateTime(status.lastAt)}</b> — ${esc(r.cigarette_type)}
+                 ×${r.quantity}, garson <b>${esc(r.waiter_name)}</b><br />` : ''}
+          Toplam kayıt: <b>${status.totalRecords}</b>
+        </div>
+
+        <p class="gate-hint mt">
+          Yüksek oynama miktarı gibi bir gerekçeyle erken verilecekse
+          <b>yetkili onayı</b> gerekir. Onay bilgisi kayda ve gün sonu raporuna işlenir.
+        </p>
+
+        <div class="field">
+          <label for="earlyApprover">Onayı Veren Yetkili <span class="req">*</span></label>
+          <input type="text" id="earlyApprover" maxlength="60"
+                 placeholder="ör. Salon Şefi Kerem" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="earlyNote">Gerekçe <span class="muted">(opsiyonel)</span></label>
+          <input type="text" id="earlyNote" maxlength="255"
+                 placeholder="ör. yüksek oynama miktarı" autocomplete="off" />
+        </div>
+
+        <label class="check gate-check">
+          <input type="checkbox" id="earlyRead" />
+          Süresinin dolmadığını gördüm, yetkili onayıyla veriyorum.
+        </label>
+
+        <div class="gate-actions">
+          <button class="btn-ghost" id="earlyCancel">Vazgeç</button>
+          <button class="btn-primary" id="earlyConfirm" disabled>Onayla ve Kaydet</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    // Kalan sure ekran acikken de akmaya devam etsin
+    const tik = setInterval(() => {
+      const kalan = deadline - Date.now();
+      const el = overlay.querySelector('#earlyTimer');
+      if (!el) return;
+      if (kalan <= 0) {
+        // Sure doldu: artik onaya gerek yok, normal kayit akisina don
+        el.textContent = '00:00:00';
+        kapat({ early_approved_by: '', early_note: '', expired: true });
+        return;
+      }
+      el.textContent = formatCountdown(kalan);
+    }, 1000);
+
+    const kapat = (sonuc) => {
+      clearInterval(tik);
+      document.body.style.overflow = '';
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+      resolve(sonuc);
+    };
+
+    const escHandler = (e) => { if (e.key === 'Escape') kapat(null); };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#earlyCancel').addEventListener('click', () => kapat(null));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) kapat(null); });
+
+    const kutu = overlay.querySelector('#earlyRead');
+    const yetkili = overlay.querySelector('#earlyApprover');
+    const not = overlay.querySelector('#earlyNote');
+    const onayla = overlay.querySelector('#earlyConfirm');
+
+    const tazele = () => {
+      onayla.disabled = !(kutu.checked && yetkili.value.trim().length >= 2);
+    };
+    kutu.addEventListener('change', tazele);
+    yetkili.addEventListener('input', tazele);
+
+    onayla.addEventListener('click', () => kapat({
+      early_approved_by: yetkili.value.trim(),
+      early_note: not.value.trim()
+    }));
+
+    yetkili.focus();
+  });
+}
+
 /** Kayit formunun ustunde duran kalici uyari serifi (ID yazilir yazilmaz gorunur). */
 function flagBannerHTML(flag) {
   if (!flag) return '';

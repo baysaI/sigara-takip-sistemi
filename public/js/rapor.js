@@ -46,6 +46,7 @@ function render(r) {
   $('sGarson').textContent   = r.summary.garson;
   $('sSigaraci').textContent = r.summary.sigaraci;
   $('sOnayli').textContent   = r.summary.onayli;
+  $('sErken').textContent    = r.summary.erken;
 
   /* --- Marka bazlı --- */
   $('brandBody').innerHTML = r.brands.length
@@ -94,6 +95,22 @@ function render(r) {
           <td data-label="Sigaracı">${esc(a.username)}</td>
         </tr>`).join('')
     : '<tr><td colspan="7" class="empty">Bu aralıkta özel onayla verilen sigara yok.</td></tr>';
+
+  /* --- Erken alımlar --- */
+  const erken = r.earlyReleases || [];
+  $('earlyCount').textContent = `${erken.length} işlem`;
+  $('earlyBody').innerHTML = erken.length
+    ? erken.map((e) => `
+        <tr>
+          <td data-label="Saat" class="mono">${formatDateTime(e.created_at)}</td>
+          <td data-label="Oyuncu"><span class="pill player">${esc(e.player_id)}</span></td>
+          <td data-label="Kalan Süreydi"><span class="pill locked">${formatDuration(e.early_remaining_ms)}</span></td>
+          <td data-label="Onaylayan"><b>${esc(e.early_approved_by || '—')}</b></td>
+          <td data-label="Gerekçe" class="info-cell">${e.early_note ? esc(e.early_note) : '—'}</td>
+          <td data-label="Tür / Adet">${esc(e.cigarette_type)} ×${e.quantity}</td>
+          <td data-label="Sigaracı">${esc(e.username)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Bu aralıkta süresi dolmadan verilen sigara yok.</td></tr>';
 
   /* --- Kalan stok (anlık) --- */
   $('stockCount').textContent = `${r.stock.summary.totalPackets} paket · ${r.stock.summary.critical} kritik`;
