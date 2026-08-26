@@ -62,6 +62,26 @@
         </div>
       </section>
 
+      <!-- Toplu birim fiyat: Excel'den kopyala-yapıştır -->
+      <section class="card" id="priceCard">
+        <h2>💰 Toplu Birim Fiyat</h2>
+        <div class="card-body">
+          <div class="field">
+            <label for="bulkPrices">
+              Her satıra <b>ürün adı</b> ve <b>fiyat</b>
+              <span class="muted">(Excel'den iki sütunu kopyalayıp yapıştırabilirsiniz)</span>
+            </label>
+            <textarea id="bulkPrices" rows="7"
+              placeholder="CAMEL YELLOW	104,65&#10;PARLIAMENT BLUE BOX	118,90&#10;MARLBORO RED BOX;125"></textarea>
+          </div>
+          <button class="btn-primary" id="bulkPriceBtn">Fiyatları Uygula</button>
+          <p class="muted mt" id="priceResult">
+            Ayraç olarak sekme, noktalı virgül veya boşluk kullanılabilir;
+            ondalık için virgül de nokta da olur.
+          </p>
+        </div>
+      </section>
+
       <!-- Stok kartları -->
       <section class="card">
         <h2>Stok Kartları <span class="badge-count" id="cardCount"></span></h2>

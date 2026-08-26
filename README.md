@@ -399,8 +399,26 @@ olduğu için Türkçe Excel'de çift tıklamayla doğru açılır, sütunlar ay
 
 ### Birim fiyat
 
-Stok Paneli'ndeki **Birim Fiyat** sütunundan tür başına girilir (yönetici, satıra
-tıklayarak). Gün sonu raporundaki TUTAR ve toplam tutar bu değerden hesaplanır.
+İki yol var, ikisi de Stok Paneli'nde ve yalnızca yöneticiye açıktır:
+
+**Tek tek** — tablodaki **Birim Fiyat** hücresine tıklayın, değeri yazıp ✓ ile kaydedin.
+
+**Toplu** — **Toplu Birim Fiyat** kutusuna her satıra bir ürün ve fiyat yazın:
+
+```
+CAMEL YELLOW	104,65
+PARLIAMENT BLUE BOX;118.90
+MARLBORO RED BOX 125
+```
+
+Ayraç olarak **sekme, noktalı virgül veya boşluk** kullanılabilir — Excel'den iki sütunu
+kopyalayıp doğrudan yapıştırabilirsiniz. Ondalık için virgül de nokta da olur, sondaki
+`₺` / `TL` yok sayılır. Ürün adı eşleşmesi büyük/küçük harf duyarsızdır.
+
+İşlem sonunda kaç ürünün güncellendiği, hangilerinin sistemde bulunamadığı ve hangi
+satırların okunamadığı listelenir — yanlış yazılan bir ad sessizce atlanmaz.
+
+Gün sonu raporundaki TUTAR ve toplam tutar bu fiyattan hesaplanır.
 
 ### Tutarsızlık işareti
 

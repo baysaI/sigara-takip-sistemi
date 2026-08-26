@@ -95,4 +95,52 @@ router.patch('/:id/price', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true });
 }));
 
+/**
+ * POST /api/stock/prices - toplu birim fiyat (admin)
+ * Govde: { items: [{ name: 'CAMEL YELLOW', price: 104.65 }, ...] }
+ * Ad eslesmesi buyuk/kucuk harf duyarsizdir (COLLATE NOCASE).
+ */
+router.post('/prices', requireAdmin, asyncHandler((req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  if (!items.length) {
+    return res.status(400).json({ ok: false, error: 'Islenecek satir bulunamadi.' });
+  }
+  if (items.length > 2000) {
+    return res.status(400).json({ ok: false, error: 'Tek seferde en fazla 2000 satir islenebilir.' });
+  }
+
+  const bul = db.prepare('SELECT id, name FROM cigarette_types WHERE name = ?');
+  const guncelle = db.prepare('UPDATE cigarette_types SET unit_price = ? WHERE id = ?');
+
+  const guncellenen = [];
+  const bulunamayan = [];
+  const hatali = [];
+
+  db.transaction(() => {
+    for (const it of items) {
+      const ad = String(it.name || '').trim();
+      const fiyat = Number(it.price);
+
+      if (!ad) continue;
+      if (!Number.isFinite(fiyat) || fiyat < 0 || fiyat > 1000000) {
+        hatali.push(ad);
+        continue;
+      }
+
+      const tur = bul.get(ad);
+      if (!tur) { bulunamayan.push(ad); continue; }
+
+      guncelle.run(Math.round(fiyat * 100) / 100, tur.id);
+      guncellenen.push(tur.name);
+    }
+  })();
+
+  res.json({
+    ok: true,
+    updated: guncellenen.length,
+    notFound: bulunamayan,
+    invalid: hatali
+  });
+}));
+
 module.exports = router;

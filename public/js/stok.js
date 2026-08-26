@@ -12,6 +12,9 @@ const DURUM = {
 };
 
 App.ready(async () => {
+  // Fiyat belirleme yonetici isi; sigaraciya bu kart gosterilmez
+  if (App.user.role !== 'admin') $('priceCard')?.remove();
+
   await Promise.all([loadStock(), loadMovements()]);
   bindEvents();
 });
@@ -209,8 +212,64 @@ async function setStock() {
   finally { btn.disabled = false; }
 }
 
+/**
+ * Yapistirilan metni {name, price} listesine cevirir.
+ * Satirin SONUNDAKI sayi fiyat, oncesi urun adi sayilir; boylece
+ * ayrac sekme, noktali virgul veya bosluk olabilir. Ondalik icin
+ * virgul de nokta da kabul edilir.
+ */
+function parsePriceLines(metin) {
+  const satirlar = metin.split('\n').map((x) => x.trim()).filter(Boolean);
+  const items = [];
+  const okunamayan = [];
+
+  for (const satir of satirlar) {
+    // Sondaki sayiyi yakala: "CAMEL YELLOW\t104,65" veya "MARLBORO;125.00"
+    const m = satir.match(/^(.*?)[\t;,\s]+([0-9]+(?:[.,][0-9]+)?)\s*(?:₺|TL)?$/i);
+    if (!m) { okunamayan.push(satir); continue; }
+
+    const ad = m[1].replace(/[;\t]+$/, '').trim();
+    const fiyat = Number(m[2].replace(',', '.'));
+
+    if (!ad || !Number.isFinite(fiyat)) { okunamayan.push(satir); continue; }
+    items.push({ name: ad, price: fiyat });
+  }
+  return { items, okunamayan };
+}
+
+async function applyBulkPrices() {
+  const { items, okunamayan } = parsePriceLines($('bulkPrices').value);
+
+  if (!items.length) {
+    return toast('Okunabilir satır bulunamadı. Örnek: CAMEL YELLOW  104,65', 'error', 6000);
+  }
+
+  const btn = $('bulkPriceBtn');
+  btn.disabled = true; btn.textContent = 'Uygulanıyor...';
+  try {
+    const r = await API.post('/api/stock/prices', { items });
+    await loadStock();
+
+    const parcalar = [`${r.updated} ürün güncellendi`];
+    if (r.notFound.length) parcalar.push(`${r.notFound.length} ürün sistemde yok`);
+    if (okunamayan.length) parcalar.push(`${okunamayan.length} satır okunamadı`);
+
+    $('priceResult').innerHTML = [
+      parcalar.join(' · '),
+      r.notFound.length ? `<br /><b>Bulunamayan:</b> ${esc(r.notFound.slice(0, 12).join(', '))}` +
+        (r.notFound.length > 12 ? ` (+${r.notFound.length - 12})` : '') : '',
+      okunamayan.length ? `<br /><b>Okunamayan:</b> ${esc(okunamayan.slice(0, 5).join(' | '))}` : ''
+    ].join('');
+
+    if (r.updated) $('bulkPrices').value = '';
+    toast(parcalar.join(' · '), r.notFound.length || okunamayan.length ? 'error' : 'success', 6000);
+  } catch (err) { toast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Fiyatları Uygula'; }
+}
+
 function bindEvents() {
   $('addStockBtn').addEventListener('click', addStock);
   $('setStockBtn').addEventListener('click', setStock);
   $('addAmount').addEventListener('keydown', (e) => { if (e.key === 'Enter') addStock(); });
+  $('bulkPriceBtn')?.addEventListener('click', applyBulkPrices);
 }
