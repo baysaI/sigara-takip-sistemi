@@ -493,6 +493,12 @@ böylece istemci ile sunucu saatleri arasındaki fark sayacı bozmaz.
 
 ## Sorun giderme
 
+**Güncelleme sonrası eski arayüz / `... is not defined` hatası** — tarayıcı eski
+JS dosyasını önbellekten kullanıyordur. Sunucu artık statik dosyalara `no-cache`
+gönderiyor (dosya değişmediyse `304`, değiştiyse yenisi iner), ayrıca dosya
+adreslerinde sürüm etiketi var. Yine de takılırsa sert yenileme yapın:
+masaüstünde `Ctrl+Shift+R`, telefonda site verilerini temizleyin.
+
 **`Failed to fetch` / ekranda hiçbir veri yok** — bu bir veritabanı arızası değil,
 tarayıcı sunucuya hiç ulaşamıyor demektir. İki nedeni olur:
 

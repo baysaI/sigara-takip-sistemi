@@ -59,13 +59,25 @@ app.get(PROTECTED_PAGES.map((p) => `/${p}.html`), requireAuth, (req, res) => {
   if (ADMIN_PAGES.includes(page) && req.session.user.role !== 'admin') {
     return res.redirect('/kayit.html');
   }
+  // HTML her zaman tazelensin: eski sayfa + yeni script karisimi olusmasin
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', page));
 });
 
 // Eski tek sayfalik panel adresini yeni ana sayfaya yonlendir
 app.get('/dashboard.html', (req, res) => res.redirect('/kayit.html'));
 
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+/*
+ * Statik dosyalar onbellege alinir ama her kullanimda sunucuya dogrulanir.
+ * Boylece guncelleme sonrasi tarayicida eski js/css takili kalmaz;
+ * dosya degismediyse 304 doner, bant genisligi de bosa gitmez.
+ */
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'],
+  etag: true,
+  lastModified: true,
+  setHeaders: (res) => res.set('Cache-Control', 'no-cache')
+}));
 
 /* ------------------------------ API --------------------------------- */
 app.use('/api/auth', authRoutes);
