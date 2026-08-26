@@ -48,7 +48,122 @@ async function loadReport() {
   } catch (err) {
     toast(err.message, 'error');
   }
+  await loadReconciliation();
 }
+
+/* ============================================================
+   GUN SONU STOK SAYIMI (mutabakat)
+   Isletmenin Excel tablosunun karsiligi:
+   DEVIR + GIRIS - TUKETIM = KALAN, sayim girilince FARK cikar.
+   ============================================================ */
+let recon = null;
+
+async function loadReconciliation() {
+  const body = $('reconBody');
+  // Mutabakat her zaman TEK GUN icindir; aralik modunda bitis gunu alinir.
+  const gun = mode === 'day' ? $('rDay').value : $('rTo').value;
+
+  try {
+    recon = await API.get('/api/reports/reconciliation', { day: gun });
+    renderReconciliation();
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="9" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+function renderReconciliation() {
+  const body = $('reconBody');
+  const t = recon.totals;
+
+  $('reconInfo').textContent =
+    `${recon.day} · ${recon.rows.length} tür · ${t.sayilan} sayıldı` +
+    (t.farkli ? ` · ${t.farkli} farklı` : '');
+
+  if (!recon.rows.length) {
+    body.innerHTML = '<tr><td colspan="9" class="empty">Tanımlı sigara türü yok.</td></tr>';
+    $('reconFoot').innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = recon.rows.map((r) => {
+    const farkSinif = r.fark === null ? '' : (r.fark === 0 ? 'free' : 'locked');
+    const farkMetin = r.fark === null ? '—' : (r.fark > 0 ? `+${r.fark}` : String(r.fark));
+
+    return `
+      <tr${r.drift ? ' title="Stok kartı ile hareket geçmişi ayrışmış"' : ''}>
+        <td data-label="NO" class="muted">${r.no}</td>
+        <td data-label="Sigara Adı"><b>${esc(r.name)}</b>${r.drift ? ' <span class="pill locked">?</span>' : ''}</td>
+        <td data-label="Devir" class="mono">${r.devir}</td>
+        <td data-label="Giriş" class="mono">${r.giris ? '+' + r.giris : '0'}</td>
+        <td data-label="Tüketim" class="mono">${r.tuketim ? '-' + r.tuketim : '0'}</td>
+        <td data-label="Kalan"><b class="mono">${r.kalan}</b></td>
+        <td data-label="Sayım">
+          <input type="number" class="count-input" min="0" max="1000000"
+                 data-type="${r.typeId}" value="${r.sayim ?? ''}" placeholder="—" />
+        </td>
+        <td data-label="Fark">
+          <span class="pill ${farkSinif}" data-fark="${r.typeId}">${farkMetin}</span>
+        </td>
+        <td data-label="Tutar" class="mono muted">${r.tutar ? r.tutar.toFixed(2) + ' ₺' : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  $('reconFoot').innerHTML = `
+    <tr>
+      <td colspan="2"><b>TOPLAM</b></td>
+      <td class="mono"><b>${t.devir}</b></td>
+      <td class="mono"><b>${t.giris}</b></td>
+      <td class="mono"><b>${t.tuketim}</b></td>
+      <td class="mono"><b>${t.kalan}</b></td>
+      <td colspan="2"></td>
+      <td class="mono"><b>${t.tutar ? t.tutar.toFixed(2) + ' ₺' : '—'}</b></td>
+    </tr>`;
+
+  // Sayim girildikce farki anlik goster
+  body.querySelectorAll('.count-input').forEach((inp) =>
+    inp.addEventListener('input', () => {
+      const satir = recon.rows.find((x) => String(x.typeId) === inp.dataset.type);
+      const rozet = body.querySelector(`[data-fark="${inp.dataset.type}"]`);
+      if (!satir || !rozet) return;
+
+      if (inp.value === '') {
+        rozet.textContent = '—';
+        rozet.className = 'pill';
+        return;
+      }
+      const fark = Number(inp.value) - satir.kalan;
+      rozet.textContent = fark > 0 ? `+${fark}` : String(fark);
+      rozet.className = `pill ${fark === 0 ? 'free' : 'locked'}`;
+    }));
+
+  $('reconNote').textContent = t.kayan
+    ? `${t.kayan} türde stok kartı ile hareket geçmişi ayrışmış — sayım girip düzeltin.`
+    : 'DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.';
+}
+
+/** Girilen sayimlari kaydeder (bos birakilanlar atlanir). */
+async function saveCounts() {
+  const counts = [...document.querySelectorAll('.count-input')]
+    .filter((i) => i.value !== '')
+    .map((i) => ({ type_id: Number(i.dataset.type), counted: Number(i.value) }));
+
+  if (!counts.length) return toast('Önce en az bir sayım girin.', 'error');
+
+  const btn = $('saveCountBtn');
+  btn.disabled = true; btn.textContent = 'Kaydediliyor...';
+  try {
+    recon = await API.post('/api/reports/counts', { day: recon.day, counts });
+    renderReconciliation();
+    const farkli = recon.totals.farkli;
+    toast(
+      farkli ? `${counts.length} sayım kaydedildi — ${farkli} türde fark var.`
+             : `${counts.length} sayım kaydedildi, fark yok.`,
+      farkli ? 'error' : 'success', 6000
+    );
+  } catch (err) { toast(err.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Sayımı Kaydet'; }
+}
+
 
 /** Tek gun <-> aralik gecisi. */
 function setMode(yeni) {
@@ -205,4 +320,8 @@ function bindEvents() {
   $('month30Btn').addEventListener('click', () => sonGunler(30));
 
   $('printBtn').addEventListener('click', () => window.print());
+  $('saveCountBtn').addEventListener('click', saveCounts);
+  $('csvBtn').addEventListener('click', () => {
+    window.location.href = `/api/reports/reconciliation.csv?day=${encodeURIComponent(recon.day)}`;
+  });
 }

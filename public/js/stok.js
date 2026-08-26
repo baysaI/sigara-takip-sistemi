@@ -37,7 +37,7 @@ async function loadStock() {
     });
 
     if (!cards.length) {
-      body.innerHTML = `<tr><td colspan="4" class="empty">
+      body.innerHTML = `<tr><td colspan="5" class="empty">
         Henüz sigara türü tanımlanmamış.<br />
         <span class="muted">Yönetim sayfasından tür ekleyin.</span></td></tr>`;
       return;
@@ -52,6 +52,11 @@ async function loadStock() {
           <b class="stock-pill stock-${c.state}" style="font-size:16px">${c.stock}</b>
           <span class="muted">paket</span>
         </td>
+        <td data-label="Birim Fiyat">
+          <span class="muted price-view" data-id="${c.id}" data-price="${c.unit_price || 0}">
+            ${(c.unit_price || 0).toFixed(2)} ₺ ${App.user.role === 'admin' ? '<b style="color:var(--accent)">✎</b>' : ''}
+          </span>
+        </td>
         <td data-label="Kritik Eşik">
           <span class="muted crit-view" data-id="${c.id}" data-level="${c.critical_level}">
             ${c.critical_level} paket ${App.user.role === 'admin' ? '<b style="color:var(--accent)">✎</b>' : ''}
@@ -64,9 +69,11 @@ async function loadStock() {
     if (App.user.role === 'admin') {
       body.querySelectorAll('.crit-view').forEach((el) =>
         el.addEventListener('click', () => editCritical(el)));
+      body.querySelectorAll('.price-view').forEach((el) =>
+        el.addEventListener('click', () => editPrice(el)));
     }
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="4" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -98,6 +105,40 @@ function editCritical(el) {
       delete el.dataset.editing;
       await loadStock();
       toast('Kritik eşik güncellendi.', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+/** Birim fiyati satir icinde duzenle (admin). Gun sonu raporunda tutar hesabinda kullanilir. */
+function editPrice(el) {
+  if (el.dataset.editing) return;
+  el.dataset.editing = '1';
+
+  const eski = el.innerHTML;
+  el.innerHTML = `<span class="inline-form">
+      <input type="number" min="0" step="0.01" value="${el.dataset.price}" style="max-width:110px" />
+      <button class="btn-primary btn-sm" style="width:auto">✓</button>
+      <button class="btn-ghost btn-sm">✕</button>
+    </span>`;
+
+  const input = el.querySelector('input');
+  const [kaydet, iptal] = el.querySelectorAll('button');
+  input.focus();
+
+  const geriAl = () => {
+    el.innerHTML = eski; delete el.dataset.editing;
+    el.addEventListener('click', () => editPrice(el), { once: true });
+  };
+  iptal.addEventListener('click', (e) => { e.stopPropagation(); geriAl(); });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') kaydet.click(); });
+
+  kaydet.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      await API.patch(`/api/stock/${el.dataset.id}/price`, { unit_price: Number(input.value) });
+      delete el.dataset.editing;
+      await loadStock();
+      toast('Birim fiyat güncellendi.', 'success');
     } catch (err) { toast(err.message, 'error'); }
   });
 }

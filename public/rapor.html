@@ -63,6 +63,34 @@
       </div>
     </section>
 
+    <!-- ==================== STOK MUTABAKATI ==================== -->
+    <section class="card">
+      <h2>🧾 Gün Sonu Stok Sayımı <span class="badge-count" id="reconInfo"></span></h2>
+
+      <div class="table-scroll">
+        <table class="responsive" id="reconTable">
+          <thead>
+            <tr>
+              <th>NO</th><th>SİGARA ADI</th><th>DEVİR</th><th>GİRİŞ</th>
+              <th>TÜKETİM</th><th>KALAN</th><th>SAYIM</th><th>FARK</th><th>TUTAR</th>
+            </tr>
+          </thead>
+          <tbody id="reconBody">
+            <tr><td colspan="9" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+          <tfoot id="reconFoot"></tfoot>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="info" id="reconNote">
+          DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.
+        </span>
+        <button class="btn-ghost btn-sm" id="csvBtn">Excel'e Aktar</button>
+        <button class="btn-primary btn-sm" id="saveCountBtn">Sayımı Kaydet</button>
+      </div>
+    </section>
+
     <!-- Özet -->
     <section class="stats">
       <div class="stat">        <div class="label">Toplam İşlem</div>  <div class="value" id="sIslem">-</div></div>

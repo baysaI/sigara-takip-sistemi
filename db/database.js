@@ -121,6 +121,27 @@ CREATE TABLE IF NOT EXISTS stock_movements (
 );
 CREATE INDEX IF NOT EXISTS idx_stock_created ON stock_movements (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_stock_type    ON stock_movements (type_id);
+
+-- ---------------------------------------------------------------
+-- daily_counts: gun sonu fiziksel sayim (stok mutabakati)
+--   business_day  is gunu (YYYY-MM-DD)
+--   counted       fiziksel sayimda bulunan paket
+--   expected      o an sistemin hesapladigi kalan (fark takibi icin)
+--   Her is gunu + tur icin tek kayit tutulur; tekrar girilirse guncellenir.
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS daily_counts (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_day TEXT    NOT NULL,
+  type_id      INTEGER REFERENCES cigarette_types(id) ON DELETE CASCADE,
+  type_name    TEXT    NOT NULL,
+  counted      INTEGER NOT NULL,
+  expected     INTEGER NOT NULL,
+  note         TEXT,
+  username     TEXT    NOT NULL,
+  created_at   TEXT    NOT NULL,
+  UNIQUE (business_day, type_id)
+);
+CREATE INDEX IF NOT EXISTS idx_counts_day ON daily_counts (business_day);
 `;
 
 db.exec(SCHEMA);
@@ -140,6 +161,9 @@ function addColumn(table, column, definition) {
 // Modul 8 - stok alanlari
 addColumn('cigarette_types', 'stock', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('cigarette_types', 'critical_level', 'INTEGER NOT NULL DEFAULT 5');
+
+// Birim fiyat: gun sonu raporunda tuketim tutarini hesaplamak icin
+addColumn('cigarette_types', 'unit_price', 'REAL NOT NULL DEFAULT 0');
 
 // Modul 7 - kayit anindaki onay bilgisi (arsivde snapshot olarak kalir)
 addColumn('records', 'flag_level', 'TEXT');

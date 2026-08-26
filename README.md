@@ -69,6 +69,7 @@ sigara/
 ├── services/
 │   ├── cooldown.js        4 SAAT KURALI — tek kaynak
 │   ├── businessDay.js     Gün değişimi (iş günü) hesapları
+│   ├── reconciliation.js  Gün sonu stok sayımı / mutabakat
 │   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
 │   └── stock.js           Modül 8 — stok hareketleri
 ├── middleware/
@@ -368,6 +369,45 @@ Ayar tek yerdedir: [services/businessDay.js](services/businessDay.js) sunucu tar
 `businessRangeISO()` ([public/js/api.js](public/js/api.js)) arayüzde. Saat
 `/api/config` ile arayüze bildirilir.
 
+## Gün sonu stok sayımı (mutabakat)
+
+İşletmenin Excel'de tuttuğu gün sonu sayım tablosunun karşılığıdır. Gün Sonu Raporu
+sayfasının en üstünde yer alır:
+
+| NO | SİGARA ADI | DEVİR | GİRİŞ | TÜKETİM | KALAN | SAYIM | FARK | TUTAR |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Camel | 9 | +20 | −3 | 26 | 24 | −2 | 328,23 ₺ |
+
+Denklem: **DEVİR + GİRİŞ − TÜKETİM = KALAN**
+
+| Sütun | Nereden gelir |
+|---|---|
+| **DEVİR** | İş günü başlamadan önceki son stok bakiyesi |
+| **GİRİŞ** | Gün içi ikmal (Stok Paneli'nden girilen koli/paket) |
+| **TÜKETİM** | Gün içi kayıtlardan çıkan paket |
+| **KALAN** | Sistemin hesapladığı bakiye |
+| **SAYIM** | Fiziksel sayımda bulunan — elle girilir |
+| **FARK** | SAYIM − KALAN. Eksi ise kayıp, artı ise fazla; sıfırsa yeşil |
+| **TUTAR** | Tüketim × birim fiyat |
+
+Sayım kutusuna yazdıkça fark anlık hesaplanır. **Sayımı Kaydet** ile o iş gününe
+kaydedilir (aynı gün tekrar girilirse güncellenir), rapor sonra açıldığında girilen
+değerler yerinde durur.
+
+**Excel'e Aktar** düğmesi tabloyu CSV olarak indirir — noktalı virgül ayraçlı ve BOM'lu
+olduğu için Türkçe Excel'de çift tıklamayla doğru açılır, sütunlar ayrışır.
+
+### Birim fiyat
+
+Stok Paneli'ndeki **Birim Fiyat** sütunundan tür başına girilir (yönetici, satıra
+tıklayarak). Gün sonu raporundaki TUTAR ve toplam tutar bu değerden hesaplanır.
+
+### Tutarsızlık işareti
+
+Bir türün adının yanında **?** rozeti çıkıyorsa, stok kartındaki değer ile hareket
+geçmişinden hesaplanan kalan ayrışmış demektir (örneğin veritabanına elle müdahale
+edilmişse). Sayım girip kaydederek düzeltebilirsiniz.
+
 ## Responsive davranış
 
 Arayüz mobile-first kurulmuştur; 320 px genişliğe kadar yatay taşma yoktur.
@@ -398,6 +438,7 @@ Ayrıntılar:
 | `waiters` | Önceden tanımlı garsonlar — form dropdown kaynağı |
 | `cigarette_types` | Sigara türleri — form dropdown kaynağı |
 | `records` | Dağıtım arşivi (onay bilgisi snapshot'ı dahil) |
+| `daily_counts` | Gün sonu fiziksel sayım kayıtları |
 | `player_flags` | Oyuncu bazlı özel uyarı / onay / bloke tanımları |
 | `stock_movements` | Her stok hareketi (ikmal, çıkış, düzeltme) |
 
@@ -443,6 +484,10 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `POST` | `/api/stock/set` | Sayım düzeltmesi |
 | `PATCH` | `/api/stock/:id/critical` | Kritik eşik *(admin)* |
 | `GET` | `/api/reports/daily?from=&to=` | Gün sonu raporu *(admin)* |
+| `GET` | `/api/reports/reconciliation?day=` | Gün sonu stok mutabakatı *(admin)* |
+| `POST` | `/api/reports/counts` | Fiziksel sayımı kaydet *(admin)* |
+| `GET` | `/api/reports/reconciliation.csv?day=` | Sayım tablosunu CSV indir *(admin)* |
+| `PATCH` | `/api/stock/:id/price` | Birim fiyat *(admin)* |
 | `POST` | `/api/cigarette-types` | Tür ekle *(admin)* |
 | `GET` | `/api/records/check?playerId=X` | **4 saat kontrolü** — kalan süre, son alım |
 | `POST` | `/api/records` | Yeni kayıt (süre dolmadıysa `409`; `early_approved` + `early_approved_by` ile erken alım) |

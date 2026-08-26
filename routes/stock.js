@@ -80,4 +80,19 @@ router.patch('/:id/critical', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true });
 }));
 
+/** PATCH /api/stock/:id/price - birim fiyat (admin) */
+router.patch('/:id/price', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const price = Number(req.body.unit_price);
+
+  if (!Number.isFinite(price) || price < 0 || price > 1000000) {
+    return res.status(400).json({ ok: false, error: 'Birim fiyat 0-1000000 arasinda olmalidir.' });
+  }
+
+  const info = db.prepare('UPDATE cigarette_types SET unit_price = ? WHERE id = ?')
+    .run(Math.round(price * 100) / 100, id);
+  if (!info.changes) return res.status(404).json({ ok: false, error: 'Sigara turu bulunamadi.' });
+  res.json({ ok: true });
+}));
+
 module.exports = router;

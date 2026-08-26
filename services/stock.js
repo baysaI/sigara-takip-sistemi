@@ -32,7 +32,7 @@ function stockState(stock, critical) {
 /** Tum stok kartlari (Stok Paneli listesi). */
 function listStock({ includeInactive = false } = {}) {
   const rows = db.prepare(`
-    SELECT id, name, stock, critical_level, is_active
+    SELECT id, name, stock, critical_level, is_active, unit_price
     FROM cigarette_types
     ${includeInactive ? '' : 'WHERE is_active = 1'}
     ORDER BY name COLLATE NOCASE
