@@ -265,9 +265,17 @@ Her sigara türü bir **stok kartıdır**. Stok Paneli tüm türleri tek ekranda
 
 ## Gün sonu raporu (Modül 9)
 
-Yalnızca yöneticiye açıktır. Varsayılan olarak bugünü gösterir; *Dün*, *Son 7 gün*
-düğmeleri veya tarih aralığı ile değiştirilir. *Yazdır* düğmesi sayfayı sade,
-beyaz zeminli bir çıktıya dönüştürür.
+Yalnızca yöneticiye açıktır. İki kapsamı vardır:
+
+**Tek Gün** (varsayılan) — asıl kullanım. Sayfa açıldığında içinde bulunulan iş günü
+seçili gelir; *Bugün* ve *Dün* kısayolları vardır. Başlık seçili günü ve saat aralığını
+açıkça yazar: `25 Ağustos 2026 günü — 06:00 / 05:59`.
+
+**Tarih Aralığı** — haftalık/aylık dökümler için. Başlangıç ve bitiş seçilir,
+*Son 7 gün* ve *Son 30 gün* kısayolları vardır. Tek gün modunda seçili olan tarih,
+aralık moduna geçince başlangıç olarak taşınır.
+
+*Yazdır* düğmesi sayfayı sade, beyaz zeminli bir çıktıya dönüştürür.
 
 Bölümler:
 
@@ -345,9 +353,8 @@ Yani 25 Ağustos saat 23:00'te başlayan gün, **26 Ağustos 05:59'a kadar** sü
 
 Bu kural şuralarda geçerlidir:
 
-- **Gün sonu raporu** — *Bugün*, *Dün*, *Son 7 gün* düğmeleri ve tarih seçimi.
-  25 Ağustos seçmek 25 Ağu 06:00 – 26 Ağu 05:59 aralığını getirir; başlıkta bu
-  aralık açıkça yazar.
+- **Gün sonu raporu** — tek gün seçimi ve tüm kısayollar. 25 Ağustos seçmek
+  25 Ağu 06:00 – 26 Ağu 05:59 aralığını getirir; başlıkta bu aralık açıkça yazar.
 - **Arşiv tarih filtresi** — aynı mantık. Gece 03:00'te açılan bir kayıt, önceki
   günün filtresinde görünür.
 - **Hızlı Kayıt özet kartları** — "Bugün Kayıt / Bugün Adet" içinde bulunulan iş

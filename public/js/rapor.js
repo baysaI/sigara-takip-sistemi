@@ -14,34 +14,68 @@ const DURUM = {
 /** YYYY-MM-DD (yerel) */
 const gunStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/** Aktif kapsam: tek gun (varsayilan) veya tarih araligi */
+let mode = 'day';
+
 App.ready(async () => {
-  // Takvim gunu degil, icinde bulundugumuz IS GUNU secili gelir
+  const saat = String(App.dayStartHour).padStart(2, '0');
+  const bitis = String((App.dayStartHour + 23) % 24).padStart(2, '0');
+  $('dayRule').textContent =
+    `Gün ${saat}:00'da değişir — seçtiğiniz gün, o günün ${saat}:00'ından ` +
+    `ertesi gün ${bitis}:59'una kadar sürer.`;
+
+  // Varsayilan: icinde bulundugumuz is gunu
   const bugun = currentBusinessDay(App.dayStartHour);
+  $('rDay').value = gunStr(bugun);
   $('rFrom').value = gunStr(bugun);
   $('rTo').value = gunStr(bugun);
-
-  const saat = String(App.dayStartHour).padStart(2, '0');
-  $('dayRule').textContent =
-    `Gün değişimi ${saat}:00'da olur — seçtiğiniz gün, o günün ${saat}:00'ından ` +
-    `ertesi gün ${String((App.dayStartHour + 23) % 24).padStart(2, '0')}:59'una kadar sürer.`;
 
   await loadReport();
   bindEvents();
 });
 
+/** Secili kapsamin ISO aralig|i. */
+function currentRange() {
+  return mode === 'day'
+    ? businessRangeISO($('rDay').value, $('rDay').value, App.dayStartHour)
+    : businessRangeISO($('rFrom').value, $('rTo').value, App.dayStartHour);
+}
+
 async function loadReport() {
   try {
-    const rapor = await API.get('/api/reports/daily',
-      businessRangeISO($('rFrom').value, $('rTo').value, App.dayStartHour));
+    const rapor = await API.get('/api/reports/daily', currentRange());
     render(rapor);
   } catch (err) {
     toast(err.message, 'error');
   }
 }
 
+/** Tek gun <-> aralik gecisi. */
+function setMode(yeni) {
+  mode = yeni;
+  const tekGun = yeni === 'day';
+
+  $('modeDay').classList.toggle('active', tekGun);
+  $('modeRange').classList.toggle('active', !tekGun);
+  $('dayPane').classList.toggle('hidden', !tekGun);
+  $('rangePane').classList.toggle('hidden', tekGun);
+
+  // Aralik moduna gecerken secili gunu baslangic yap
+  if (!tekGun && $('rDay').value) {
+    $('rFrom').value = $('rDay').value;
+    if (!$('rTo').value) $('rTo').value = $('rDay').value;
+  }
+  loadReport();
+}
+
 function render(r) {
-  const bas = formatDateTime(r.range.from), son = formatDateTime(r.range.to);
-  $('rangeLabel').textContent = `${bas} — ${son} arası döküm`;
+  const bas = new Date(r.range.from), son = new Date(r.range.to);
+  const saatBicim = { hour: '2-digit', minute: '2-digit' };
+
+  $('rangeLabel').textContent = mode === 'day'
+    ? `${bas.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü — ` +
+      `${bas.toLocaleTimeString('tr-TR', saatBicim)} / ${son.toLocaleTimeString('tr-TR', saatBicim)}`
+    : `${formatDateTime(r.range.from)} — ${formatDateTime(r.range.to)} arası döküm`;
 
   /* --- Özet --- */
   $('sIslem').textContent    = r.summary.islem;
@@ -139,28 +173,36 @@ function render(r) {
 }
 
 function bindEvents() {
+  $('modeDay').addEventListener('click', () => setMode('day'));
+  $('modeRange').addEventListener('click', () => setMode('range'));
+
+  $('rDay').addEventListener('change', loadReport);
   ['rFrom', 'rTo'].forEach((id) => $(id).addEventListener('change', loadReport));
 
-  const ayarla = (from, to) => {
-    $('rFrom').value = gunStr(from);
-    $('rTo').value = gunStr(to);
-    loadReport();
-  };
-
   $('todayBtn').addEventListener('click', () => {
-    const d = currentBusinessDay(App.dayStartHour); ayarla(d, d);
+    $('rDay').value = gunStr(currentBusinessDay(App.dayStartHour));
+    loadReport();
   });
 
   $('yesterdayBtn').addEventListener('click', () => {
     const d = currentBusinessDay(App.dayStartHour);
-    d.setDate(d.getDate() - 1); ayarla(d, d);
+    d.setDate(d.getDate() - 1);
+    $('rDay').value = gunStr(d);
+    loadReport();
   });
 
-  $('week7Btn').addEventListener('click', () => {
+  /** Son N is gunu (bugun dahil). */
+  const sonGunler = (adet) => {
     const son = currentBusinessDay(App.dayStartHour);
-    const bas = new Date(son); bas.setDate(bas.getDate() - 6);
-    ayarla(bas, son);
-  });
+    const bas = new Date(son);
+    bas.setDate(bas.getDate() - (adet - 1));
+    $('rFrom').value = gunStr(bas);
+    $('rTo').value = gunStr(son);
+    loadReport();
+  };
+
+  $('week7Btn').addEventListener('click', () => sonGunler(7));
+  $('month30Btn').addEventListener('click', () => sonGunler(30));
 
   $('printBtn').addEventListener('click', () => window.print());
 }

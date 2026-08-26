@@ -17,25 +17,49 @@
     </div>
 
     <section class="card card-overflow">
-      <h2>Tarih Aralığı</h2>
+      <h2>Rapor Günü</h2>
       <div class="card-body">
-        <div class="filters">
-          <div class="field">
-            <label for="rFrom">Başlangıç</label>
-            <input type="date" id="rFrom" />
-          </div>
-          <div class="field">
-            <label for="rTo">Bitiş</label>
-            <input type="date" id="rTo" />
-          </div>
-          <p class="muted" style="grid-column:1/-1;margin-bottom:2px" id="dayRule"></p>
-          <div class="filter-actions quick-range">
-            <button class="btn-ghost btn-sm" id="todayBtn">Bugün</button>
-            <button class="btn-ghost btn-sm" id="yesterdayBtn">Dün</button>
-            <button class="btn-ghost btn-sm" id="week7Btn">Son 7 gün</button>
-            <button class="btn-primary btn-sm" id="printBtn">Yazdır</button>
+
+        <!-- Tek gün / aralık geçişi -->
+        <div class="seg" role="group" aria-label="Rapor kapsamı">
+          <button type="button" class="seg-btn active" id="modeDay">Tek Gün</button>
+          <button type="button" class="seg-btn" id="modeRange">Tarih Aralığı</button>
+        </div>
+
+        <!-- TEK GÜN (varsayılan) -->
+        <div id="dayPane" class="mt">
+          <div class="filters">
+            <div class="field">
+              <label for="rDay">Gün</label>
+              <input type="date" id="rDay" />
+            </div>
+            <div class="filter-actions quick-range">
+              <button class="btn-ghost btn-sm" id="todayBtn">Bugün</button>
+              <button class="btn-ghost btn-sm" id="yesterdayBtn">Dün</button>
+            </div>
           </div>
         </div>
+
+        <!-- TARİH ARALIĞI -->
+        <div id="rangePane" class="hidden mt">
+          <div class="filters">
+            <div class="field">
+              <label for="rFrom">Başlangıç</label>
+              <input type="date" id="rFrom" />
+            </div>
+            <div class="field">
+              <label for="rTo">Bitiş</label>
+              <input type="date" id="rTo" />
+            </div>
+            <div class="filter-actions quick-range">
+              <button class="btn-ghost btn-sm" id="week7Btn">Son 7 gün</button>
+              <button class="btn-ghost btn-sm" id="month30Btn">Son 30 gün</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="muted mt" id="dayRule"></p>
+        <button class="btn-primary btn-auto mt" id="printBtn">Yazdır</button>
       </div>
     </section>
 
