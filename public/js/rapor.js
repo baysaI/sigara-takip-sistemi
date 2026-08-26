@@ -15,9 +15,15 @@ const DURUM = {
 const gunStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 App.ready(async () => {
-  const bugun = new Date();
+  // Takvim gunu degil, icinde bulundugumuz IS GUNU secili gelir
+  const bugun = currentBusinessDay(App.dayStartHour);
   $('rFrom').value = gunStr(bugun);
   $('rTo').value = gunStr(bugun);
+
+  const saat = String(App.dayStartHour).padStart(2, '0');
+  $('dayRule').textContent =
+    `Gün değişimi ${saat}:00'da olur — seçtiğiniz gün, o günün ${saat}:00'ından ` +
+    `ertesi gün ${String((App.dayStartHour + 23) % 24).padStart(2, '0')}:59'una kadar sürer.`;
 
   await loadReport();
   bindEvents();
@@ -25,10 +31,8 @@ App.ready(async () => {
 
 async function loadReport() {
   try {
-    const rapor = await API.get('/api/reports/daily', {
-      from: localDateToISO($('rFrom').value, false),
-      to: localDateToISO($('rTo').value, true)
-    });
+    const rapor = await API.get('/api/reports/daily',
+      businessRangeISO($('rFrom').value, $('rTo').value, App.dayStartHour));
     render(rapor);
   } catch (err) {
     toast(err.message, 'error');
@@ -143,15 +147,18 @@ function bindEvents() {
     loadReport();
   };
 
-  $('todayBtn').addEventListener('click', () => { const d = new Date(); ayarla(d, d); });
+  $('todayBtn').addEventListener('click', () => {
+    const d = currentBusinessDay(App.dayStartHour); ayarla(d, d);
+  });
 
   $('yesterdayBtn').addEventListener('click', () => {
-    const d = new Date(); d.setDate(d.getDate() - 1); ayarla(d, d);
+    const d = currentBusinessDay(App.dayStartHour);
+    d.setDate(d.getDate() - 1); ayarla(d, d);
   });
 
   $('week7Btn').addEventListener('click', () => {
-    const son = new Date(), bas = new Date();
-    bas.setDate(bas.getDate() - 6);
+    const son = currentBusinessDay(App.dayStartHour);
+    const bas = new Date(son); bas.setDate(bas.getDate() - 6);
     ayarla(bas, son);
   });
 

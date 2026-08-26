@@ -20,6 +20,10 @@ App.ready(async () => {
       .closest('table').querySelector('thead tr')
       .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
   }
+  const saat = String(App.dayStartHour).padStart(2, '0');
+  const not = $('dayNote');
+  if (not) not.textContent = `· Tarih filtresi iş gününe göredir (gün ${saat}:00'da değişir).`;
+
   await loadFilterOptions();
   await loadArchive();
   bindEvents();
@@ -51,13 +55,16 @@ async function loadFilterOptions() {
 }
 
 function currentFilters() {
+  // Tarih filtresi is gunune gore: 25.08 secimi 25.08 06:00 - 26.08 05:59 arasi
+  const aralik = businessRangeISO($('fFrom').value, $('fTo').value, App.dayStartHour);
+
   return {
     playerId: $('fPlayer').value.trim(),
     waiter: $('fWaiter').value,
     type: $('fType').value,
     user: $('fUser').value,
-    from: localDateToISO($('fFrom').value, false),
-    to: localDateToISO($('fTo').value, true),
+    from: aralik.from,
+    to: aralik.to,
     page: state.page,
     pageSize: state.pageSize
   };

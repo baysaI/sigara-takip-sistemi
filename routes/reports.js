@@ -18,12 +18,16 @@ const { db } = require('../db/database');
 const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
 const { listStock, stockSummary } = require('../services/stock');
 const { LEVEL_LABELS } = require('../services/flags');
+const { businessDayRange } = require('../services/businessDay');
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireAdmin);   // gun sonu raporu yalnizca yoneticiye
 
-/** Aralik verilmediyse bugunun tamamini (sunucu yerel gunu) kullan. */
+/**
+ * Aralik verilmediyse icinde bulunulan IS GUNUNU kullan.
+ * Gun degisimi gece yarisinda degil DAY_START_HOUR saatinde olur.
+ */
 function resolveRange(query) {
   if (query.from || query.to) {
     return {
@@ -31,10 +35,8 @@ function resolveRange(query) {
       to: String(query.to || new Date().toISOString())
     };
   }
-  const now = new Date();
-  const bas = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const son = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  return { from: bas.toISOString(), to: son.toISOString() };
+  const { from, to } = businessDayRange();
+  return { from, to };
 }
 
 /** GET /api/reports/daily?from=&to= */

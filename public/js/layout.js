@@ -11,6 +11,8 @@ const App = {
   user: null,
   cooldownHours: 4,
   cooldownMs: 4 * 60 * 60 * 1000,
+  /** Gun degisimi saati — is gunu hesaplari bunu kullanir */
+  dayStartHour: 6,
 
   /** Sayfa scriptleri bunu cagirir: kabuk hazir olunca callback calisir. */
   async ready(callback) {
@@ -23,6 +25,7 @@ const App = {
       App.user = me.user;
       App.cooldownHours = cfg.cooldownHours;
       App.cooldownMs = cfg.cooldownHours * 60 * 60 * 1000;
+      App.dayStartHour = cfg.dayStartHour ?? 6;
 
       renderShell();
       await callback();

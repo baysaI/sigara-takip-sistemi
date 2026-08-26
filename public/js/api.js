@@ -137,6 +137,50 @@ function localDateToISO(dateStr, endOfDay = false) {
   return dt.toISOString();
 }
 
+/* ---------------------- İş günü (gün değişimi) ---------------------- */
+/*
+ * Gün değişimi gece yarısında değil, App.dayStartHour saatinde olur
+ * (varsayılan 06:00). 25 Ağustos 06:00 ile 26 Ağustos 05:59 arasındaki
+ * her işlem "25 Ağustos" iş gününe aittir.
+ */
+
+/** Şu an hangi iş günündeyiz? (Date, saat bilgisi anlamsız) */
+function currentBusinessDay(startHour) {
+  const d = new Date();
+  if (d.getHours() < startHour) d.setDate(d.getDate() - 1);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * Takvim tarihi aralığını iş günü aralığına çevirir.
+ * "25.08 - 25.08" seçimi 25.08 06:00 - 26.08 05:59:59.999 olur.
+ * @param {string} fromStr YYYY-MM-DD
+ * @param {string} toStr   YYYY-MM-DD (boşsa fromStr kullanılır)
+ * @param {number} startHour
+ */
+function businessRangeISO(fromStr, toStr, startHour) {
+  if (!fromStr && !toStr) return { from: '', to: '' };
+
+  const parse = (str) => { const [y, m, d] = str.split('-').map(Number); return { y, m, d }; };
+
+  let from = '';
+  if (fromStr) {
+    const { y, m, d } = parse(fromStr);
+    from = new Date(y, m - 1, d, startHour, 0, 0, 0).toISOString();
+  }
+
+  let to = '';
+  if (toStr || fromStr) {
+    const { y, m, d } = parse(toStr || fromStr);
+    const son = new Date(y, m - 1, d, startHour, 0, 0, 0);
+    son.setDate(son.getDate() + 1);
+    son.setMilliseconds(son.getMilliseconds() - 1);
+    to = son.toISOString();
+  }
+
+  return { from, to };
+}
+
 /** XSS koruması: kullanıcı verisi innerHTML'e girerken kaçışlanır. */
 function esc(value) {
   if (value == null) return '';

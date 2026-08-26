@@ -17,10 +17,20 @@ let waitersReady = false;
 let typesReady = false;
 
 App.ready(async () => {
+  showDayInfo();
   await Promise.all([loadTypes(), loadWaiters()]);
   await Promise.all([loadStats(), loadRecent()]);
   bindEvents();
 });
+
+/** Hangi is gunundeyiz — gun degisimi gece yarisi degil (varsayilan 06:00). */
+function showDayInfo() {
+  const el = $('dayInfo');
+  if (!el) return;
+  const gun = currentBusinessDay(App.dayStartHour);
+  const saat = String(App.dayStartHour).padStart(2, '0');
+  el.textContent = `· İş günü: ${gun.toLocaleDateString('tr-TR')} (${saat}:00'da değişir)`;
+}
 
 /* ---------------------- Referans listeler ---------------------- */
 async function loadWaiters() {

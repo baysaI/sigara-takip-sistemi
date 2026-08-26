@@ -71,7 +71,12 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 app.use('/api/auth', authRoutes);
 
 app.get('/api/config', (req, res) => {
-  res.json({ ok: true, cooldownHours: config.COOLDOWN_HOURS, serverTime: new Date().toISOString() });
+  res.json({
+    ok: true,
+    cooldownHours: config.COOLDOWN_HOURS,
+    dayStartHour: config.DAY_START_HOUR,
+    serverTime: new Date().toISOString()
+  });
 });
 
 app.use('/api', lookupRoutes);        // /api/waiters, /api/cigarette-types

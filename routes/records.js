@@ -6,6 +6,7 @@ const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth'
 const { getCooldownStatus, normalizePlayerId } = require('../services/cooldown');
 const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
+const { businessDayRange } = require('../services/businessDay');
 const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, COOLDOWN_HOURS } = require('../config');
 
 const router = express.Router();
@@ -268,14 +269,15 @@ router.get('/', asyncHandler((req, res) => {
 /* GET /api/records/stats - dashboard ozet kartlari                    */
 /* ------------------------------------------------------------------ */
 router.get('/stats', asyncHandler((req, res) => {
-  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // Istatistikler icinde bulunulan IS GUNUNU kapsar (gun degisimi 06:00).
+  const gun = businessDayRange();
   const cooldownStart = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
 
   const last24h = db.prepare(`
     SELECT COUNT(*) AS records, COALESCE(SUM(quantity),0) AS quantity,
            COUNT(DISTINCT player_id) AS players
-    FROM records WHERE created_at >= ?
-  `).get(dayAgo);
+    FROM records WHERE created_at BETWEEN ? AND ?
+  `).get(gun.from, gun.to);
 
   const activeCooldowns = db.prepare(`
     SELECT COUNT(DISTINCT player_id) AS c FROM records WHERE created_at >= ?
@@ -283,9 +285,9 @@ router.get('/stats', asyncHandler((req, res) => {
 
   const topWaiter = db.prepare(`
     SELECT waiter_name, COUNT(*) AS c
-    FROM records WHERE created_at >= ?
+    FROM records WHERE created_at BETWEEN ? AND ?
     GROUP BY waiter_name ORDER BY c DESC LIMIT 1
-  `).get(dayAgo);
+  `).get(gun.from, gun.to);
 
   res.json({
     ok: true,
@@ -295,7 +297,8 @@ router.get('/stats', asyncHandler((req, res) => {
       last24hPlayers: last24h.players,
       activeCooldowns,
       topWaiter: topWaiter ? `${topWaiter.waiter_name} (${topWaiter.c})` : '-',
-      allTime: db.prepare('SELECT COUNT(*) AS c FROM records').get().c
+      allTime: db.prepare('SELECT COUNT(*) AS c FROM records').get().c,
+      businessDay: gun.from
     }
   });
 }));

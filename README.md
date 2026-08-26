@@ -53,6 +53,7 @@ kayıt olma yoktur.
 |---|---|---|
 | `PORT` | `3000` | Sunucu portu |
 | `COOLDOWN_HOURS` | `4` | Sigara kuralı (saat). Değiştirince arayüz de otomatik uyum sağlar |
+| `DAY_START_HOUR` | `6` | Gün değişimi saati. İş günü bu saatte başlar, ertesi gün bir dakika öncesinde biter |
 | `SESSION_SECRET` | — | Oturum çerezi imzalama anahtarı |
 | `NODE_ENV` | `development` | `production` yapılırsa çerez `secure` (HTTPS) olur |
 
@@ -67,6 +68,7 @@ sigara/
 │   └── seed.js            Başlangıç verisi (garson, tür, kullanıcı)
 ├── services/
 │   ├── cooldown.js        4 SAAT KURALI — tek kaynak
+│   ├── businessDay.js     Gün değişimi (iş günü) hesapları
 │   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
 │   └── stock.js           Modül 8 — stok hareketleri
 ├── middleware/
@@ -325,6 +327,40 @@ copy data\sigara.db data\yedek-sigara.db
 Geri yüklemek için uygulamayı durdurup dosyayı geri kopyalayın (`.db-wal` ve `.db-shm`
 dosyalarını silin).
 
+## Gün değişimi (iş günü)
+
+Sistemde gün **gece yarısında değil, sabah 06:00'da** değişir. `DAY_START_HOUR`
+ayarıyla değiştirilebilir.
+
+Yani 25 Ağustos saat 23:00'te başlayan gün, **26 Ağustos 05:59'a kadar** sürer.
+26 Ağustos 06:00'da yeni gün başlar.
+
+| İşlem saati | Ait olduğu iş günü |
+|---|---|
+| 25 Ağu 23:00 | 25 Ağustos |
+| 26 Ağu 03:00 | **25 Ağustos** |
+| 26 Ağu 05:59 | **25 Ağustos** |
+| 26 Ağu 06:00 | 26 Ağustos |
+| 26 Ağu 12:00 | 26 Ağustos |
+
+Bu kural şuralarda geçerlidir:
+
+- **Gün sonu raporu** — *Bugün*, *Dün*, *Son 7 gün* düğmeleri ve tarih seçimi.
+  25 Ağustos seçmek 25 Ağu 06:00 – 26 Ağu 05:59 aralığını getirir; başlıkta bu
+  aralık açıkça yazar.
+- **Arşiv tarih filtresi** — aynı mantık. Gece 03:00'te açılan bir kayıt, önceki
+  günün filtresinde görünür.
+- **Hızlı Kayıt özet kartları** — "Bugün Kayıt / Bugün Adet" içinde bulunulan iş
+  gününü sayar. Sayfa başlığında hangi iş gününde olunduğu yazar.
+
+4 saat kuralı bundan **etkilenmez** — o, son alımdan itibaren kayan bir penceredir,
+gün sınırıyla ilgisi yoktur. Gece 05:00'te sigara alan biri 09:00'da tekrar alabilir,
+araya gün değişimi girmiş olması bir şey değiştirmez.
+
+Ayar tek yerdedir: [services/businessDay.js](services/businessDay.js) sunucu tarafında,
+`businessRangeISO()` ([public/js/api.js](public/js/api.js)) arayüzde. Saat
+`/api/config` ile arayüze bildirilir.
+
 ## Responsive davranış
 
 Arayüz mobile-first kurulmuştur; 320 px genişliğe kadar yatay taşma yoktur.
@@ -374,7 +410,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `POST` | `/api/auth/login` | Giriş |
 | `POST` | `/api/auth/logout` | Çıkış |
 | `GET` | `/api/auth/me` | Oturumdaki kullanıcı |
-| `GET` | `/api/config` | Kural süresi + sunucu saati |
+| `GET` | `/api/config` | Kural süresi, gün değişimi saati, sunucu saati |
 | `GET` | `/api/waiters` | Garson listesi (dropdown) |
 | `POST` | `/api/waiters` | Garson ekle *(admin)* |
 | `PATCH` | `/api/waiters/:id` | Garson aktif/pasif *(admin)* |
