@@ -149,6 +149,25 @@ kuralının karşılığıdır. İptaller listesinde ve gün sonu raporunda
 Raporun (muhasebe) ve sayacın (hak) geç iptalde farklı davranması kasıtlıdır:
 defter geçmişi korur, oyuncu ise olmamış bir satış yüzünden beklemez.
 
+### İptali geri alma
+
+Yanlışlıkla iptal edilen satış, İptaller sayfasındaki **Geri Al** düğmesiyle
+(yönetici) yeniden aktif kayda dönüştürülür: sigara tekrar stoktan düşer,
+oyuncunun sayacı yeniden işler. İptal kaydı **silinmez** —
+`reverted_at` / `reverted_by` ile "geri alındı" olarak işaretlenir, denetim izi kalır.
+
+**Geri alma, kapanmış bir raporu değiştirecekse yasaktır.** Tek engellenen durum:
+
+> Satış **aynı dönemde** iptal edilmiş (o dönemin raporundan çıkarılmış) ve
+> **o dönem kapanmış**. Geri almak, satışı kapanmış rapora geri eklerdi.
+
+Bu satırlarda düğme yerine *kilitli* yazar. Gerekiyorsa satış yeni bir kayıt
+olarak açılır. **Geç iptallerde böyle bir engel yoktur** — satış kapanmış
+raporda zaten sayılıyordu, geri almak orayı etkilemez.
+
+Stok yetmiyorsa geri alma reddedilir ve işlem bütünüyle geri sarılır;
+kayıt iptal durumunda kalır.
+
 ## Dosya yapısı
 
 ```
