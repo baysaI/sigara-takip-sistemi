@@ -8,7 +8,9 @@ const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
 const { openPeriod } = require('../services/businessDay');
 const { exchangeRecord, exchangeableRecords, assertExchangeable } = require('../services/exchange');
-const { cancelRecord, assertCancellable, listCancellations } = require('../services/cancellation');
+const {
+  cancelRecord, uncancelRecord, assertCancellable, assertUncancellable, listCancellations
+} = require('../services/cancellation');
 const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, COOLDOWN_HOURS } = require('../config');
 
 const router = express.Router();
@@ -500,6 +502,26 @@ router.post('/:id/cancel', requireAdmin, asyncHandler((req, res) => {
     ok: true,
     ...sonuc,
     status: getCooldownStatus(sonuc.record.player_id)   // sayac serbest kalmis olmali
+  });
+}));
+
+/* POST /api/records/:id/uncancel - iptali geri al                     */
+/* Satis yeniden aktif kayit olur, stok tekrar duser.                  */
+/* Kapanmis raporu degistirecek geri almalar reddedilir                */
+/* (bkz. services/cancellation.js assertUncancellable).                */
+router.post('/:id/uncancel', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+
+  assertUncancellable(id);
+  const sonuc = uncancelRecord({ recordId: id, user: req.session.user });
+
+  res.json({
+    ok: true,
+    ...sonuc,
+    status: getCooldownStatus(sonuc.record.player_id)   // sayac yeniden isler
   });
 }));
 

@@ -196,8 +196,11 @@ router.get('/daily', asyncHandler((req, res) => {
       onayli: onaylilar.length,
       erken: erkenler.length,
       degisim: degisimler.length,
-      iptal: iptaller.length,
-      iptalPaket: iptaller.reduce((t, x) => t + x.quantity, 0),
+      // Geri alinmis iptaller sayilari sismesin: islem o donemde
+      // yapildi ama sonucu ortadan kalkti. Listede izleri kalir.
+      iptal: iptaller.filter((x) => !x.reverted_at).length,
+      iptalPaket: iptaller.reduce((t, x) => t + (x.reverted_at ? 0 : x.quantity), 0),
+      iptalGeriAlinan: iptaller.filter((x) => x.reverted_at).length,
       stokGiris: stokHareket.giris,
       stokCikis: stokHareket.cikis
     },
