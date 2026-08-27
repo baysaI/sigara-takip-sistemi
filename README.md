@@ -110,6 +110,45 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## İptal Edilenler / Arşiv
+
+Müşteri sigarayı aldıktan sonra iade ederse satış **iptal edilir**: aktif
+kayıtlardan çıkar ama **silinmez** — tüm geçmişiyle `/iptal.html` sayfasında
+arşivlenir. Arşivdeki *İptal Et* düğmesi (yönetici) bu işlemi yapar.
+
+İptal edildiğinde:
+
+- Kayıt aktif arşivde ve Son Kayıtlar listesinde **görünmez**; İptaller
+  bölümüne taşınır. Satış tarihi, garson, sigaracı, adet, uyarı/erken alım
+  rozetleri — hepsi korunur.
+- **İptal nedeni, zamanı ve iptali yapan kullanıcı** `record_cancellations`
+  tablosuna yazılır.
+- Sigara **stoğa geri döner**.
+- Oyuncunun **4 saat sayacı serbest kalır** — iptal edilen satış hak kullanımı
+  sayılmaz, olmamış bir satış için oyuncu bekletilmez.
+- İptal edilmiş bir satışta sigara değişimi yapılamaz.
+- Sigara değişimiyle güncellenmiş bir kaydın iptali, **yerine geçen güncel
+  kayıt** üzerinden yapılır; stok yalnızca fiilen dışarıda olan sigara için döner.
+
+### Aynı gün iptal / geç iptal
+
+Kapanmış bir günün raporu **değişmez** — "gün sonu raporu alındı" kavramının
+tüm anlamı budur. Bu yüzden iptal, satışın dönemi hâlâ açık mı diye ikiye ayrılır:
+
+| | Aynı dönemde iptal | Geç iptal (gün kapanmışken) |
+|---|---|---|
+| Satış o günün raporunda | **Çıkar** | **Kalır** — sigara o gün gerçekten satılmıştı |
+| Stok iadesi | O dönemin tüketimini sıfırlar | **Cari döneme** düzeltme olarak düşer |
+| 4 saat sayacı | Serbest kalır | Serbest kalır |
+
+Geç iptalde iade, bugünün mutabakatında **DÜZELTME** sütununda görünür.
+Muhasebedeki "geçmiş defteri düzeltilmez, cari döneme iade fişi kesilir"
+kuralının karşılığıdır. İptaller listesinde ve gün sonu raporunda
+**GEÇ İPTAL** rozetiyle işaretlenir.
+
+Raporun (muhasebe) ve sayacın (hak) geç iptalde farklı davranması kasıtlıdır:
+defter geçmişi korur, oyuncu ise olmamış bir satış yüzünden beklemez.
+
 ## Dosya yapısı
 
 ```
@@ -123,6 +162,7 @@ sigara/
 │   ├── cooldown.js        4 SAAT KURALI — tek kaynak
 │   ├── businessDay.js     Gün değişimi — KAPANIŞ tabanlı dönem hesapları
 │   ├── exchange.js        Sigara değişimi — tek kaynak
+│   ├── cancellation.js    Satış iptali / iade — tek kaynak
 │   ├── reconciliation.js  Gün sonu stok sayımı / mutabakat
 │   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
 │   └── stock.js           Modül 8 — stok hareketleri
@@ -151,6 +191,7 @@ sigara/
 │       ├── autocomplete.js Uzun listeler için yazarak seçim bileşeni
 │       ├── approval.js    Modül 7 — engel / onay ekranı
 │       ├── degisim.js     Sigara değiştir — onay ekranı
+│       ├── iptal.js       İptal Edilenler sayfası
 │       ├── danger.js      Silme ve sıfırlama onay pencereleri
 │       ├── layout.js      Ortak kabuk: üst bar, gezinme, oturum
 │       ├── login.js  kayit.js  arsiv.js  sorgu.js  yonetim.js
@@ -164,6 +205,7 @@ sigara/
 | `/login.html` | Giriş | herkes |
 | `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
 | `/arsiv.html` | Filtreler + tam arşiv + sayfalama | oturum |
+| `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
 | `/rapor.html` | Gün sonu raporu | **admin** |
