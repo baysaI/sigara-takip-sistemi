@@ -437,9 +437,12 @@ function render(r) {
   $('cancelCount').textContent = `${iptal.length} iptal · ${r.summary.iptalPaket ?? 0} paket`;
   $('cancelBody').innerHTML = iptal.length
     ? iptal.map((c) => `
-        <tr>
+        <tr${c.reverted_at ? ' class="row-superseded"' : ''}>
           <td data-label="İptal Saati" class="mono">${formatDateTime(c.created_at)}</td>
-          <td data-label="Oyuncu"><span class="pill player">${esc(c.player_id)}</span></td>
+          <td data-label="Oyuncu">
+            <span class="pill player">${esc(c.player_id)}</span>
+            ${c.reverted_at ? `<span class="pill free" title="${esc(c.reverted_by || '')} geri aldı — satış yeniden aktif">GERİ ALINDI</span>` : ''}
+          </td>
           <td data-label="Sigara">${esc(c.cigarette_type)}</td>
           <td data-label="Adet"><span class="pill qty">${c.quantity}</span></td>
           <td data-label="Satış Günü">
@@ -453,10 +456,20 @@ function render(r) {
 
   // Gec iptal varsa neden toplamlarin degismedigini yaz: rapordaki
   // "iptal edildi ama paket sayisi dusmedi" sorusu burada cevaplansin.
-  const gecSayi = iptal.filter((c) => c.late).length;
-  $('cancelNote').textContent = gecSayi
-    ? `${gecSayi} tanesi GEÇ iptal: satış kapanmış bir güne aitti, o günün raporu ` +
+  const gecSayi = iptal.filter((c) => c.late && !c.reverted_at).length;
+  const geriSayi = r.summary.iptalGeriAlinan ?? 0;
+  const notlar = [];
+  if (gecSayi) {
+    notlar.push(
+      `${gecSayi} tanesi GEÇ iptal: satış kapanmış bir güne aitti, o günün raporu ` +
       'değişmez; iade bu dönemin stok düzeltmesine işlendi.'
+    );
+  }
+  if (geriSayi) {
+    notlar.push(`${geriSayi} iptal geri alındı — satış yeniden aktif, toplamlara sayılmıyor.`);
+  }
+  $('cancelNote').textContent = notlar.length
+    ? notlar.join(' ')
     : 'Bu dönemde yapılan iptaller. Kayıtlar silinmez, İptaller bölümünde saklanır.';
 
   /* --- Kalan stok (anlık) --- */

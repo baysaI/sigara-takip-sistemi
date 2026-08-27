@@ -13,10 +13,19 @@
 
 const $ = (id) => document.getElementById(id);
 
+/** Tablo sutun sayisi — yoneticide "Islem" sutunu da var. */
+const SUTUN = () => (App.user && App.user.role === 'admin' ? 9 : 8);
+
 const state = { page: 1 };
 const refilter = () => { state.page = 1; loadCancellations(); };
 
 App.ready(async () => {
+  // Yonetici iptali geri alabilir; basligi ona gore ekle
+  if (App.user.role === 'admin') {
+    document.querySelector('#cancelBody')
+      .closest('table').querySelector('thead tr')
+      .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
+  }
   await loadFilterOptions();
   await loadCancellations();
   bindEvents();
@@ -53,13 +62,13 @@ function currentFilters() {
 
 async function loadCancellations() {
   const body = $('cancelBody');
-  body.innerHTML = '<tr><td colspan="8" class="empty">Yükleniyor...</td></tr>';
+  body.innerHTML = `<tr><td colspan="${SUTUN()}" class="empty">Yükleniyor...</td></tr>`;
 
   let veri;
   try {
     veri = await API.get('/api/records/cancelled', currentFilters());
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="8" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${SUTUN()}" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
     return;
   }
 
@@ -70,7 +79,7 @@ async function loadCancellations() {
   $('sLate').textContent  = summary.late;
 
   if (!records.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty">İptal edilmiş satış yok.</td></tr>';
+    body.innerHTML = `<tr><td colspan="${SUTUN()}" class="empty">İptal edilmiş satış yok.</td></tr>`;
   } else {
     body.innerHTML = records.map((r) => `
       <tr>
@@ -90,7 +99,21 @@ async function loadCancellations() {
         <td data-label="Neden" class="info-cell">${r.cancel_reason ? esc(r.cancel_reason) : '—'}</td>
         <td data-label="İptal Eden"><b>${esc(r.cancelled_by)}</b></td>
         <td data-label="Garson" class="muted">${esc(r.waiter_name)}</td>
+        ${App.user.role === 'admin' ? `
+        <td data-label="İşlem">
+          ${r.canUndo
+            ? `<button class="btn-ghost btn-sm" data-undo="${r.id}">Geri Al</button>`
+            : `<span class="muted" title="Satışın günü kapandı — geri almak kapanmış raporu değiştirirdi">kilitli</span>`}
+        </td>` : ''}
       </tr>`).join('');
+
+    if (App.user.role === 'admin') {
+      body.querySelectorAll('[data-undo]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const kayit = records.find((x) => String(x.id) === btn.dataset.undo);
+          if (kayit) geriAl(kayit);
+        }));
+    }
   }
 
   $('cancelCount').textContent = `${summary.total} iptal · ${summary.totalQuantity} paket iade`;
@@ -99,6 +122,41 @@ async function loadCancellations() {
   $('prevPage').disabled = pagination.page <= 1;
   $('nextPage').disabled = pagination.page >= pagination.totalPages;
   state.page = pagination.page;
+}
+
+/**
+ * Iptali geri alir: satis yeniden aktif kayit olur.
+ * Sigara tekrar stoktan duser, oyuncunun sayaci yeniden isler.
+ */
+async function geriAl(kayit) {
+  const onay = await confirmDelete({
+    title: 'İptali geri al',
+    icon: '↩️',
+    body:
+      `<b>${esc(kayit.player_id)}</b> — ${esc(kayit.cigarette_type)} ×${kayit.quantity}<br />` +
+      `İptal eden: <b>${esc(kayit.cancelled_by)}</b> · ${formatDateTime(kayit.cancelled_at)}` +
+      (kayit.cancel_reason ? `<br />Neden: ${esc(kayit.cancel_reason)}` : '') +
+      '<br /><br />Satış <b>yeniden aktif kayıt</b> olacak: sigara tekrar stoktan ' +
+      `düşecek ve oyuncunun ${App.cooldownHours} saat sayacı yeniden işleyecek.`,
+    warning: 'İptal kaydı silinmez, "geri alındı" olarak işaretlenir.',
+    confirmText: 'İptali Geri Al'
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.post(`/api/records/${kayit.id}/uncancel`, {});
+    await loadCancellations();
+
+    toast(
+      r.stock
+        ? `İptal geri alındı. ${r.stock.name} stoğu ${r.stock.balance} pakete indi.`
+        : 'İptal geri alındı.',
+      'success', 5000
+    );
+    if (r.stock && r.stock.state === 'critical') {
+      toast(`⚠️ ${r.stock.name} kritik seviyede (${r.stock.balance} paket).`, 'error', 6000);
+    }
+  } catch (err) { toast(err.message, 'error', 7000); }
 }
 
 function bindEvents() {

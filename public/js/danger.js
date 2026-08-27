@@ -5,14 +5,21 @@
 'use strict';
 
 /**
- * Basit silme onayi — tek bir kaydi silmek icin.
+ * Basit onay penceresi — tek bir kaydi silmek/geri almak icin.
  * @param {object} o
  * @param {string} o.title    Baslik (ör. "Garsonu sil")
- * @param {string} o.body     HTML gövde: ne silinecek, sonucu ne
+ * @param {string} o.body     HTML gövde: ne olacak, sonucu ne
  * @param {string} [o.confirmText='Sil']
+ * @param {string} [o.warning] Alt uyari satiri. Yikici olmayan islemlerde
+ *                             (ör. iptali geri alma) uygun metin verilmeli;
+ *                             bos string verilirse satir hic gosterilmez.
+ * @param {string} [o.icon='🗑️']
  * @returns {Promise<boolean>}
  */
-function confirmDelete({ title, body, confirmText = 'Sil' }) {
+function confirmDelete({
+  title, body, confirmText = 'Sil',
+  warning = '<b>Bu işlem geri alınamaz.</b>', icon = '🗑️'
+}) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'gate-overlay gate-blocked';
@@ -22,11 +29,11 @@ function confirmDelete({ title, body, confirmText = 'Sil' }) {
     overlay.innerHTML = `
       <div class="gate-box" style="max-width:440px">
         <div class="gate-head">
-          <span class="gate-icon" aria-hidden="true">🗑️</span>
+          <span class="gate-icon" aria-hidden="true">${icon}</span>
           <h2>${esc(title)}</h2>
         </div>
         <div class="cooldown-meta" style="font-size:14px;line-height:1.7">${body}</div>
-        <p class="gate-hint mt"><b>Bu işlem geri alınamaz.</b></p>
+        ${warning ? `<p class="gate-hint mt">${warning}</p>` : ''}
         <div class="gate-actions">
           <button class="btn-ghost" data-no>Vazgeç</button>
           <button class="btn-danger" data-yes>${esc(confirmText)}</button>
