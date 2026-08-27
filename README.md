@@ -53,9 +53,62 @@ kayıt olma yoktur.
 |---|---|---|
 | `PORT` | `3000` | Sunucu portu |
 | `COOLDOWN_HOURS` | `4` | Sigara kuralı (saat). Değiştirince arayüz de otomatik uyum sağlar |
-| `DAY_START_HOUR` | `6` | Gün değişimi saati. İş günü bu saatte başlar, ertesi gün bir dakika öncesinde biter |
 | `SESSION_SECRET` | — | Oturum çerezi imzalama anahtarı |
 | `NODE_ENV` | `development` | `production` yapılırsa çerez `secure` (HTTPS) olur |
+| `DAY_START_HOUR` | — | **Artık kullanılmıyor.** Yalnızca eski kurulumların geçmişini aktarırken bir kez okunur (aşağıya bakın) |
+
+## Gün değişimi — gün sonu raporu ile
+
+Gün değişimi **saate bağlı değildir.** İş günü, yönetici *Gün Sonu Raporu*'nu
+**alana kadar** sürer; raporun alındığı an dönem kapanır ve yeni iş günü tam o
+anda başlar.
+
+- Rapor sayfasındaki **"Günü Kapat ve Raporu Al"** düğmesi bu işlemi yapar.
+  Onay penceresi çıkar; ne kapatılacağı ve sonucu açıkça yazar.
+- **Raporu yalnızca görüntülemek günü kapatmaz.** Sayfayı açmak, dönem seçmek,
+  yazdırmak veya Excel'e aktarmak kapanış sayılmaz — kapanış yalnızca o düğmeyle olur.
+- Kapanmış bir güne kayıt eklenemez ve o günün kayıtlarında **sigara değişimi yapılamaz**
+  (değişim stoğu güncel döneme işlerken kaydı eski döneme bırakır, iki günün
+  mutabakatı da bozulurdu).
+- Aynı takvim gününde ikinci kez kapanış yapılırsa dönem etiketi `#2`, `#3` soneki alır.
+- Dönemde hiç işlem yoksa sistem uyarır; yönetici isterse boş günü yine de kapatabilir.
+
+Kapanışlar `day_closures` tablosunda tutulur: hangi dönem, ne zaman açıldı,
+ne zaman ve **kim tarafından** kapatıldı, kapanış notu.
+
+### Mevcut kurulumdan geçiş
+
+Eskiden gün değişimi `DAY_START_HOUR` (varsayılan 06:00) ile hesaplanıyordu.
+Yeni sürüm ilk çalıştığında geçmiş günleri bu eski kurala göre **geriye dönük
+kapanış kayıtlarına çevirir** — eski gün sonu raporlarınız ve kaydedilmiş fiziksel
+sayımlarınız aynen geçerli kalır. İçinde bulunduğunuz gün kapatılmaz, açık kalır.
+Bu aktarım bir kez çalışır ve konsola kaç günün dönüştürüldüğünü yazar.
+
+## Sigara değiştir
+
+Misafir aldığı sigarayı başka bir türle değiştirmek isterse Hızlı Kayıt
+sayfasındaki *Son Kayıtlar* listesinden **Değiştir** düğmesiyle yapılır.
+
+Onay ekranı ne olacağını açıkça gösterir (`Marlboro ×2 → Parliament ×2`) ve tür
+seçilmeden onay düğmesi açılmaz — yanlışlıkla değişim yapılmasını bu engeller.
+
+Değişim yapıldığında:
+
+- **İlk kayıt silinmez.** Arşivde `DEĞİŞTİRİLDİ` rozetiyle durur; yerine geçen
+  kayda `superseded_by` ile bağlanır.
+- Hangi sigaranın neyle değiştirildiği, adet, **tarih/saat** ve **işlemi yapan
+  kullanıcı** `record_exchanges` tablosuna yazılır.
+- **Stok:** eski tür stoğa geri döner, yeni türden düşer.
+- **Rapor ve günlük adet:** toplamlar `superseded_by IS NULL` süzgeciyle
+  hesaplanır, yani bir değişim dağıtılan paketi iki kat göstermez. Marka bazlı
+  dağılımda sigara yeni markaya sayılır.
+- **4 saat sayacı değişmez.** Değişim yeni bir hak kullanımı değildir; yerine
+  geçen kayıt orijinalin saatini devralır. Değişimin kendi anı ayrıca tutulur.
+- Değişim tekrarlanabilir (A → B → C); zincir korunur.
+- Bir kayıt silinirse **zincirin tamamı** birlikte silinir ve yalnızca fiilen
+  dışarıda olan sigara stoğa iade edilir.
+
+Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
 ## Dosya yapısı
 
@@ -68,7 +121,8 @@ sigara/
 │   └── seed.js            Başlangıç verisi (garson, tür, kullanıcı)
 ├── services/
 │   ├── cooldown.js        4 SAAT KURALI — tek kaynak
-│   ├── businessDay.js     Gün değişimi (iş günü) hesapları
+│   ├── businessDay.js     Gün değişimi — KAPANIŞ tabanlı dönem hesapları
+│   ├── exchange.js        Sigara değişimi — tek kaynak
 │   ├── reconciliation.js  Gün sonu stok sayımı / mutabakat
 │   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
 │   └── stock.js           Modül 8 — stok hareketleri
@@ -96,6 +150,7 @@ sigara/
 │       ├── api.js         Fetch sarmalayıcı, biçimleyiciler, toast
 │       ├── autocomplete.js Uzun listeler için yazarak seçim bileşeni
 │       ├── approval.js    Modül 7 — engel / onay ekranı
+│       ├── degisim.js     Sigara değiştir — onay ekranı
 │       ├── danger.js      Silme ve sıfırlama onay pencereleri
 │       ├── layout.js      Ortak kabuk: üst bar, gezinme, oturum
 │       ├── login.js  kayit.js  arsiv.js  sorgu.js  yonetim.js
