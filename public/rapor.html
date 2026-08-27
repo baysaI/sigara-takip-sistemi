@@ -17,25 +17,26 @@
     </div>
 
     <section class="card card-overflow">
-      <h2>Rapor Günü</h2>
+      <h2>Rapor Dönemi</h2>
       <div class="card-body">
 
-        <!-- Tek gün / aralık geçişi -->
+        <!-- Dönem / aralık geçişi -->
         <div class="seg" role="group" aria-label="Rapor kapsamı">
-          <button type="button" class="seg-btn active" id="modeDay">Tek Gün</button>
+          <button type="button" class="seg-btn active" id="modeDay">Gün Seç</button>
           <button type="button" class="seg-btn" id="modeRange">Tarih Aralığı</button>
         </div>
 
-        <!-- TEK GÜN (varsayılan) -->
+        <!-- DÖNEM SEÇİMİ (varsayılan) -->
         <div id="dayPane" class="mt">
           <div class="filters">
             <div class="field">
-              <label for="rDay">Gün</label>
-              <input type="date" id="rDay" />
+              <label for="rPeriod">Dönem</label>
+              <select id="rPeriod">
+                <option value="">Yükleniyor...</option>
+              </select>
             </div>
             <div class="filter-actions quick-range">
-              <button class="btn-ghost btn-sm" id="todayBtn">Bugün</button>
-              <button class="btn-ghost btn-sm" id="yesterdayBtn">Dün</button>
+              <button class="btn-ghost btn-sm" id="openBtn">Açık Dönem</button>
             </div>
           </div>
         </div>
@@ -59,7 +60,29 @@
         </div>
 
         <p class="muted mt" id="dayRule"></p>
-        <button class="btn-primary btn-auto mt" id="printBtn">Yazdır</button>
+        <div class="pager">
+          <span class="info" id="periodState">—</span>
+          <button class="btn-ghost btn-sm" id="printBtn">Yazdır</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== GÜN SONU RAPORUNU AL (GÜN DEĞİŞİMİ) ============== -->
+    <!-- Raporun alınması ile gün değişimi AYNI işlemdir: bu düğme açık
+         dönemi kapatır ve yeni dönem tam o an başlar. Raporu yalnızca
+         görüntülemek günü KAPATMAZ. -->
+    <section class="card" id="closeCard">
+      <h2>🔒 Gün Sonu Raporunu Al</h2>
+      <div class="card-body">
+        <p class="muted" id="closeHint">
+          Bu işlem <b>günü kapatır</b>: dönem burada biter ve yeni iş günü tam o an başlar.
+          Kapanan güne sonradan kayıt eklenemez, o günün kayıtlarında sigara değişimi yapılamaz.
+        </p>
+        <div class="field">
+          <label for="closeNote">Kapanış notu <span class="muted">(opsiyonel)</span></label>
+          <input type="text" id="closeNote" maxlength="255" placeholder="ör. gece vardiyası sonu" />
+        </div>
+        <button class="btn-primary btn-auto" id="closeDayBtn">Günü Kapat ve Raporu Al</button>
       </div>
     </section>
 
@@ -100,6 +123,7 @@
       <div class="stat">        <div class="label">Sigaracı</div>      <div class="value" id="sSigaraci">-</div></div>
       <div class="stat danger"> <div class="label">Özel Onaylı</div>   <div class="value" id="sOnayli">-</div></div>
       <div class="stat danger"> <div class="label">Erken Alım</div>    <div class="value" id="sErken">-</div></div>
+      <div class="stat accent"> <div class="label">Sigara Değişimi</div><div class="value" id="sDegisim">-</div></div>
     </section>
 
     <div class="split">
@@ -168,6 +192,24 @@
       </div>
     </section>
 
+    <!-- Sigara değişimleri -->
+    <section class="card">
+      <h2>🔄 Sigara Değişimleri <span class="badge-count" id="swapCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr><th>Saat</th><th>Oyuncu</th><th>Verilen</th><th>Değişen</th><th>Adet</th><th>Gerekçe</th><th>İşlemi Yapan</th></tr>
+          </thead>
+          <tbody id="swapBody"><tr><td colspan="7" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="info">
+          İlk kayıt silinmez, arşivde kalır. Dağıtılan paket toplamı değişime göre hesaplanır.
+        </span>
+      </div>
+    </section>
+
     <!-- Kalan stok -->
     <section class="card">
       <h2>📦 Kalan Stok Raporu <span class="badge-count" id="stockCount"></span></h2>
@@ -188,6 +230,7 @@
 
   <script src="/js/api.js?v=1.1.0"></script>
   <script src="/js/layout.js?v=1.1.0"></script>
+  <script src="/js/danger.js?v=1.1.0"></script>
   <script src="/js/rapor.js?v=1.1.0"></script>
 </body>
 </html>

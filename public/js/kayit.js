@@ -23,13 +23,23 @@ App.ready(async () => {
   bindEvents();
 });
 
-/** Hangi is gunundeyiz — gun degisimi gece yarisi degil (varsayilan 06:00). */
+/**
+ * Hangi is gunundeyiz — gun degisimi SAATE bagli degil.
+ * Acik donem, yonetici Gun Sonu Raporu'nu alana kadar surer.
+ */
 function showDayInfo() {
   const el = $('dayInfo');
-  if (!el) return;
-  const gun = currentBusinessDay(App.dayStartHour);
-  const saat = String(App.dayStartHour).padStart(2, '0');
-  el.textContent = `· İş günü: ${gun.toLocaleDateString('tr-TR')} (${saat}:00'da değişir)`;
+  if (!el || !App.period) return;
+
+  // openedAt bakir sistemde null gelir: "1970'ten beri acik" yazilmasin
+  const sure = App.period.openedAt
+    ? periodDuration(App.period.openedAt, App.period.asOf)
+    : '';
+
+  el.textContent =
+    `· İş günü: ${periodLabel(App.period.dayKey)}` +
+    (sure ? ` — ${sure} önce açıldı` : '') +
+    ' (gün sonu raporu alınınca değişir)';
 }
 
 /* ---------------------- Referans listeler ---------------------- */
@@ -112,24 +122,99 @@ async function loadRecent() {
     $('recentCount').textContent = `${summary.total} kayıt`;
 
     if (!records.length) {
-      body.innerHTML = '<tr><td colspan="6" class="empty">Henüz kayıt yok.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="empty">Henüz kayıt yok.</td></tr>';
       return;
     }
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
-    body.innerHTML = records.map((r) => `
-      <tr>
+    body.innerHTML = records.map((r) => {
+      /* Degisim yalnizca ACIK donemin, henuz degistirilmemis kaydi icin.
+         Kapanmis gunun kaydini degistirmek stogu ve raporu ayri donemlere
+         dusururdu (sunucu da ayni kurali uygular). */
+      const acikDonemde = !App.period || r.created_at >= App.period.from;
+      const degistirilebilir = !r.superseded_by && acikDonemde;
+
+      return `
+      <tr${r.superseded_by ? ' class="row-superseded"' : ''}>
         <td data-label="Tarih" class="mono">${formatDateTime(r.created_at)}</td>
         <td data-label="Oyuncu ID">
           <span class="pill player">${esc(r.player_id)}</span>
           ${r.early_release ? '<span class="pill early">ERKEN</span>' : ''}
         </td>
-        <td data-label="Sigara Türü">${esc(r.cigarette_type)}</td>
+        <td data-label="Sigara Türü">
+          ${esc(r.cigarette_type)}
+          ${r.exchanged_from ? '<span class="pill swap" title="Değişim sonucu">DEĞİŞİM</span>' : ''}
+        </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
-      </tr>`).join('');
+        <td data-label="İşlem">
+          ${r.superseded_by
+            ? '<span class="pill locked" title="Bu kayıt değiştirildi, arşivde kalır">DEĞİŞTİRİLDİ</span>'
+            : degistirilebilir
+              ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
+              : '<span class="muted">—</span>'}
+        </td>
+      </tr>`;
+    }).join('');
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="6" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+/* ============================================================
+   SIGARA DEGISTIR
+   Misafir aldigi sigarayi baska bir turle degistirmek istediginde.
+   Ilk kayit silinmez; arsivde kalir ve yerine gecen kayda baglanir.
+   ============================================================ */
+async function handleExchange(recordId) {
+  let kayit, turler;
+
+  try {
+    // Kaydin ve stogun GUNCEL hali alinir: ekranda bayat veri olabilir
+    const [liste, stok] = await Promise.all([
+      API.get('/api/records', { pageSize: 50, page: 1 }),
+      API.get('/api/stock')
+    ]);
+    kayit = liste.records.find((r) => r.id === recordId);
+    turler = stok.cards;
+  } catch (err) {
+    return toast(`Değişim ekranı açılamadı: ${err.message}`, 'error');
+  }
+
+  if (!kayit) return toast('Kayıt bulunamadı, listeyi yenileyin.', 'error');
+  if (kayit.superseded_by) return toast('Bu kayıt zaten değiştirilmiş.', 'error');
+
+  const secim = await showExchangeDialog({ record: kayit, types: turler });
+  if (!secim) return;   // vazgecildi
+
+  try {
+    const res = await API.post(`/api/records/${recordId}/exchange`, secim);
+
+    const st = res.stock;
+    toast(
+      `${res.replacement.player_id} — ${res.exchange.from_type_name} → ` +
+      `${res.exchange.to_type_name} ×${res.exchange.quantity} değiştirildi.`,
+      'success', 5000
+    );
+    if (st.returned) {
+      toast(`↩️ ${st.returned.name}: ${st.returned.balance} paket (iade edildi)`, 'info', 4500);
+    }
+    if (st.issued.state === 'critical') {
+      toast(`⚠️ ${st.issued.name} kritik seviyede (${st.issued.balance} paket).`, 'error', 7000);
+    }
+    if (st.issued.state === 'out') {
+      toast(`⛔ ${st.issued.name} tükendi.`, 'error', 7000);
+    }
+
+    // Sayac degismemis olmali; ekrandaki oyuncu buysa durumu tazele
+    if (cd.playerId && cd.playerId === res.replacement.player_id) {
+      applyStatus(res.status);
+    }
+
+    await Promise.all([loadStats(), loadRecent(), loadTypes()]);
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    await loadRecent();
   }
 }
 
@@ -414,5 +499,15 @@ function bindEvents() {
   });
 
   $('recordForm').addEventListener('submit', submitRecord);
+
+  // Son Kayitlar tablosu her yenilendiginde yeniden baglanmasin diye
+  // dinleyici govdeye bir kez kurulur (olay delegasyonu).
+  $('recentBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-swap]');
+    if (!btn) return;
+    btn.disabled = true;
+    handleExchange(Number(btn.dataset.swap)).finally(() => { btn.disabled = false; });
+  });
+
   setInterval(loadStats, 60000);
 }

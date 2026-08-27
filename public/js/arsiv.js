@@ -20,9 +20,14 @@ App.ready(async () => {
       .closest('table').querySelector('thead tr')
       .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
   }
-  const saat = String(App.dayStartHour).padStart(2, '0');
+  /*
+   * Tarih filtresi TAKVIM gunune gore calisir (00:00-23:59). Is gunu artik
+   * saatle degil, gun sonu raporunun alinmasiyla degistigi icin bir takvim
+   * tarihini sabit bir donem araligina cevirmek mumkun degil — donem bazli
+   * dokum icin Gun Sonu Raporu sayfasi kullanilir.
+   */
   const not = $('dayNote');
-  if (not) not.textContent = `· Tarih filtresi iş gününe göredir (gün ${saat}:00'da değişir).`;
+  if (not) not.textContent = '· Tarih filtresi takvim gününe göredir (00:00–23:59).';
 
   await loadFilterOptions();
   await loadArchive();
@@ -55,16 +60,17 @@ async function loadFilterOptions() {
 }
 
 function currentFilters() {
-  // Tarih filtresi is gunune gore: 25.08 secimi 25.08 06:00 - 26.08 05:59 arasi
-  const aralik = businessRangeISO($('fFrom').value, $('fTo').value, App.dayStartHour);
+  // Takvim gunu siniri: baslangic 00:00, bitis 23:59:59.999 (yerel saat)
+  const from = localDateToISO($('fFrom').value, false);
+  const to = localDateToISO($('fTo').value || $('fFrom').value, true);
 
   return {
     playerId: $('fPlayer').value.trim(),
     waiter: $('fWaiter').value,
     type: $('fType').value,
     user: $('fUser').value,
-    from: aralik.from,
-    to: aralik.to,
+    from,
+    to,
     page: state.page,
     pageSize: state.pageSize
   };

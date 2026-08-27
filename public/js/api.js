@@ -139,46 +139,37 @@ function localDateToISO(dateStr, endOfDay = false) {
 
 /* ---------------------- İş günü (gün değişimi) ---------------------- */
 /*
- * Gün değişimi gece yarısında değil, App.dayStartHour saatinde olur
- * (varsayılan 06:00). 25 Ağustos 06:00 ile 26 Ağustos 05:59 arasındaki
- * her işlem "25 Ağustos" iş gününe aittir.
+ * Gün değişimi SAATE BAĞLI DEĞİLDİR. Açık dönem, yönetici Gün Sonu
+ * Raporu'nu alana kadar sürer; raporun alındığı an dönem kapanır ve yenisi
+ * tam o anda başlar. Sınırlar sunucudan gelir (App.period).
  */
 
-/** Şu an hangi iş günündeyiz? (Date, saat bilgisi anlamsız) */
-function currentBusinessDay(startHour) {
-  const d = new Date();
-  if (d.getHours() < startHour) d.setDate(d.getDate() - 1);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/** Dönem etiketini insan diline çevirir: "27.08.2026" / "27.08.2026 (2. kapanış)" */
+function periodLabel(dayKey) {
+  if (!dayKey) return '—';
+  const [tarih, sira] = String(dayKey).split('#');
+  const [y, m, d] = tarih.split('-');
+  const gosterim = (y && m && d) ? `${d}.${m}.${y}` : tarih;
+  return sira ? `${gosterim} (${sira}. kapanış)` : gosterim;
 }
 
 /**
- * Takvim tarihi aralığını iş günü aralığına çevirir.
- * "25.08 - 25.08" seçimi 25.08 06:00 - 26.08 05:59:59.999 olur.
- * @param {string} fromStr YYYY-MM-DD
- * @param {string} toStr   YYYY-MM-DD (boşsa fromStr kullanılır)
- * @param {number} startHour
+ * Açık dönemin ne kadar süredir açık olduğunu yazar.
+ * "3 sa 12 dk" gibi — yöneticiye günü kapatmayı unutup unutmadığını gösterir.
  */
-function businessRangeISO(fromStr, toStr, startHour) {
-  if (!fromStr && !toStr) return { from: '', to: '' };
+function periodDuration(fromISO, nowISO) {
+  const bas = Date.parse(fromISO);
+  const son = nowISO ? Date.parse(nowISO) : Date.now();
+  if (Number.isNaN(bas) || son <= bas) return '';
 
-  const parse = (str) => { const [y, m, d] = str.split('-').map(Number); return { y, m, d }; };
+  const dk = Math.floor((son - bas) / 60000);
+  const gun = Math.floor(dk / 1440);
+  const saat = Math.floor((dk % 1440) / 60);
+  const kalan = dk % 60;
 
-  let from = '';
-  if (fromStr) {
-    const { y, m, d } = parse(fromStr);
-    from = new Date(y, m - 1, d, startHour, 0, 0, 0).toISOString();
-  }
-
-  let to = '';
-  if (toStr || fromStr) {
-    const { y, m, d } = parse(toStr || fromStr);
-    const son = new Date(y, m - 1, d, startHour, 0, 0, 0);
-    son.setDate(son.getDate() + 1);
-    son.setMilliseconds(son.getMilliseconds() - 1);
-    to = son.toISOString();
-  }
-
-  return { from, to };
+  if (gun) return `${gun} gün ${saat} sa`;
+  if (saat) return `${saat} sa ${kalan} dk`;
+  return `${kalan} dk`;
 }
 
 /** XSS koruması: kullanıcı verisi innerHTML'e girerken kaçışlanır. */

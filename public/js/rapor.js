@@ -14,41 +14,183 @@ const DURUM = {
 /** YYYY-MM-DD (yerel) */
 const gunStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** Aktif kapsam: tek gun (varsayilan) veya tarih araligi */
+/** Aktif kapsam: tek donem (varsayilan) veya tarih araligi */
 let mode = 'day';
 
-App.ready(async () => {
-  const saat = String(App.dayStartHour).padStart(2, '0');
-  const bitis = String((App.dayStartHour + 23) % 24).padStart(2, '0');
-  $('dayRule').textContent =
-    `Gün ${saat}:00'da değişir — seçtiğiniz gün, o günün ${saat}:00'ından ` +
-    `ertesi gün ${bitis}:59'una kadar sürer.`;
+/** Kapanmis donemler + acik donem (dropdown kaynagi) */
+let donemler = { open: null, closures: [] };
 
-  // Varsayilan: icinde bulundugumuz is gunu
-  const bugun = currentBusinessDay(App.dayStartHour);
-  $('rDay').value = gunStr(bugun);
-  $('rFrom').value = gunStr(bugun);
-  $('rTo').value = gunStr(bugun);
+App.ready(async () => {
+  $('dayRule').textContent =
+    'Gün değişimi saate bağlı değildir: açık dönem, Gün Sonu Raporu alınana ' +
+    'kadar sürer. Rapor alındığı an dönem kapanır ve yeni iş günü başlar.';
+
+  await loadPeriods();
+
+  const bugun = gunStr(new Date());
+  $('rFrom').value = bugun;
+  $('rTo').value = bugun;
 
   await loadReport();
   bindEvents();
 });
 
-/** Secili kapsamin ISO aralig|i. */
-function currentRange() {
-  return mode === 'day'
-    ? businessRangeISO($('rDay').value, $('rDay').value, App.dayStartHour)
-    : businessRangeISO($('rFrom').value, $('rTo').value, App.dayStartHour);
+/* ============================================================
+   DONEM LISTESI
+   ============================================================ */
+async function loadPeriods() {
+  try {
+    donemler = await API.get('/api/reports/closures');
+  } catch (err) {
+    return toast(`Dönemler yüklenemedi: ${err.message}`, 'error');
+  }
+
+  const sel = $('rPeriod');
+  const acik = donemler.open;
+
+  const acikSecenek = acik
+    ? `<option value="open">▶ Açık dönem — ${periodLabel(acik.dayKey)} (henüz kapanmadı)</option>`
+    : '';
+
+  const kapaliSecenekler = donemler.closures.map((c) => {
+    const saat = new Date(c.closedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    return `<option value="${c.closureId}">${esc(periodLabel(c.dayKey))} — ${saat}'de kapandı (${esc(c.closedBy)})</option>`;
+  }).join('');
+
+  const oncekiDeger = sel.value;
+  sel.innerHTML = acikSecenek + kapaliSecenekler;
+
+  // Onceki secim hala listedeyse korunur, yoksa acik doneme dusulur
+  sel.value = [...sel.options].some((o) => o.value === oncekiDeger) ? oncekiDeger : 'open';
+}
+
+/** Secili kapsamin sunucuya gidecek sorgu parametreleri. */
+function currentScope() {
+  if (mode === 'range') {
+    return { from: $('rFrom').value, to: $('rTo').value };
+  }
+  const deger = $('rPeriod').value;
+  return deger === 'open' || !deger ? {} : { closure: deger };
+}
+
+/** Acik donem mi goruntuleniyor? (Gunu Kapat karti yalnizca o zaman gorunur) */
+function acikDonemdeMiyiz() {
+  return mode === 'day' && ($('rPeriod').value === 'open' || !$('rPeriod').value);
 }
 
 async function loadReport() {
   try {
-    const rapor = await API.get('/api/reports/daily', currentRange());
+    const rapor = await API.get('/api/reports/daily', currentScope());
     render(rapor);
   } catch (err) {
     toast(err.message, 'error');
   }
   await loadReconciliation();
+  updateCloseCard();
+}
+
+/**
+ * "Günü Kapat" karti yalnizca ACIK donem goruntulenirken anlamlidir:
+ * kapanmis bir gunu tekrar kapatmak diye bir sey yoktur.
+ */
+function updateCloseCard() {
+  const kart = $('closeCard');
+  if (!kart) return;
+
+  const gorunur = acikDonemdeMiyiz();
+  kart.classList.toggle('hidden', !gorunur);
+
+  const durum = $('periodState');
+  if (!durum) return;
+
+  if (gorunur && donemler.open) {
+    const o = donemler.open;
+    const sure = o.openedAt ? periodDuration(o.openedAt, o.asOf) : '';
+    durum.textContent = o.pristine
+      ? 'Açık dönem — henüz hiç işlem yok'
+      : `Açık dönem — ${sure ? sure + ' önce açıldı' : 'yeni açıldı'}`;
+  } else if (mode === 'range') {
+    durum.textContent = 'Tarih aralığı — birden çok dönem birleştirildi';
+  } else {
+    const secili = donemler.closures.find((c) => String(c.closureId) === $('rPeriod').value);
+    durum.textContent = secili
+      ? `Kapanmış dönem — ${formatDateTime(secili.closedAt)} · ${secili.closedBy}` +
+        (secili.note ? ` · ${secili.note}` : '')
+      : '—';
+  }
+}
+
+/* ============================================================
+   GUN SONU RAPORUNU AL = GUN DEGISIMI
+   Raporu goruntulemek gunu kapatmaz; kapanis yalnizca bu islemle olur.
+   ============================================================ */
+async function closeDay() {
+  const acik = donemler.open;
+  if (!acik) return toast('Açık dönem bulunamadı.', 'error');
+
+  const sure = acik.openedAt ? periodDuration(acik.openedAt, acik.asOf) : '';
+  const ozet = recon
+    ? `<br />Bu dönemde <b>${recon.totals.tuketim} paket</b> tüketim işlendi.`
+    : '';
+  const acilis = acik.openedAt
+    ? `Açılış: <b>${formatDateTime(acik.openedAt)}</b>${sure ? ` (${sure} önce)` : ''}`
+    : 'Bu dönemde henüz hiç işlem yok.';
+
+  const onay = await confirmDelete({
+    title: 'Günü kapat ve raporu al',
+    body:
+      `<b>${periodLabel(acik.dayKey)}</b> dönemi kapatılacak.<br />` +
+      `${acilis}${ozet}` +
+      '<br /><br />Kapanıştan sonra bu döneme kayıt eklenemez ve ' +
+      'bu dönemin kayıtlarında <b>sigara değişimi yapılamaz</b>. ' +
+      'Yeni iş günü tam bu anda başlar.',
+    confirmText: 'Günü Kapat'
+  });
+  if (!onay) return;
+
+  const btn = $('closeDayBtn');
+  btn.disabled = true; btn.textContent = 'Kapatılıyor...';
+
+  try {
+    const res = await API.post('/api/reports/close', { note: $('closeNote').value.trim() });
+
+    toast(
+      `${periodLabel(res.closed.dayKey)} kapatıldı. Yeni iş günü başladı.`,
+      'success', 6000
+    );
+
+    $('closeNote').value = '';
+    await App.refreshPeriod();
+    await loadPeriods();
+
+    // Kapanan donemin raporunu goster: yonetici ne kapattigini gorsun
+    $('rPeriod').value = String(res.closed.closureId);
+    await loadReport();
+  } catch (err) {
+    // Bos donem uyarisi: yonetici yine de kapatmak isteyebilir
+    if (err.payload?.code === 'EMPTY_PERIOD') {
+      const zorla = await confirmDelete({
+        title: 'Dönemde hiç işlem yok',
+        body: 'Bu dönemde ne kayıt ne stok hareketi var. Boş günü yine de kapatmak istiyor musunuz?',
+        confirmText: 'Boş Günü Kapat'
+      });
+      if (zorla) {
+        try {
+          const res = await API.post('/api/reports/close', {
+            note: $('closeNote').value.trim(), allowEmpty: true
+          });
+          toast(`${periodLabel(res.closed.dayKey)} (boş) kapatıldı.`, 'success');
+          await App.refreshPeriod();
+          await loadPeriods();
+          await loadReport();
+        } catch (e2) { toast(e2.message, 'error'); }
+      }
+    } else {
+      toast(err.message, 'error', 6000);
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Günü Kapat ve Raporu Al';
+  }
 }
 
 /* ============================================================
@@ -60,13 +202,12 @@ let recon = null;
 
 async function loadReconciliation() {
   const body = $('reconBody');
-  // Mutabakat her zaman TEK GUN icindir; aralik modunda bitis gunu alinir.
-  const gun = mode === 'day' ? $('rDay').value : $('rTo').value;
-
+  // Mutabakat her zaman TEK DONEM icindir; aralik modunda sonuncusu alinir.
   try {
-    recon = await API.get('/api/reports/reconciliation', { day: gun });
+    recon = await API.get('/api/reports/reconciliation', currentScope());
     renderReconciliation();
   } catch (err) {
+    recon = null;
     body.innerHTML = `<tr><td colspan="9" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
@@ -76,7 +217,8 @@ function renderReconciliation() {
   const t = recon.totals;
 
   $('reconInfo').textContent =
-    `${recon.day} · ${recon.rows.length} tür · ${t.sayilan} sayıldı` +
+    `${periodLabel(recon.day)} · ${recon.closed ? 'kapandı' : 'açık'} · ` +
+    `${recon.rows.length} tür · ${t.sayilan} sayıldı` +
     (t.farkli ? ` · ${t.farkli} farklı` : '');
 
   if (!recon.rows.length) {
@@ -152,7 +294,7 @@ async function saveCounts() {
   const btn = $('saveCountBtn');
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
-    recon = await API.post('/api/reports/counts', { day: recon.day, counts });
+    recon = await API.post('/api/reports/counts', { dayKey: recon.day, counts });
     renderReconciliation();
     const farkli = recon.totals.farkli;
     toast(
@@ -165,7 +307,7 @@ async function saveCounts() {
 }
 
 
-/** Tek gun <-> aralik gecisi. */
+/** Donem secimi <-> tarih araligi gecisi. */
 function setMode(yeni) {
   mode = yeni;
   const tekGun = yeni === 'day';
@@ -175,22 +317,29 @@ function setMode(yeni) {
   $('dayPane').classList.toggle('hidden', !tekGun);
   $('rangePane').classList.toggle('hidden', tekGun);
 
-  // Aralik moduna gecerken secili gunu baslangic yap
-  if (!tekGun && $('rDay').value) {
-    $('rFrom').value = $('rDay').value;
-    if (!$('rTo').value) $('rTo').value = $('rDay').value;
-  }
   loadReport();
 }
 
 function render(r) {
-  const bas = new Date(r.range.from), son = new Date(r.range.to);
-  const saatBicim = { hour: '2-digit', minute: '2-digit' };
+  const d = r.period;
 
-  $('rangeLabel').textContent = mode === 'day'
-    ? `${bas.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} günü — ` +
-      `${bas.toLocaleTimeString('tr-TR', saatBicim)} / ${son.toLocaleTimeString('tr-TR', saatBicim)}`
-    : `${formatDateTime(r.range.from)} — ${formatDateTime(r.range.to)} arası döküm`;
+  /* Baslik: acik donemin bitisi YOKTUR — ust sinir (9999) ekrana yazilmaz. */
+  if (d && d.open) {
+    const sure = d.openedAt ? periodDuration(d.openedAt, d.asOf) : '';
+    $('rangeLabel').textContent = d.pristine
+      ? 'Açık dönem — henüz hiç işlem yok, gün sonu raporu alınmadı'
+      : `Açık dönem — ${formatDateTime(d.openedAt)} tarihinden beri` +
+        (sure ? ` (${sure})` : '') + ', henüz kapatılmadı';
+  } else if (d) {
+    $('rangeLabel').textContent =
+      `${periodLabel(d.dayKey)} — ${formatDateTime(d.from)} / ${formatDateTime(d.closedAt)} ` +
+      `· ${d.closedBy} kapattı`;
+  } else {
+    const adet = (r.periods || []).length;
+    $('rangeLabel').textContent =
+      `${formatDateTime(r.range.from)} — ${formatDateTime(r.range.to)} arası döküm` +
+      (adet ? ` (${adet} dönem)` : '');
+  }
 
   /* --- Özet --- */
   $('sIslem').textContent    = r.summary.islem;
@@ -200,6 +349,7 @@ function render(r) {
   $('sSigaraci').textContent = r.summary.sigaraci;
   $('sOnayli').textContent   = r.summary.onayli;
   $('sErken').textContent    = r.summary.erken;
+  $('sDegisim').textContent  = r.summary.degisim ?? 0;
 
   /* --- Marka bazlı --- */
   $('brandBody').innerHTML = r.brands.length
@@ -265,6 +415,22 @@ function render(r) {
         </tr>`).join('')
     : '<tr><td colspan="7" class="empty">Bu aralıkta süresi dolmadan verilen sigara yok.</td></tr>';
 
+  /* --- Sigara değişimleri --- */
+  const degisim = r.exchanges || [];
+  $('swapCount').textContent = `${degisim.length} değişim`;
+  $('swapBody').innerHTML = degisim.length
+    ? degisim.map((x) => `
+        <tr>
+          <td data-label="Saat" class="mono">${formatDateTime(x.created_at)}</td>
+          <td data-label="Oyuncu"><span class="pill player">${esc(x.player_id)}</span></td>
+          <td data-label="Verilen"><b>${esc(x.to_type_name)}</b></td>
+          <td data-label="Değişen" class="muted">${esc(x.from_type_name)} yerine</td>
+          <td data-label="Adet"><span class="pill qty">${x.quantity}</span></td>
+          <td data-label="Gerekçe" class="info-cell">${x.note ? esc(x.note) : '—'}</td>
+          <td data-label="İşlemi Yapan">${esc(x.username)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Bu aralıkta sigara değişimi yapılmamış.</td></tr>';
+
   /* --- Kalan stok (anlık) --- */
   $('stockCount').textContent = `${r.stock.summary.totalPackets} paket · ${r.stock.summary.critical} kritik`;
   $('stockBody').innerHTML = r.stock.cards.length
@@ -291,29 +457,23 @@ function bindEvents() {
   $('modeDay').addEventListener('click', () => setMode('day'));
   $('modeRange').addEventListener('click', () => setMode('range'));
 
-  $('rDay').addEventListener('change', loadReport);
+  $('rPeriod').addEventListener('change', loadReport);
   ['rFrom', 'rTo'].forEach((id) => $(id).addEventListener('change', loadReport));
 
-  $('todayBtn').addEventListener('click', () => {
-    $('rDay').value = gunStr(currentBusinessDay(App.dayStartHour));
+  $('openBtn').addEventListener('click', () => {
+    setMode('day');
+    $('rPeriod').value = 'open';
     loadReport();
   });
 
-  $('yesterdayBtn').addEventListener('click', () => {
-    const d = currentBusinessDay(App.dayStartHour);
-    d.setDate(d.getDate() - 1);
-    $('rDay').value = gunStr(d);
-    loadReport();
-  });
-
-  /** Son N is gunu (bugun dahil). */
+  /** Son N takvim gunu (bugun dahil) — kapanmis donemler etiketlerine gore suzulur. */
   const sonGunler = (adet) => {
-    const son = currentBusinessDay(App.dayStartHour);
+    const son = new Date();
     const bas = new Date(son);
     bas.setDate(bas.getDate() - (adet - 1));
     $('rFrom').value = gunStr(bas);
     $('rTo').value = gunStr(son);
-    loadReport();
+    setMode('range');
   };
 
   $('week7Btn').addEventListener('click', () => sonGunler(7));
@@ -321,7 +481,10 @@ function bindEvents() {
 
   $('printBtn').addEventListener('click', () => window.print());
   $('saveCountBtn').addEventListener('click', saveCounts);
+  $('closeDayBtn').addEventListener('click', closeDay);
+
   $('csvBtn').addEventListener('click', () => {
-    window.location.href = `/api/reports/reconciliation.csv?day=${encodeURIComponent(recon.day)}`;
+    if (!recon) return toast('Önce mutabakat tablosu yüklenmeli.', 'error');
+    window.location.href = `/api/reports/reconciliation.csv?dayKey=${encodeURIComponent(recon.day)}`;
   });
 }

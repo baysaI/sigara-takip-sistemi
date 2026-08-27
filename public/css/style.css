@@ -569,6 +569,7 @@ input.ac-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(229, 
 
 /* Erken alim ekrani: kalan sureyi one cikaran blok */
 .gate-early { --warn-line: #4a9eff; }
+.gate-swap  { --warn-line: #a874ff; }
 .early-count {
   background: #0d141c;
   border-left: 5px solid var(--warn-line);
@@ -719,6 +720,11 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 .pill.locked { background: var(--danger-soft); border-color: rgba(229, 72, 77, .45); color: #ff9ea1; }
 .pill.free   { background: var(--ok-soft); border-color: rgba(46, 160, 67, .45); color: #6fe093; }
 .pill.early  { background: rgba(74, 158, 255, .14); border-color: rgba(74, 158, 255, .5); color: #6fb6ff; }
+/* Sigara degisimi: yerine gecen kaydin rozeti */
+.pill.swap   { background: rgba(168, 116, 255, .14); border-color: rgba(168, 116, 255, .5); color: #c3a0ff; }
+
+/* Degistirilmis (yerini yenisine birakmis) kayit: arsivde durur ama soluk */
+.row-superseded { opacity: .55; }
 .info-cell { color: var(--text-faint); font-style: italic; max-width: 220px; }
 .empty { text-align: center; padding: 32px 16px; color: var(--text-faint); line-height: 1.7; }
 
