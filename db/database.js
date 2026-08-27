@@ -227,7 +227,12 @@ CREATE TABLE IF NOT EXISTS record_cancellations (
   restocked      INTEGER NOT NULL DEFAULT 1 CHECK (restocked IN (0,1)),
   user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
   username       TEXT    NOT NULL,
-  created_at     TEXT    NOT NULL
+  created_at     TEXT    NOT NULL,
+  -- Iptal geri alindiysa doldurulur. Satir SILINMEZ: "iptal edildi,
+  -- sonra geri alindi" izi denetim icin kalir. Aktif iptal, ayni kayda
+  -- ait reverted_at IS NULL olan satirdir.
+  reverted_at    TEXT,
+  reverted_by    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_cancel_created ON record_cancellations (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cancel_record  ON record_cancellations (record_id);
@@ -288,6 +293,11 @@ addColumn('records', 'cancelled_at', 'TEXT');
 addColumn('records', 'cancelled_by', 'TEXT');
 addColumn('records', 'cancel_reason', 'TEXT');
 addColumn('records', 'cancel_late', 'INTEGER NOT NULL DEFAULT 0');
+
+// Iptalin geri alinmasi. CREATE TABLE IF NOT EXISTS mevcut tabloya
+// sutun eklemedigi icin burada da tanimlanir.
+addColumn('record_cancellations', 'reverted_at', 'TEXT');
+addColumn('record_cancellations', 'reverted_by', 'TEXT');
 
 // Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
 db.exec(`
