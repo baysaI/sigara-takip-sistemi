@@ -12,12 +12,17 @@ module.exports = {
   COOLDOWN_HOURS,
   COOLDOWN_MS: COOLDOWN_HOURS * 60 * 60 * 1000,
 
-  /**
-   * Gun degisimi saati. Isletme gunu 00:00'da degil bu saatte baslar:
-   * 06:00 verilirse 25 Agustos 06:00 ile 26 Agustos 05:59 arasi
-   * "25 Agustos" is gunu sayilir.
+  /*
+   * DAY_START_HOUR ARTIK KULLANILMIYOR.
+   *
+   * Gun degisimi saate bagli degildir: acik donem, yonetici gun sonu
+   * raporunu ALANA kadar surer (POST /api/reports/close). Sinirlar
+   * day_closures tablosundan gelir — bkz. services/businessDay.js.
+   *
+   * .env'deki eski deger yalnizca BIR KEZ, mevcut kurulumlarin gecmisini
+   * kapanis kayitlarina cevirirken okunur (db/database.js backfillClosures).
+   * Yeni kurulumlarda hicbir etkisi yoktur.
    */
-  DAY_START_HOUR: Math.min(23, Math.max(0, Number(process.env.DAY_START_HOUR ?? 6))),
 
   /** Arsiv sayfa boyutu */
   DEFAULT_PAGE_SIZE: 50,

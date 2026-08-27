@@ -8,6 +8,7 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const config = require('./config');
 const { db } = require('./db/database');
 const { requireAuth } = require('./middleware/auth');
+const { openPeriod } = require('./services/businessDay');
 
 const authRoutes = require('./routes/auth');
 const lookupRoutes = require('./routes/lookups');
@@ -86,7 +87,9 @@ app.get('/api/config', (req, res) => {
   res.json({
     ok: true,
     cooldownHours: config.COOLDOWN_HOURS,
-    dayStartHour: config.DAY_START_HOUR,
+    // Gun degisimi artik saate bagli degil: acik donem, gun sonu raporu
+    // alinana kadar surer. Arayuz "iş günü" etiketini bundan uretir.
+    period: openPeriod(),
     serverTime: new Date().toISOString()
   });
 });
