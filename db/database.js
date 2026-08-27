@@ -195,6 +195,43 @@ CREATE TABLE IF NOT EXISTS record_exchanges (
 CREATE INDEX IF NOT EXISTS idx_exchanges_created ON record_exchanges (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_exchanges_record  ON record_exchanges (record_id);
 CREATE INDEX IF NOT EXISTS idx_exchanges_player  ON record_exchanges (player_id);
+
+-- ---------------------------------------------------------------
+-- record_cancellations: IPTAL EDILEN SATISLAR
+--   Musteri sigarayi aldiktan sonra iade ederse satis aktif
+--   kayitlardan cikar ama SILINMEZ; records.cancelled_at doldurulur
+--   ve olayin detayi buraya yazilir.
+--
+--   late = iptal, satisin ait oldugu donem KAPANDIKTAN sonra mi yapildi?
+--     0 -> ayni donem icinde iptal. Satis o donemde hic olmamis sayilir;
+--          stok iadesi reason='kayit' (+adet) yazilir, donemin TUKETIMI
+--          kendiliginden sifirlanir.
+--     1 -> gec iptal. Kapanmis gunun raporu DEGISMEZ (satis orada kalir);
+--          iade cari doneme reason='duzeltme' olarak duser. Muhasebedeki
+--          "gecmis defteri duzeltme, cari doneme iade fisi kes" kurali.
+--
+--   sale_day_key / cancel_day_key: satisin ve iptalin donem etiketleri.
+--   Ikisi farkliysa gec iptaldir; raporda hangi gune ait oldugu gorunur.
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS record_cancellations (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  record_id      INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+  player_id      TEXT    NOT NULL,
+  cigarette_type TEXT    NOT NULL,
+  type_id        INTEGER REFERENCES cigarette_types(id) ON DELETE SET NULL,
+  quantity       INTEGER NOT NULL CHECK (quantity > 0),
+  reason         TEXT,
+  sale_day_key   TEXT,
+  cancel_day_key TEXT,
+  late           INTEGER NOT NULL DEFAULT 0 CHECK (late IN (0,1)),
+  restocked      INTEGER NOT NULL DEFAULT 1 CHECK (restocked IN (0,1)),
+  user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  username       TEXT    NOT NULL,
+  created_at     TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cancel_created ON record_cancellations (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cancel_record  ON record_cancellations (record_id);
+CREATE INDEX IF NOT EXISTS idx_cancel_player  ON record_cancellations (player_id);
 `;
 
 db.exec(SCHEMA);
@@ -243,10 +280,20 @@ addColumn('records', 'exchanged_from', 'INTEGER REFERENCES records(id) ON DELETE
 addColumn('records', 'exchanged_at', 'TEXT');
 addColumn('records', 'exchanged_by', 'TEXT');
 
+// Iptal edilen satis. Kayit silinmez; aktif kayitlardan cikar ve
+// "Iptal Edilenler" bolumunde arsivlenir. cancel_late, iptalin satis
+// donemi kapandiktan SONRA yapilip yapilmadigini soyler — raporlarin
+// hangi donemde neyi sayacagi buna bagli (bkz. services/cancellation.js).
+addColumn('records', 'cancelled_at', 'TEXT');
+addColumn('records', 'cancelled_by', 'TEXT');
+addColumn('records', 'cancel_reason', 'TEXT');
+addColumn('records', 'cancel_late', 'INTEGER NOT NULL DEFAULT 0');
+
 // Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_records_superseded ON records (superseded_by);
   CREATE INDEX IF NOT EXISTS idx_records_exchfrom   ON records (exchanged_from);
+  CREATE INDEX IF NOT EXISTS idx_records_cancelled  ON records (cancelled_at);
 `);
 
 /* ------------------------------------------------------------------
