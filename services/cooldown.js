@@ -14,21 +14,31 @@ function normalizePlayerId(raw) {
 }
 
 /*
- * Degistirilmis kayitlar (superseded_by dolu) sayilmaz: sigara degisiminde
- * orijinal kayit arsivde kalir ama gecerli olan yerine gecen kayittir.
- * Yeni kayit orijinalin created_at'ini devraldigi icin 4 saat sayaci
- * degisimden etkilenmez — degisim yeni bir hak kullanimi degildir.
+ * Sayac yalnizca GECERLI kayitlara bakar:
+ *
+ *   superseded_by  Sigara degisiminde orijinal kayit arsivde kalir ama
+ *                  gecerli olan yerine gecen kayittir. Yeni kayit
+ *                  orijinalin created_at'ini devraldigi icin sayac
+ *                  degisimden etkilenmez — degisim yeni hak degildir.
+ *
+ *   cancelled_at   Iptal edilen satis hic olmamis sayilir; oyuncu hakkini
+ *                  kullanmamistir, olmamis bir satis icin bekletilmez.
+ *                  Gec iptalde bile sayac serbest kalir — rapor (muhasebe)
+ *                  ile sayacin (hak) farkli davranmasi kasitlidir,
+ *                  bkz. services/cancellation.js.
  */
+const AKTIF = 'superseded_by IS NULL AND cancelled_at IS NULL';
+
 const lastRecordStmt = db.prepare(`
   SELECT id, player_id, cigarette_type, quantity, waiter_name, username, info, created_at
   FROM records
-  WHERE player_id = ? AND superseded_by IS NULL
+  WHERE player_id = ? AND ${AKTIF}
   ORDER BY created_at DESC, id DESC
   LIMIT 1
 `);
 
 const totalCountStmt = db.prepare(
-  'SELECT COUNT(*) AS c FROM records WHERE player_id = ? AND superseded_by IS NULL'
+  `SELECT COUNT(*) AS c FROM records WHERE player_id = ? AND ${AKTIF}`
 );
 
 /** Bir oyuncunun son kaydini dondurur (yoksa undefined). */

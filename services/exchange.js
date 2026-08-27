@@ -83,6 +83,15 @@ function assertExchangeable(recordId) {
     );
   }
 
+  // Iptal edilmis satis artik yok hukmunde: stogu iade edilmistir,
+  // degisim yapmak iade edilmis sigarayi ikinci kez dagitmak olurdu.
+  if (kayit.cancelled_at) {
+    throw hata(
+      'Bu satış iptal edilmiş; iptal edilen bir satışta sigara değişimi yapılamaz.',
+      409, { cancelledAt: kayit.cancelled_at }
+    );
+  }
+
   // Kapanmis bir donemin kaydi degistirilemez: kayit eski doneme, stok
   // hareketi yeni doneme duserdi ve iki gunun mutabakati da bozulurdu.
   if (!isOpen(kayit.created_at)) {
@@ -223,6 +232,7 @@ function exchangeableRecords(playerId, { limit = 10 } = {}) {
     FROM records
     WHERE player_id = ?
       AND superseded_by IS NULL
+      AND cancelled_at IS NULL
       AND created_at BETWEEN ? AND ?
     ORDER BY created_at DESC, id DESC
     LIMIT ?
