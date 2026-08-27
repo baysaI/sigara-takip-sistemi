@@ -142,6 +142,59 @@ CREATE TABLE IF NOT EXISTS daily_counts (
   UNIQUE (business_day, type_id)
 );
 CREATE INDEX IF NOT EXISTS idx_counts_day ON daily_counts (business_day);
+
+-- ---------------------------------------------------------------
+-- day_closures: gun sonu raporu alindiginda islenen KAPANIS kaydi
+--   Is gunu artik duvar saatinden hesaplanmaz; gun, raporu alan
+--   yonetici kapatana kadar acik kalir. Her satir kapanmis bir donemdir:
+--     opened_at  donem baslangici (bir onceki kapanisin closed_at'i)
+--     closed_at  raporun alindigi an
+--   Acik donem = son kapanisin closed_at'inden simdiye kadar; ayri bir
+--   satiri yoktur, yoklugundan anlasilir.
+--
+--   day_key      donemin etiketi (YYYY-MM-DD, donemin ACILIS tarihi).
+--                Ayni takvim gununde ikinci kez kapanis yapilirsa
+--                '#2', '#3' soneki alir; daily_counts bu anahtara baglidir.
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS day_closures (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  day_key    TEXT    NOT NULL UNIQUE,
+  opened_at  TEXT    NOT NULL,
+  closed_at  TEXT    NOT NULL,
+  user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  closed_by  TEXT    NOT NULL,
+  note       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_closures_closed ON day_closures (closed_at DESC);
+
+-- ---------------------------------------------------------------
+-- record_exchanges: sigara degisimi (Hizli Kayit -> "Sigara Degistir")
+--   Misafir aldigi sigarayi baska bir turle degistirdiginde ilk kayit
+--   SILINMEZ; superseded_by ile yeni kayda baglanir ve arsivde kalir.
+--   Bu tablo degisimin kendi olayidir: neyin neyle, ne zaman, kim
+--   tarafindan degistirildigi.
+--
+--   Not: yeni kayit orijinalin created_at'ini devralir (4 saat sayaci
+--   bozulmasin diye). Degisimin GERCEK ani bu tablodaki created_at'tir.
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS record_exchanges (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  record_id      INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+  new_record_id  INTEGER REFERENCES records(id) ON DELETE SET NULL,
+  player_id      TEXT    NOT NULL,
+  from_type_id   INTEGER REFERENCES cigarette_types(id) ON DELETE SET NULL,
+  from_type_name TEXT    NOT NULL,
+  to_type_id     INTEGER REFERENCES cigarette_types(id) ON DELETE SET NULL,
+  to_type_name   TEXT    NOT NULL,
+  quantity       INTEGER NOT NULL CHECK (quantity > 0),
+  note           TEXT,
+  user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  username       TEXT    NOT NULL,
+  created_at     TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_exchanges_created ON record_exchanges (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_exchanges_record  ON record_exchanges (record_id);
+CREATE INDEX IF NOT EXISTS idx_exchanges_player  ON record_exchanges (player_id);
 `;
 
 db.exec(SCHEMA);
@@ -181,5 +234,93 @@ addColumn('records', 'early_release', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('records', 'early_remaining_ms', 'INTEGER');
 addColumn('records', 'early_approved_by', 'TEXT');
 addColumn('records', 'early_note', 'TEXT');
+
+// Sigara degisimi. Ilk kayit silinmez: superseded_by ile yerine gecen kayda
+// baglanir ve arsivde "DEGISTIRILDI" olarak gorunur. Rapor/istatistik
+// toplamlari superseded_by IS NULL suzgecini kullanir ki adet iki kez sayilmasin.
+addColumn('records', 'superseded_by', 'INTEGER REFERENCES records(id) ON DELETE SET NULL');
+addColumn('records', 'exchanged_from', 'INTEGER REFERENCES records(id) ON DELETE SET NULL');
+addColumn('records', 'exchanged_at', 'TEXT');
+addColumn('records', 'exchanged_by', 'TEXT');
+
+// Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_records_superseded ON records (superseded_by);
+  CREATE INDEX IF NOT EXISTS idx_records_exchfrom   ON records (exchanged_from);
+`);
+
+/* ------------------------------------------------------------------
+   Migrasyon: gun kavrami saat tabanlidan KAPANIS tabanlina gecti.
+
+   Eski kurulumda is gunu duvar saatinden hesaplaniyordu (DAY_START_HOUR,
+   varsayilan 06:00). Gecmis veriyi oldugu gibi birakirsak tum arsiv tek
+   bir devasa "acik donem" gorunur, eski gun sonu raporlari ve kaydedilmis
+   fiziksel sayimlar anlamini yitirirdi.
+
+   Bu yuzden gecmis gunler eski kurala gore geriye donuk KAPANIS satirlarina
+   cevrilir. Icinde bulunulan gun kapatilmaz — acik kalir, ilk raporu
+   yonetici aldiginda kapanir.
+
+   Yalnizca day_closures bosken ve gercekten gecmis veri varken calisir.
+   ------------------------------------------------------------------ */
+function backfillClosures() {
+  const varMi = db.prepare('SELECT COUNT(*) AS c FROM day_closures').get().c;
+  if (varMi > 0) return 0;
+
+  const ilk = db.prepare(`
+    SELECT MIN(t) AS ilk FROM (
+      SELECT MIN(created_at) AS t FROM records
+      UNION ALL
+      SELECT MIN(created_at) AS t FROM stock_movements
+    ) WHERE t IS NOT NULL
+  `).get().ilk;
+
+  if (!ilk) return 0;   // temiz kurulum: kapatilacak gecmis yok
+
+  const saat = Math.min(23, Math.max(0, Number(process.env.DAY_START_HOUR ?? 6)));
+
+  /** Eski kural: saat gun baslangicindan onceyse bir onceki takvim gunu. */
+  const isGunu = (an) => {
+    const d = new Date(an);
+    if (d.getHours() < saat) d.setDate(d.getDate() - 1);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+  const anahtar = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const baslangic = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), saat, 0, 0, 0);
+
+  const ilkGun = isGunu(ilk);
+  const buGun = isGunu(new Date());
+
+  const ekle = db.prepare(`
+    INSERT INTO day_closures (day_key, opened_at, closed_at, user_id, closed_by, note)
+    VALUES (?, ?, ?, NULL, 'sistem', ?)
+  `);
+
+  let sayac = 0;
+  const aktar = db.transaction(() => {
+    for (let g = new Date(ilkGun); g < buGun; g.setDate(g.getDate() + 1)) {
+      const acilis = baslangic(g);
+      const kapanis = new Date(acilis);
+      kapanis.setDate(kapanis.getDate() + 1);
+
+      ekle.run(
+        anahtar(g),
+        acilis.toISOString(),
+        kapanis.toISOString(),
+        `Gecmis aktarim: eski ${String(saat).padStart(2, '0')}:00 kuralindan uretildi`
+      );
+      sayac++;
+    }
+  });
+  aktar();
+
+  return sayac;
+}
+
+const aktarilan = backfillClosures();
+if (aktarilan) {
+  console.log(`[migrasyon] ${aktarilan} gecmis is gunu kapanis kaydina donusturuldu.`);
+}
 
 module.exports = { db, DB_PATH };
