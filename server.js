@@ -45,7 +45,7 @@ app.use(session({
 /* ------------------------- Korumali sayfalar ------------------------ */
 // Oturum gerektiren sayfalar. express.static'ten ONCE tanimlanir,
 // yoksa statik katman dosyayi kontrolsuz servis eder.
-const PROTECTED_PAGES = ['kayit', 'arsiv', 'sorgu', 'stok', 'rapor', 'yonetim'];
+const PROTECTED_PAGES = ['kayit', 'arsiv', 'iptal', 'sorgu', 'stok', 'rapor', 'yonetim'];
 
 app.get(['/', '/index.html'], (req, res) => {
   res.redirect(req.session?.user ? '/kayit.html' : '/login.html');

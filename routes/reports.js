@@ -29,13 +29,28 @@ const {
 } = require('../services/businessDay');
 const { buildReconciliation, saveCounts } = require('../services/reconciliation');
 const { exchangesInRange } = require('../services/exchange');
+const { cancellationsInRange } = require('../services/cancellation');
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireAdmin);   // gun sonu raporu yalnizca yoneticiye
 
-/** Degistirilmis kayitlari toplamlarin disinda birakan suzgec. */
-const AKTIF = 'superseded_by IS NULL';
+/**
+ * Raporun toplamlarina hangi kayitlar girer.
+ *
+ *   superseded_by IS NULL   Degistirilmis kayit sayilmaz; gecerli olan
+ *                           yerine gecen kayittir.
+ *
+ *   cancelled_at IS NULL    Iptal edilen satis sayilmaz...
+ *   OR cancel_late = 1      ...AMA gec iptal edilmisse sayilir.
+ *
+ * Gec iptal (satis donemi kapandiktan sonra yapilan iptal) kapanmis
+ * gunun raporunu DEGISTIRMEZ: o gun sigara gercekten satilmisti. Iade
+ * cari doneme duzeltme olarak duser. Kapanmis raporun sayilarini geriye
+ * donuk oynatmak "gun kapandi" kavramini anlamsizlastirirdi.
+ * Ayrinti: services/cancellation.js
+ */
+const AKTIF = 'superseded_by IS NULL AND (cancelled_at IS NULL OR cancel_late = 1)';
 
 /**
  * Rapor kapsamini cozer.
@@ -147,6 +162,11 @@ router.get('/daily', asyncHandler((req, res) => {
   /* --- Sigara degisimleri --- */
   const degisimler = exchangesInRange(from, to);
 
+  /* --- Bu donemde YAPILAN iptaller ---
+     Gec iptaller de burada gorunur: satis baska bir gune ait olsa da
+     iade bu donemde islenmistir (sale_day_key farkli olur). */
+  const iptaller = cancellationsInRange(from, to);
+
   /* --- Donem icindeki stok hareketleri --- */
   const stokHareket = db.prepare(`
     SELECT
@@ -176,6 +196,8 @@ router.get('/daily', asyncHandler((req, res) => {
       onayli: onaylilar.length,
       erken: erkenler.length,
       degisim: degisimler.length,
+      iptal: iptaller.length,
+      iptalPaket: iptaller.reduce((t, x) => t + x.quantity, 0),
       stokGiris: stokHareket.giris,
       stokCikis: stokHareket.cikis
     },
@@ -185,6 +207,7 @@ router.get('/daily', asyncHandler((req, res) => {
     approvals: onaylilar,
     earlyReleases: erkenler,
     exchanges: degisimler,
+    cancellations: iptaller,
     restocks: ikmaller,
     // Kalan stok raporu her zaman ANLIK durumu gosterir
     stock: { cards: listStock(), summary: stockSummary() },

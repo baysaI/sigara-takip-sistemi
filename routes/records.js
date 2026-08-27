@@ -8,17 +8,26 @@ const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
 const { openPeriod } = require('../services/businessDay');
 const { exchangeRecord, exchangeableRecords, assertExchangeable } = require('../services/exchange');
+const { cancelRecord, assertCancellable, listCancellations } = require('../services/cancellation');
 const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, COOLDOWN_HOURS } = require('../config');
 
 const router = express.Router();
 router.use(requireAuth);
 
 /**
- * Degistirilmis kayitlari toplamlarin disinda birakan suzgec.
- * Sigara degisiminde orijinal kayit arsivde kalir (silinmez) ama gecerli
- * olan yerine gecen kayittir; ikisi de sayilirsa adet iki kat gorunur.
+ * Toplamlara hangi kayitlar girer.
+ *
+ *   superseded_by IS NULL   Degistirilmis kayit sayilmaz; sigara
+ *                           degisiminde orijinal arsivde kalir ama gecerli
+ *                           olan yerine gecen kayittir (ikisi de sayilirsa
+ *                           adet iki kat gorunur).
+ *
+ *   cancelled_at IS NULL    Iptal edilen satis sayilmaz...
+ *   OR cancel_late = 1      ...AMA satis donemi kapandiktan sonra iptal
+ *                           edilmisse kapanmis gunun raporunda kalir.
+ *                           Bkz. services/cancellation.js
  */
-const AKTIF = 'superseded_by IS NULL';
+const AKTIF = 'superseded_by IS NULL AND (cancelled_at IS NULL OR cancel_late = 1)';
 
 const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
 
@@ -206,10 +215,16 @@ router.post('/', asyncHandler((req, res) => {
 /* GET /api/records - filtreli arsiv                                   */
 /* Parametreler: playerId, waiter, type, user, from, to, page, pageSize */
 /* from/to: ISO tarih-saat (frontend yerel tarihi ISO'ya cevirir)       */
+/*                                                                     */
+/* Iptal edilen satislar bu listede GORUNMEZ: aktif kayitlardan cikip  */
+/* "Iptal Edilenler" bolumune (GET /cancelled) tasinirlar.             */
+/* ?includeCancelled=1 ile yine de dahil edilebilir.                   */
 /* ------------------------------------------------------------------ */
 router.get('/', asyncHandler((req, res) => {
   const where = [];
   const params = {};
+
+  if (req.query.includeCancelled !== '1') where.push('cancelled_at IS NULL');
 
   if (req.query.playerId) {
     where.push('player_id LIKE @playerId');
@@ -261,7 +276,8 @@ router.get('/', asyncHandler((req, res) => {
   const rows = db.prepare(`
     SELECT id, player_id, cigarette_type, quantity, waiter_name, username, info, created_at,
            flag_level, approved_by, early_release, early_remaining_ms, early_approved_by,
-           superseded_by, exchanged_from, exchanged_at, exchanged_by
+           superseded_by, exchanged_from, exchanged_at, exchanged_by,
+           cancelled_at, cancelled_by, cancel_reason, cancel_late
     FROM records
     ${whereSql}
     ORDER BY created_at DESC, id DESC
@@ -435,6 +451,58 @@ router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
 /* Ilk kayit SILINMEZ; arsivde kalir ve yerine gecen kayda baglanir.   */
 /* 4 saat sayaci degisimden etkilenmez (bkz. services/exchange.js).    */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/* IPTAL EDILEN SATISLAR                                               */
+/*                                                                     */
+/* GET  /api/records/cancelled     Iptal Edilenler / Arsiv listesi     */
+/* POST /api/records/:id/cancel    satisi iptal et (yumusak)           */
+/*                                                                     */
+/* Kayit SILINMEZ: aktif listeden cikar, tum gecmisiyle iptal          */
+/* bolumunde durur. Stok iade edilir; satis donemi kapanmissa iade     */
+/* cari doneme duzeltme olarak duser (bkz. services/cancellation.js).  */
+/* ------------------------------------------------------------------ */
+router.get('/cancelled', asyncHandler((req, res) => {
+  const sonuc = listCancellations({
+    playerId: req.query.playerId ? normalizePlayerId(req.query.playerId) : '',
+    type: String(req.query.type || '').trim(),
+    user: String(req.query.user || '').trim(),
+    from: String(req.query.from || ''),
+    to: String(req.query.to || ''),
+    late: String(req.query.late ?? ''),
+    page: req.query.page,
+    pageSize: Math.min(MAX_PAGE_SIZE, Number(req.query.pageSize) || DEFAULT_PAGE_SIZE)
+  });
+  res.json({ ok: true, ...sonuc, serverTime: new Date().toISOString() });
+}));
+
+router.post('/:id/cancel', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+
+  const reason = String(req.body.reason || '').trim() || null;
+  if (reason && reason.length > 255) {
+    return res.status(400).json({ ok: false, error: 'Iptal nedeni en fazla 255 karakter olabilir.' });
+  }
+
+  // Uygunluk kontrolu islemden ONCE: hata mesaji net olsun
+  assertCancellable(id);
+
+  const sonuc = cancelRecord({
+    recordId: id,
+    reason,
+    restock: req.body.restock !== false,
+    user: req.session.user
+  });
+
+  res.status(201).json({
+    ok: true,
+    ...sonuc,
+    status: getCooldownStatus(sonuc.record.player_id)   // sayac serbest kalmis olmali
+  });
+}));
+
 router.get('/exchangeable', asyncHandler((req, res) => {
   const playerId = normalizePlayerId(req.query.playerId);
   if (!playerId) {
