@@ -53,6 +53,92 @@ function confirmDelete({ title, body, confirmText = 'Sil' }) {
 }
 
 /**
+ * SATIS IPTALI onayi.
+ *
+ * Silmeden farki: kayit yok olmaz, "Iptal Edilenler" bolumune tasinir ve
+ * tum gecmisiyle orada durur. Bu yuzden pencere kirmizi/yikici degil,
+ * bilgilendirici tonda ve ne olacagini madde madde yazar.
+ *
+ * @param {object} o
+ * @param {object} o.record  {player_id, cigarette_type, quantity, created_at}
+ * @param {boolean} o.late   Satisin donemi kapanmis mi (gec iptal)
+ * @returns {Promise<null | {reason:string}>}
+ */
+function confirmCancel({ record, late }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay gate-cancel';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    /* Gec iptalde muhasebe farkli isler; yonetici bunu ONCEDEN bilmeli. */
+    const gecUyari = late ? `
+      <p class="gate-hint" style="border-left:3px solid var(--accent);padding-left:10px">
+        <b>Bu satış kapanmış bir güne ait.</b> O günün raporu
+        <b>değişmeyecek</b> — sigara o gün gerçekten satılmıştı.
+        İade, <b>bugünün dönemine</b> düzeltme hareketi olarak işlenecek.
+      </p>` : '';
+
+    overlay.innerHTML = `
+      <div class="gate-box" style="max-width:460px">
+        <div class="gate-head">
+          <span class="gate-icon" aria-hidden="true">🚫</span>
+          <h2>Satışı iptal et</h2>
+        </div>
+
+        <div class="gate-player">
+          Oyuncu <b>${esc(record.player_id)}</b>
+        </div>
+
+        <div class="cooldown-meta" style="font-size:14px;line-height:1.7;margin-bottom:14px">
+          <b>${esc(record.cigarette_type)} ×${record.quantity}</b><br />
+          Kayıt saati: <b>${formatDateTime(record.created_at)}</b>
+        </div>
+
+        <div class="field">
+          <label for="cancelReason">İptal nedeni <span class="muted">(opsiyonel)</span></label>
+          <input type="text" id="cancelReason" maxlength="255"
+                 placeholder="ör. müşteri iade etti" autocomplete="off" />
+        </div>
+
+        ${gecUyari}
+
+        <p class="gate-hint">
+          Kayıt <b>silinmez</b> — aktif arşivden çıkar, <b>İptaller</b> bölümünde
+          tüm detaylarıyla kalır.<br />
+          Sigara <b>stoğa geri döner</b>.<br />
+          Oyuncunun <b>${App.cooldownHours} saat sayacı serbest kalır</b>: iptal edilen
+          satış hak kullanımı sayılmaz.
+        </p>
+
+        <div class="gate-actions">
+          <button class="btn-ghost" data-no>Vazgeç</button>
+          <button class="btn-danger" data-yes>Satışı İptal Et</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const kapat = (sonuc) => {
+      document.body.style.overflow = '';
+      overlay.remove();
+      document.removeEventListener('keydown', escTus);
+      resolve(sonuc);
+    };
+    const escTus = (e) => { if (e.key === 'Escape') kapat(null); };
+    document.addEventListener('keydown', escTus);
+
+    overlay.querySelector('[data-no]').addEventListener('click', () => kapat(null));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) kapat(null); });
+    overlay.querySelector('[data-yes]').addEventListener('click', () =>
+      kapat({ reason: overlay.querySelector('#cancelReason').value.trim() }));
+
+    overlay.querySelector('#cancelReason').focus();
+  });
+}
+
+/**
  * Toplu sifirlama onayi — kapsam secimi + kelime yazarak dogrulama.
  * @param {Array<{key:string,label:string,count:number}>} scopes
  * @param {string} confirmWord

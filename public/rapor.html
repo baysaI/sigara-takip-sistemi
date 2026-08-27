@@ -124,6 +124,7 @@
       <div class="stat danger"> <div class="label">Özel Onaylı</div>   <div class="value" id="sOnayli">-</div></div>
       <div class="stat danger"> <div class="label">Erken Alım</div>    <div class="value" id="sErken">-</div></div>
       <div class="stat accent"> <div class="label">Sigara Değişimi</div><div class="value" id="sDegisim">-</div></div>
+      <div class="stat danger"> <div class="label">İptal Edilen</div>  <div class="value" id="sIptal">-</div></div>
     </section>
 
     <div class="split">
@@ -206,6 +207,24 @@
       <div class="pager">
         <span class="info">
           İlk kayıt silinmez, arşivde kalır. Dağıtılan paket toplamı değişime göre hesaplanır.
+        </span>
+      </div>
+    </section>
+
+    <!-- İptal edilen satışlar -->
+    <section class="card">
+      <h2>🚫 İptal Edilen Satışlar <span class="badge-count" id="cancelCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr><th>İptal Saati</th><th>Oyuncu</th><th>Sigara</th><th>Adet</th><th>Satış Günü</th><th>Neden</th><th>İptal Eden</th></tr>
+          </thead>
+          <tbody id="cancelBody"><tr><td colspan="7" class="empty">—</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="info" id="cancelNote">
+          Bu dönemde yapılan iptaller. Kayıtlar silinmez, İptaller bölümünde saklanır.
         </span>
       </div>
     </section>

@@ -568,8 +568,9 @@ input.ac-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(229, 
 .gate-actions button { flex: 1 1 140px; }
 
 /* Erken alim ekrani: kalan sureyi one cikaran blok */
-.gate-early { --warn-line: #4a9eff; }
-.gate-swap  { --warn-line: #a874ff; }
+.gate-early  { --warn-line: #4a9eff; }
+.gate-swap   { --warn-line: #a874ff; }
+.gate-cancel { --warn-line: var(--danger); }
 .early-count {
   background: #0d141c;
   border-left: 5px solid var(--warn-line);

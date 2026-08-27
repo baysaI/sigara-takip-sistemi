@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#161c24" />
+  <title>İptal Edilenler — Sigara Takip Sistemi</title>
+  <link rel="stylesheet" href="/css/style.css?v=1.1.0" />
+</head>
+<body>
+
+  <main class="container">
+
+    <div class="page-head">
+      <h1>🚫 İptal Edilenler</h1>
+      <p>İptal veya iade edilen satışlar. Kayıtlar silinmez — işlem geçmişi
+         ve detayları burada korunur.
+         <span class="muted">Aktif kayıtlar için <a href="/arsiv.html">Arşiv</a>.</span></p>
+    </div>
+
+    <!-- Özet kartları -->
+    <section class="stats">
+      <div class="stat danger"> <div class="label">İptal Edilen</div>   <div class="value" id="sTotal">-</div></div>
+      <div class="stat">        <div class="label">İade Paket</div>    <div class="value" id="sQty">-</div></div>
+      <div class="stat accent"> <div class="label">Geç İptal</div>      <div class="value" id="sLate">-</div></div>
+    </section>
+
+    <section class="card card-overflow">
+      <h2>Filtreler</h2>
+      <div class="card-body">
+        <div class="filters">
+          <div class="field">
+            <label for="fPlayer">Oyuncu ID</label>
+            <input type="text" id="fPlayer" placeholder="Ara..." inputmode="text" />
+          </div>
+          <div class="field">
+            <label for="fType">Sigara Türü</label>
+            <select id="fType"><option value="">Tümü</option></select>
+          </div>
+          <div class="field">
+            <label for="fUser">İptal Eden</label>
+            <select id="fUser"><option value="">Tümü</option></select>
+          </div>
+          <div class="field">
+            <label for="fLate">Tür</label>
+            <select id="fLate">
+              <option value="">Tümü</option>
+              <option value="0">Aynı gün iptal</option>
+              <option value="1">Geç iptal (gün kapandıktan sonra)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fFrom">Başlangıç</label>
+            <input type="date" id="fFrom" />
+          </div>
+          <div class="field">
+            <label for="fTo">Bitiş</label>
+            <input type="date" id="fTo" />
+          </div>
+          <div class="filter-actions">
+            <button class="btn-ghost btn-sm" id="clearFilters">Filtreleri Temizle</button>
+          </div>
+        </div>
+        <p class="muted mt">
+          Tarih filtresi <b>iptalin yapıldığı</b> ana göredir, satışın tarihine değil.
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>İptal Kayıtları <span class="badge-count" id="cancelCount"></span></h2>
+
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>İptal Tarihi</th><th>Oyuncu ID</th><th>Sigara Türü</th>
+              <th>Adet</th><th>Satış Tarihi</th><th>Neden</th>
+              <th>İptal Eden</th><th>Garson</th>
+            </tr>
+          </thead>
+          <tbody id="cancelBody">
+            <tr><td colspan="8" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="info" id="pagerInfo">—</span>
+        <button class="btn-ghost btn-sm" id="prevPage" disabled>‹ Önceki</button>
+        <button class="btn-ghost btn-sm" id="nextPage" disabled>Sonraki ›</button>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="/js/api.js?v=1.1.0"></script>
+  <script src="/js/layout.js?v=1.1.0"></script>
+  <script src="/js/iptal.js?v=1.1.0"></script>
+</body>
+</html>

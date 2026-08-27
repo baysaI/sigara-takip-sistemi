@@ -52,6 +52,9 @@ const App = {
 const NAV_ITEMS = [
   { href: '/kayit.html',   icon: '⚡', label: 'Kayıt' },
   { href: '/arsiv.html',   icon: '🗂️', label: 'Arşiv' },
+  // Iptal edilen satislar aktif arsivden cikar, burada gecmisiyle durur.
+  // Goruntulemek herkese acik; iptal etmek yalnizca yoneticide.
+  { href: '/iptal.html',   icon: '🚫', label: 'İptaller' },
   { href: '/sorgu.html',   icon: '🔍', label: 'Sorgu' },
   { href: '/stok.html',    icon: '📦', label: 'Stok' },
   { href: '/rapor.html',   icon: '📊', label: 'Rapor', adminOnly: true },

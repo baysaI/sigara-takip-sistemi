@@ -350,6 +350,7 @@ function render(r) {
   $('sOnayli').textContent   = r.summary.onayli;
   $('sErken').textContent    = r.summary.erken;
   $('sDegisim').textContent  = r.summary.degisim ?? 0;
+  $('sIptal').textContent    = r.summary.iptal ?? 0;
 
   /* --- Marka bazlı --- */
   $('brandBody').innerHTML = r.brands.length
@@ -430,6 +431,33 @@ function render(r) {
           <td data-label="İşlemi Yapan">${esc(x.username)}</td>
         </tr>`).join('')
     : '<tr><td colspan="7" class="empty">Bu aralıkta sigara değişimi yapılmamış.</td></tr>';
+
+  /* --- İptal edilen satışlar --- */
+  const iptal = r.cancellations || [];
+  $('cancelCount').textContent = `${iptal.length} iptal · ${r.summary.iptalPaket ?? 0} paket`;
+  $('cancelBody').innerHTML = iptal.length
+    ? iptal.map((c) => `
+        <tr>
+          <td data-label="İptal Saati" class="mono">${formatDateTime(c.created_at)}</td>
+          <td data-label="Oyuncu"><span class="pill player">${esc(c.player_id)}</span></td>
+          <td data-label="Sigara">${esc(c.cigarette_type)}</td>
+          <td data-label="Adet"><span class="pill qty">${c.quantity}</span></td>
+          <td data-label="Satış Günü">
+            ${esc(periodLabel(c.sale_day_key))}
+            ${c.late ? '<span class="pill locked" title="Kapanmış güne ait satış — o günün raporu değişmedi, iade bu döneme işlendi">GEÇ</span>' : ''}
+          </td>
+          <td data-label="Neden" class="info-cell">${c.reason ? esc(c.reason) : '—'}</td>
+          <td data-label="İptal Eden">${esc(c.username)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Bu aralıkta iptal edilen satış yok.</td></tr>';
+
+  // Gec iptal varsa neden toplamlarin degismedigini yaz: rapordaki
+  // "iptal edildi ama paket sayisi dusmedi" sorusu burada cevaplansin.
+  const gecSayi = iptal.filter((c) => c.late).length;
+  $('cancelNote').textContent = gecSayi
+    ? `${gecSayi} tanesi GEÇ iptal: satış kapanmış bir güne aitti, o günün raporu ` +
+      'değişmez; iade bu dönemin stok düzeltmesine işlendi.'
+    : 'Bu dönemde yapılan iptaller. Kayıtlar silinmez, İptaller bölümünde saklanır.';
 
   /* --- Kalan stok (anlık) --- */
   $('stockCount').textContent = `${r.stock.summary.totalPackets} paket · ${r.stock.summary.critical} kritik`;

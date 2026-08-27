@@ -108,14 +108,16 @@ function renderArchive({ records, pagination, summary }) {
         <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
         ${App.user.role === 'admin' ? `
         <td data-label="İşlem">
-          <button class="btn-danger btn-sm" data-del="${r.id}"
-                  data-ozet="${esc(r.player_id)} — ${esc(r.cigarette_type)} ×${r.quantity}">Sil</button>
+          <button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>
         </td>` : ''}
       </tr>`).join('');
 
     if (App.user.role === 'admin') {
-      body.querySelectorAll('[data-del]').forEach((btn) =>
-        btn.addEventListener('click', () => silKayit(btn.dataset.del, btn.dataset.ozet)));
+      body.querySelectorAll('[data-cancel]').forEach((btn) =>
+        btn.addEventListener('click', () => {
+          const kayit = records.find((x) => String(x.id) === btn.dataset.cancel);
+          if (kayit) iptalEt(kayit);
+        }));
     }
   }
 
@@ -127,25 +129,38 @@ function renderArchive({ records, pagination, summary }) {
   state.page = pagination.page;
 }
 
-/** Tek kaydi siler. Varsayilan olarak stok iade edilir. */
-async function silKayit(id, ozet) {
-  const onay = await confirmDelete({
-    title: 'Kaydı sil',
-    body: `<b>${esc(ozet)}</b> kaydı arşivden silinecek.<br />
-           Verilen paketler <b>stoğa geri eklenir</b> ve bu bir düzeltme hareketi olarak loglanır.`
-  });
+/**
+ * Satisi IPTAL eder — silmez.
+ * Kayit aktif arsivden cikar, "Iptaller" bolumune gecmisiyle tasinir,
+ * sigara stoga doner ve oyuncunun sayaci serbest kalir.
+ */
+async function iptalEt(kayit) {
+  // Satisin donemi kapanmis mi? Kapanmissa iade cari doneme duzeltme
+  // olarak duser ve kapanmis raporun sayilari degismez — kullaniciya
+  // bunu ONCEDEN soyleyebilmek icin burada hesaplaniyor.
+  const gec = !!App.period && kayit.created_at < App.period.from;
+
+  const onay = await confirmCancel({ record: kayit, late: gec });
   if (!onay) return;
 
   try {
-    const r = await API.request(`/api/records/${id}`, { method: 'DELETE' });
+    const r = await API.post(`/api/records/${kayit.id}/cancel`, { reason: onay.reason });
     await loadArchive();
+
     toast(
       r.restocked
-        ? `Kayıt silindi. ${r.restocked.type} stoğu ${r.restocked.balance} pakete çıktı.`
-        : 'Kayıt silindi.',
-      'success'
+        ? `Satış iptal edildi. ${r.restocked.name} stoğu ${r.restocked.balance} pakete çıktı.`
+        : 'Satış iptal edildi.',
+      'success', 5000
     );
-  } catch (err) { toast(err.message, 'error'); }
+    if (r.late) {
+      toast(
+        `${periodLabel(r.saleDayKey)} tarihli satıştı — o günün raporu değişmedi, ` +
+        'iade bugünün dönemine düzeltme olarak işlendi.',
+        'info', 7000
+      );
+    }
+  } catch (err) { toast(err.message, 'error', 6000); }
 }
 
 function bindEvents() {
