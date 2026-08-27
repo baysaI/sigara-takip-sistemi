@@ -153,6 +153,102 @@ const cancelRecord = db.transaction(({ recordId, reason = null, restock = true, 
 });
 
 /**
+ * Geri alinabilecek iptali dogrular ve {kayit, iptal} dondurur.
+ *
+ * TEK ENGEL — kapanmis raporu degistirecek geri almalar:
+ *
+ *   Ayni donemde iptal edilmis (late=0) bir satis, o donemin
+ *   raporundan CIKARILMISTI. Donem kapandiktan sonra iptali geri
+ *   almak satisi kapanmis rapora GERI EKLER — tam da mühürlü defteri
+ *   korumak icin engelledigimiz sey. Bu durumda geri alma reddedilir.
+ *
+ *   Gec iptalde (late=1) boyle bir sorun yoktur: satis kapanmis
+ *   raporda zaten SAYILIYORDU, geri almak orayi hic etkilemez.
+ *   Iade cari doneme duzeltme olarak islenmisti, geri alinmasi da
+ *   cari doneme ters duzeltme olarak isler.
+ *
+ * @throws {Error} uygun degilse
+ */
+function assertUncancellable(recordId) {
+  const kayit = recordByIdStmt.get(Number(recordId));
+  if (!kayit) throw hata('Kayıt bulunamadı.', 404);
+
+  if (!kayit.cancelled_at) {
+    throw hata('Bu satış zaten iptal edilmemiş — geri alınacak bir işlem yok.', 409);
+  }
+
+  const iptal = db.prepare(`
+    SELECT * FROM record_cancellations
+    WHERE record_id = ? AND reverted_at IS NULL
+    ORDER BY created_at DESC, id DESC LIMIT 1
+  `).get(kayit.id);
+
+  if (!iptal) throw hata('İptal kaydı bulunamadı.', 404);
+
+  if (!iptal.late && !isOpen(kayit.created_at)) {
+    throw hata(
+      `Bu iptal geri alınamaz: satış ${iptal.sale_day_key} dönemine aitti ve o gün ` +
+      'kapandı. Geri almak kapanmış günün raporuna satışı geri eklerdi. ' +
+      'Gerekiyorsa satışı yeni bir kayıt olarak açın.',
+      409, { code: 'PERIOD_CLOSED', saleDayKey: iptal.sale_day_key }
+    );
+  }
+
+  return { kayit, iptal };
+}
+
+/**
+ * Iptali geri alir: satis yeniden aktif kayit olur.
+ *
+ * Stok yeniden dusurulur — sigara tekrar disari cikmis sayilir. Iadenin
+ * hangi sebeple yazildiysa tersi ayni sebeple yazilir ki donem
+ * matematigi simetrik kalsin:
+ *   late=0 -> reason='kayit'    (-adet), donemin tuketimi geri gelir
+ *   late=1 -> reason='duzeltme' (-adet), cari donemde ters duzeltme
+ *
+ * @param {object} p
+ * @param {number} p.recordId
+ * @param {{id:number, username:string}} p.user
+ */
+const uncancelRecord = db.transaction(({ recordId, user }) => {
+  const { kayit, iptal } = assertUncancellable(recordId);
+  const simdi = new Date().toISOString();
+
+  /* --- Stok yeniden dusurulur (yetersizse applyMovement 409 firlatir) --- */
+  let cikis = null;
+  if (iptal.restocked && kayit.cigarette_type_id && typeByIdStmt.get(kayit.cigarette_type_id)) {
+    cikis = applyMovement({
+      typeId: kayit.cigarette_type_id,
+      delta: -kayit.quantity,
+      reason: iptal.late ? 'duzeltme' : 'kayit',
+      recordId: kayit.id,
+      note: `İptal geri alındı: ${kayit.cigarette_type} ×${kayit.quantity} (${kayit.player_id})`,
+      user
+    });
+  }
+
+  /* --- Kayit yeniden aktif --- */
+  db.prepare(`
+    UPDATE records
+    SET cancelled_at = NULL, cancelled_by = NULL, cancel_reason = NULL, cancel_late = 0
+    WHERE id = ?
+  `).run(kayit.id);
+
+  /* --- Iptal satiri SILINMEZ: geri alindi olarak isaretlenir --- */
+  db.prepare('UPDATE record_cancellations SET reverted_at = ?, reverted_by = ? WHERE id = ?')
+    .run(simdi, user.username, iptal.id);
+
+  return {
+    record: recordByIdStmt.get(kayit.id),
+    cancellation: db.prepare('SELECT * FROM record_cancellations WHERE id = ?').get(iptal.id),
+    stock: cikis
+      ? { name: cikis.type.name, balance: cikis.balanceAfter, state: cikis.state,
+          critical: cikis.type.critical_level }
+      : null
+  };
+});
+
+/**
  * Iptal edilen satislar — /iptal.html sayfasinin kaynagi.
  * Kayit ve iptal olayi birlestirilerek dondurulur.
  */
@@ -178,7 +274,8 @@ function listCancellations({
   const ozet = db.prepare(`
     SELECT COUNT(*) AS total, COALESCE(SUM(r.quantity), 0) AS totalQuantity,
            COALESCE(SUM(c.late), 0) AS lateCount
-    FROM records r JOIN record_cancellations c ON c.record_id = r.id
+    FROM records r
+    JOIN record_cancellations c ON c.record_id = r.id AND c.reverted_at IS NULL
     ${whereSql}
   `).get(params);
 
@@ -189,14 +286,26 @@ function listCancellations({
            c.id AS cancel_id, c.reason AS cancel_reason, c.username AS cancelled_by,
            c.created_at AS cancelled_at, c.late, c.restocked,
            c.sale_day_key, c.cancel_day_key
-    FROM records r JOIN record_cancellations c ON c.record_id = r.id
+    FROM records r
+    JOIN record_cancellations c ON c.record_id = r.id AND c.reverted_at IS NULL
     ${whereSql}
     ORDER BY c.created_at DESC, c.id DESC
     LIMIT @limit OFFSET @offset
   `).all({ ...params, limit, offset });
 
+  /*
+   * canUndo: bu iptal geri alinabilir mi? Ayni donemde iptal edilmis
+   * (late=0) bir satis, donemi kapandiysa geri alinamaz — kapanmis
+   * rapora satisi geri eklerdi. Arayuz dugmeyi buna gore gosterir;
+   * sunucu ayni kurali assertUncancellable icinde tekrar uygular.
+   */
+  const zenginRows = rows.map((r) => ({
+    ...r,
+    canUndo: !!r.late || isOpen(r.created_at)
+  }));
+
   return {
-    records: rows,
+    records: zenginRows,
     summary: {
       total: ozet.total,
       totalQuantity: ozet.totalQuantity,
@@ -211,11 +320,16 @@ function listCancellations({
   };
 }
 
-/** Bir donemde YAPILAN iptaller (gun sonu raporu icin). */
+/**
+ * Bir donemde YAPILAN iptaller (gun sonu raporu icin).
+ * Geri alinmis olanlar da dondurulur (reverted_at dolu): o donemde
+ * gercekten bir iptal islemi yapilmisti, raporda izi kalmali.
+ */
 function cancellationsInRange(from, to) {
   return db.prepare(`
     SELECT id, record_id, player_id, cigarette_type, quantity, reason,
-           sale_day_key, cancel_day_key, late, restocked, username, created_at
+           sale_day_key, cancel_day_key, late, restocked, username, created_at,
+           reverted_at, reverted_by
     FROM record_cancellations
     WHERE created_at BETWEEN ? AND ?
     ORDER BY created_at DESC
@@ -224,7 +338,9 @@ function cancellationsInRange(from, to) {
 
 module.exports = {
   cancelRecord,
+  uncancelRecord,
   assertCancellable,
+  assertUncancellable,
   listCancellations,
   cancellationsInRange
 };
