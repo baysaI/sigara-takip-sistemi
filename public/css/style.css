@@ -726,6 +726,9 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 
 /* Degistirilmis (yerini yenisine birakmis) kayit: arsivde durur ama soluk */
 .row-superseded { opacity: .55; }
+
+/* Satir ici islem dugmeleri (Degistir / Iptal Et) yan yana, dar ekranda alta sarar */
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .info-cell { color: var(--text-faint); font-style: italic; max-width: 220px; }
 .empty { text-align: center; padding: 32px 16px; color: var(--text-faint); line-height: 1.7; }
 

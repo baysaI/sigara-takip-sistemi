@@ -14,12 +14,11 @@ let waiterAC = null;
 const refilter = () => { state.page = 1; loadArchive(); };
 
 App.ready(async () => {
-  // Yonetici satir basina silme yapabilir; basligi ona gore ekle
-  if (App.user.role === 'admin') {
-    document.querySelector('#archiveBody')
-      .closest('table').querySelector('thead tr')
-      .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
-  }
+  /* Islem sutunu HERKESE gorunur: sigara degisimi yonetici yetkisi
+     istemez (sigaraci da yapabilir), iptal ise yalnizca yoneticide. */
+  document.querySelector('#archiveBody')
+    .closest('table').querySelector('thead tr')
+    .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
   /*
    * Tarih filtresi TAKVIM gunune gore calisir (00:00-23:59). Is gunu artik
    * saatle degil, gun sonu raporunun alinmasiyla degistigi icin bir takvim
@@ -90,35 +89,66 @@ function renderArchive({ records, pagination, summary }) {
   const body = $('archiveBody');
 
   if (!records.length) {
-    body.innerHTML = `<tr><td colspan="${App.user.role === 'admin' ? 8 : 7}" class="empty">Bu filtrelerle kayıt bulunamadı.</td></tr>`;
+    body.innerHTML = '<tr><td colspan="8" class="empty">Bu filtrelerle kayıt bulunamadı.</td></tr>';
   } else {
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
-    body.innerHTML = records.map((r) => `
-      <tr>
+    body.innerHTML = records.map((r) => {
+      /*
+       * Degisim yalnizca ACIK donemin, henuz degistirilmemis kaydi icin.
+       * Kapanmis gunun kaydini degistirmek stogu cari doneme, kaydi eski
+       * doneme dusururdu (sunucu da ayni kurali uygular).
+       *
+       * Iptal ise kapanmis gunde de yapilabilir — "gec iptal" olarak cari
+       * doneme iade islenir; o yuzden acik donem sarti aranmaz.
+       */
+      const acikDonemde = !App.period || r.created_at >= App.period.from;
+      const degisebilir = !r.superseded_by && acikDonemde;
+      const iptalEdilebilir = App.user.role === 'admin' && !r.superseded_by;
+
+      return `
+      <tr${r.superseded_by ? ' class="row-superseded"' : ''}>
         <td data-label="Tarih" class="mono">${formatDateTime(r.created_at)}</td>
         <td data-label="Oyuncu ID">
           <span class="pill player">${esc(r.player_id)}</span>
           ${r.early_release ? '<span class="pill early" title="Süresi dolmadan, yetkili onayıyla verildi">ERKEN</span>' : ''}
           ${r.flag_level ? '<span class="pill locked" title="Özel uyarı/onay ile verildi">ONAYLI</span>' : ''}
+          ${r.superseded_by ? '<span class="pill locked" title="Bu kayıt değiştirildi; geçerli olan yerine geçen kayıttır">DEĞİŞTİRİLDİ</span>' : ''}
         </td>
-        <td data-label="Sigara Türü">${esc(r.cigarette_type)}</td>
+        <td data-label="Sigara Türü">
+          ${esc(r.cigarette_type)}
+          ${r.exchanged_from ? '<span class="pill swap" title="Sigara değişimi sonucu oluşan kayıt">DEĞİŞİM</span>' : ''}
+        </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
         <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
-        ${App.user.role === 'admin' ? `
         <td data-label="İşlem">
-          <button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>
-        </td>` : ''}
-      </tr>`).join('');
+          <div class="row-actions">
+            ${degisebilir
+              ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
+              : (!r.superseded_by
+                  ? '<span class="muted" title="Bu kaydın günü kapandı — değişim yapılamaz">gün kapalı</span>'
+                  : '')}
+            ${iptalEdilebilir ? `<button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>` : ''}
+            ${!degisebilir && !iptalEdilebilir && r.superseded_by ? '<span class="muted">—</span>' : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
 
-    if (App.user.role === 'admin') {
-      body.querySelectorAll('[data-cancel]').forEach((btn) =>
-        btn.addEventListener('click', () => {
-          const kayit = records.find((x) => String(x.id) === btn.dataset.cancel);
-          if (kayit) iptalEt(kayit);
-        }));
-    }
+    const bul = (id) => records.find((x) => String(x.id) === id);
+
+    body.querySelectorAll('[data-swap]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const kayit = bul(btn.dataset.swap);
+        if (kayit) degistir(kayit);
+      }));
+
+    body.querySelectorAll('[data-cancel]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const kayit = bul(btn.dataset.cancel);
+        if (kayit) iptalEt(kayit);
+      }));
   }
 
   $('archiveCount').textContent = `${summary.total} kayıt · ${summary.totalQuantity} adet`;
@@ -127,6 +157,47 @@ function renderArchive({ records, pagination, summary }) {
   $('prevPage').disabled = pagination.page <= 1;
   $('nextPage').disabled = pagination.page >= pagination.totalPages;
   state.page = pagination.page;
+}
+
+/**
+ * Sigara degisimi — arsiv satirindan.
+ * Ilk kayit silinmez; arsivde DEGISTIRILDI olarak kalir ve yerine gecen
+ * kayda baglanir. 4 saat sayaci degisimden etkilenmez.
+ */
+async function degistir(kayit) {
+  let turler;
+  try {
+    // Stok anlik alinir: ekrandaki liste bayat olabilir
+    turler = (await API.get('/api/stock')).cards;
+  } catch (err) {
+    return toast(`Değişim ekranı açılamadı: ${err.message}`, 'error');
+  }
+
+  const secim = await showExchangeDialog({ record: kayit, types: turler });
+  if (!secim) return;
+
+  try {
+    const res = await API.post(`/api/records/${kayit.id}/exchange`, secim);
+    await loadArchive();
+
+    toast(
+      `${res.replacement.player_id} — ${res.exchange.from_type_name} → ` +
+      `${res.exchange.to_type_name} ×${res.exchange.quantity} değiştirildi.`,
+      'success', 5000
+    );
+    if (res.stock.returned) {
+      toast(`↩️ ${res.stock.returned.name}: ${res.stock.returned.balance} paket (iade edildi)`, 'info', 4500);
+    }
+    if (res.stock.issued.state === 'critical') {
+      toast(`⚠️ ${res.stock.issued.name} kritik seviyede (${res.stock.issued.balance} paket).`, 'error', 6000);
+    }
+    if (res.stock.issued.state === 'out') {
+      toast(`⛔ ${res.stock.issued.name} tükendi.`, 'error', 6000);
+    }
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    await loadArchive();
+  }
 }
 
 /**
