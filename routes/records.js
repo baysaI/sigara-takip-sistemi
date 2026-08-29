@@ -35,11 +35,11 @@ const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
 
 const insertRecordStmt = db.prepare(`
   INSERT INTO records
-    (player_id, cigarette_type, cigarette_type_id, quantity, waiter_id, waiter_name,
+    (player_id, cigarette_type, cigarette_type_id, custom_type, quantity, waiter_id, waiter_name,
      user_id, username, info, created_at, flag_level, flag_note, approved_by, approval_note,
      early_release, early_remaining_ms, early_approved_by, early_note)
   VALUES
-    (@player_id, @cigarette_type, @cigarette_type_id, @quantity, @waiter_id, @waiter_name,
+    (@player_id, @cigarette_type, @cigarette_type_id, @custom_type, @quantity, @waiter_id, @waiter_name,
      @user_id, @username, @info, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
      @early_release, @early_remaining_ms, @early_approved_by, @early_note)
 `);
@@ -143,17 +143,39 @@ router.post('/', asyncHandler((req, res) => {
     });
   }
 
-  // --- MODUL 8: stok kontrolu ---
+  /* --- Sigara turu: listeden mi, TEK SEFERLIK mi? ---
+     "Yeni Sigara Ekle" ile girilen tur ana listeye eklenmez ve stok karti
+     olmadigi icin stoktan dusulmez. Ayni adda AKTIF bir tur zaten varsa
+     tek seferlik sayilmaz: normal yola dusulur ki stok takibi
+     yanlislikla atlanmasin (kullaniciya bildirilir). */
   const type = typeByNameStmt.get(cigaretteType);
-  if (!type || !type.is_active) {
-    return res.status(400).json({ ok: false, error: 'Secilen sigara turu gecersiz veya pasif durumda.' });
-  }
-  if (type.stock < quantity) {
-    return res.status(409).json({
-      ok: false,
-      error: `${type.name} stogu yetersiz. Mevcut: ${type.stock} paket, istenen: ${quantity} paket.`,
-      stock: { name: type.name, available: type.stock, requested: quantity }
-    });
+  const listedeVar = !!(type && type.is_active);
+  const ozelTur = req.body.custom_type === true && !listedeVar;
+
+  if (ozelTur) {
+    if (cigaretteType.length > 60) {
+      return res.status(400).json({ ok: false, error: 'Sigara adi en fazla 60 karakter olabilir.' });
+    }
+    // Pasif bir turle ayni ad girilirse arsiv iki farkli seyi ayni ada
+    // baglar; kullaniciyi Yonetim'e yonlendir.
+    if (type && !type.is_active) {
+      return res.status(409).json({
+        ok: false,
+        error: `"${type.name}" listede pasif durumda. Tek seferlik kayit yerine ` +
+               'Yonetim sayfasindan aktiflestirin.'
+      });
+    }
+  } else {
+    if (!type || !type.is_active) {
+      return res.status(400).json({ ok: false, error: 'Secilen sigara turu gecersiz veya pasif durumda.' });
+    }
+    if (type.stock < quantity) {
+      return res.status(409).json({
+        ok: false,
+        error: `${type.name} stogu yetersiz. Mevcut: ${type.stock} paket, istenen: ${quantity} paket.`,
+        stock: { name: type.name, available: type.stock, requested: quantity }
+      });
+    }
   }
 
   const created_at = new Date().toISOString();
@@ -163,8 +185,11 @@ router.post('/', asyncHandler((req, res) => {
   const kaydet = db.transaction(() => {
     const result = insertRecordStmt.run({
       player_id: playerId,
-      cigarette_type: type.name,
-      cigarette_type_id: type.id,
+      // Tek seferlik turde ad kullanicinin yazdigi gibi saklanir; stok
+      // karti olmadigi icin cigarette_type_id bostur.
+      cigarette_type: ozelTur ? cigaretteType : type.name,
+      cigarette_type_id: ozelTur ? null : type.id,
+      custom_type: ozelTur ? 1 : 0,
       quantity,
       waiter_id: waiter.id,
       waiter_name: waiter.name,
@@ -185,7 +210,9 @@ router.post('/', asyncHandler((req, res) => {
     });
 
     const recordId = result.lastInsertRowid;
-    const hareket = applyMovement({
+
+    // Tek seferlik turde stok hareketi YAZILMAZ: dusulecek bir kart yok.
+    const hareket = ozelTur ? null : applyMovement({
       typeId: type.id,
       delta: -quantity,
       reason: 'kayit',
@@ -203,12 +230,15 @@ router.post('/', asyncHandler((req, res) => {
     ok: true,
     record: recordByIdStmt.get(recordId),
     status: getCooldownStatus(playerId),   // yeni geri sayim durumu
-    stock: {
-      name: type.name,
-      remaining: hareket.balanceAfter,
-      state: hareket.state,
-      critical: type.critical_level
-    },
+    customType: ozelTur,
+    stock: hareket
+      ? {
+          name: type.name,
+          remaining: hareket.balanceAfter,
+          state: hareket.state,
+          critical: type.critical_level
+        }
+      : null,
     early: early ? { remainingMs: early.remainingMs, by: early.by } : null
   });
 }));
@@ -276,7 +306,7 @@ router.get('/', asyncHandler((req, res) => {
   `).get(params);
 
   const rows = db.prepare(`
-    SELECT id, player_id, cigarette_type, cigarette_type_id, quantity, waiter_name,
+    SELECT id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity, waiter_name,
            username, info, created_at,
            flag_level, approved_by, early_release, early_remaining_ms, early_approved_by,
            superseded_by, exchanged_from, exchanged_at, exchanged_by,

@@ -117,6 +117,7 @@ function renderArchive({ records, pagination, summary }) {
         <td data-label="Sigara Türü">
           ${esc(r.cigarette_type)}
           ${r.exchanged_from ? '<span class="pill swap" title="Sigara değişimi sonucu oluşan kayıt">DEĞİŞİM</span>' : ''}
+          ${r.custom_type ? '<span class="pill custom" title="Tek seferlik sigara — ana listede yok, stok kartı olmadığı için stoktan düşülmedi">LİSTE DIŞI</span>' : ''}
         </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>

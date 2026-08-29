@@ -47,6 +47,19 @@
               <select id="cigaretteType" name="cigarette_type" required>
                 <option value="">— Seçiniz —</option>
               </select>
+
+              <!-- "➕ Yeni Sigara Ekle" seçilince açılır. Buraya yazılan tür
+                   ana listeye EKLENMEZ; tek seferlik alınan sigaralar içindir. -->
+              <div class="field mt hidden" id="customTypeBox">
+                <label for="customTypeName">Sigara adı <span class="req">*</span></label>
+                <input type="text" id="customTypeName" maxlength="60" autocomplete="off"
+                       placeholder="ör. MARLBORO TOUCH" />
+                <p class="muted mt">
+                  Tek seferlik kayıt: bu sigara <b>ana listeye eklenmez</b> ve
+                  <b>stoktan düşülmez</b> (stok kartı yok). Arşivde ve gün sonu
+                  raporunda normal şekilde görünür.
+                </p>
+              </div>
             </div>
 
             <div class="row">

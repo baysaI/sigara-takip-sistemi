@@ -162,6 +162,20 @@ router.get('/daily', asyncHandler((req, res) => {
   /* --- Sigara degisimleri --- */
   const degisimler = exchangesInRange(from, to);
 
+  /* --- Tek seferlik ("liste disi") sigaralar ---
+     Stok karti olmadigi icin mutabakat tablosunda SATIRI YOKTUR ama
+     dagitilan paket toplamina girerler. Iki sayi arasindaki farkin
+     nedeni budur; arayuz bunu mutabakatin altinda acikca yazar. */
+  const ozelTurler = db.prepare(`
+    SELECT cigarette_type AS name,
+           COUNT(*) AS islem,
+           COALESCE(SUM(quantity), 0) AS paket
+    FROM records
+    WHERE created_at BETWEEN @from AND @to AND ${AKTIF} AND custom_type = 1
+    GROUP BY cigarette_type
+    ORDER BY paket DESC, name COLLATE NOCASE
+  `).all(p);
+
   /* --- Bu donemde YAPILAN iptaller ---
      Gec iptaller de burada gorunur: satis baska bir gune ait olsa da
      iade bu donemde islenmistir (sale_day_key farkli olur). */
@@ -201,6 +215,8 @@ router.get('/daily', asyncHandler((req, res) => {
       iptal: iptaller.filter((x) => !x.reverted_at).length,
       iptalPaket: iptaller.reduce((t, x) => t + (x.reverted_at ? 0 : x.quantity), 0),
       iptalGeriAlinan: iptaller.filter((x) => x.reverted_at).length,
+      ozelIslem: ozelTurler.reduce((t, x) => t + x.islem, 0),
+      ozelPaket: ozelTurler.reduce((t, x) => t + x.paket, 0),
       stokGiris: stokHareket.giris,
       stokCikis: stokHareket.cikis
     },
@@ -211,6 +227,7 @@ router.get('/daily', asyncHandler((req, res) => {
     earlyReleases: erkenler,
     exchanges: degisimler,
     cancellations: iptaller,
+    customTypes: ozelTurler,
     restocks: ikmaller,
     // Kalan stok raporu her zaman ANLIK durumu gosterir
     stock: { cards: listStock(), summary: stockSummary() },

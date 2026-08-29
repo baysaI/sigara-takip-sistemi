@@ -110,6 +110,36 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## Yeni Sigara Ekle (tek seferlik)
+
+Sigara türü listesinin en altında **➕ Yeni Sigara Ekle** seçeneği vardır.
+Markette alınan, listede olmayan bir sigarayı kaydetmek içindir — sürekli
+kullanılacak ürünler için değil (onlar Yönetim → Sigara Türleri'nden eklenir).
+
+Seçilince ad alanı açılır, ad elle yazılır ve kayıt normal şekilde oluşur.
+
+- Tür **ana listeye eklenmez**; bir dahaki sefere açılır menüde çıkmaz.
+- **Stoktan düşülmez** ve stok hareketi yazılmaz — o sigaranın stok kartı yok,
+  hiç stoklanmamıştır.
+- Kayıt arşivde, geçmişte ve gün sonu raporunun marka dökümünde **normal
+  şekilde görünür**; `LİSTE DIŞI` rozetiyle işaretlenir.
+- 4 saat kuralı, iptal ve geri alma bu kayıtlarda da normal çalışır. İptalinde
+  stok iadesi yapılmaz (iade edilecek kart yok).
+
+**Listede zaten aktif olan bir ad yazılırsa** tek seferlik sayılmaz: sistem
+normal yola düşer ve stoktan düşer. Böylece stok takibi bu kapıdan atlanamaz.
+Ad pasif bir türle aynıysa kayıt reddedilir ve türü Yönetim'den aktifleştirmeniz
+istenir — aksi halde arşivde iki farklı şey aynı ada bağlanırdı.
+
+### Rapordaki etkisi
+
+Liste dışı sigaraların **stok mutabakatı tablosunda satırı olmaz** (stok kartı
+yok), ama *Dağıtılan Paket* toplamına girerler. İki sayı tutmadığında defter
+bozuk sanılmasın diye mutabakat tablosunun altında farkın nedeni yazılır:
+
+> Ayrıca 2 paket liste dışı sigara verildi — stok kartı olmadığı için bu
+> tabloda görünmez: MARLBORO TOUCH (2).
+
 ## İptal Edilenler / Arşiv
 
 Müşteri sigarayı aldıktan sonra iade ederse satış **iptal edilir**: aktif

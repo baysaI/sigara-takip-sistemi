@@ -200,6 +200,9 @@ async function closeDay() {
    ============================================================ */
 let recon = null;
 
+/** Son yuklenen gun sonu raporu — mutabakat notu liste disi bilgisini buradan alir. */
+let sonRapor = null;
+
 async function loadReconciliation() {
   const body = $('reconBody');
   // Mutabakat her zaman TEK DONEM icindir; aralik modunda sonuncusu alinir.
@@ -278,9 +281,28 @@ function renderReconciliation() {
       rozet.className = `pill ${fark === 0 ? 'free' : 'locked'}`;
     }));
 
-  $('reconNote').textContent = t.kayan
-    ? `${t.kayan} türde stok kartı ile hareket geçmişi ayrışmış — sayım girip düzeltin.`
-    : 'DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.';
+  const notlar = [
+    t.kayan
+      ? `${t.kayan} türde stok kartı ile hareket geçmişi ayrışmış — sayım girip düzeltin.`
+      : 'DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.'
+  ];
+
+  /*
+   * Liste disi (tek seferlik) sigaralarin stok karti yoktur, bu yuzden
+   * yukaridaki tabloda SATIRI YOKTUR — ama "Dagitilan Paket" toplamina
+   * girerler. Iki sayi tutmayinca defter bozuk sanilmasin diye farkin
+   * nedeni burada acikca yaziliyor.
+   */
+  const ozelPaket = sonRapor?.summary?.ozelPaket || 0;
+  if (ozelPaket) {
+    const adlar = (sonRapor.customTypes || []).map((x) => `${x.name} (${x.paket})`).join(', ');
+    notlar.push(
+      `Ayrıca ${ozelPaket} paket liste dışı sigara verildi — stok kartı olmadığı için ` +
+      `bu tabloda görünmez: ${adlar}.`
+    );
+  }
+
+  $('reconNote').textContent = notlar.join(' ');
 }
 
 /** Girilen sayimlari kaydeder (bos birakilanlar atlanir). */
@@ -321,6 +343,7 @@ function setMode(yeni) {
 }
 
 function render(r) {
+  sonRapor = r;
   const d = r.period;
 
   /* Baslik: acik donemin bitisi YOKTUR — ust sinir (9999) ekrana yazilmaz. */
@@ -353,10 +376,17 @@ function render(r) {
   $('sIptal').textContent    = r.summary.iptal ?? 0;
 
   /* --- Marka bazlı --- */
+  // Liste disi turler marka dokumunde de isaretlenir: stok tablosunda
+  // karsiliklari olmadigi icin okuyan kisi nedenini gorsun.
+  const ozelAdlar = new Set((r.customTypes || []).map((x) => x.name));
+
   $('brandBody').innerHTML = r.brands.length
     ? r.brands.map((b) => `
         <tr>
-          <td data-label="Sigara Türü"><b>${esc(b.name)}</b></td>
+          <td data-label="Sigara Türü">
+            <b>${esc(b.name)}</b>
+            ${ozelAdlar.has(b.name) ? '<span class="pill custom" title="Tek seferlik — stok kartı yok">LİSTE DIŞI</span>' : ''}
+          </td>
           <td data-label="Paket"><span class="pill qty">${b.paket}</span></td>
           <td data-label="İşlem">${b.islem}</td>
         </tr>`).join('')

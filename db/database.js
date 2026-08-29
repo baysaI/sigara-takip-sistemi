@@ -299,6 +299,20 @@ addColumn('records', 'cancel_late', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('record_cancellations', 'reverted_at', 'TEXT');
 addColumn('record_cancellations', 'reverted_by', 'TEXT');
 
+/*
+ * Tek seferlik ("liste disi") sigara — "Yeni Sigara Ekle".
+ *
+ * Markette alinan, ana listede olmayan bir sigara icin kullanilir. Tur
+ * cigarette_types'a EKLENMEZ: kalici listeyi kirletmez, dropdown'da
+ * gorunmez. Bu yuzden stok karti da yoktur —
+ *   cigarette_type_id = NULL  ve  stok hareketi YAZILMAZ.
+ * Kayit arsivde, gecmiste ve gun sonu raporunun marka dokumunde normal
+ * sekilde gorunur; yalnizca stok mutabakatinda satiri olmaz (olmasi da
+ * dogru degil, hic stoklanmamistir).
+ */
+addColumn('records', 'custom_type', 'INTEGER NOT NULL DEFAULT 0');
+db.exec('CREATE INDEX IF NOT EXISTS idx_records_custom ON records (custom_type)');
+
 // Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_records_superseded ON records (superseded_by);

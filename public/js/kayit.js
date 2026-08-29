@@ -6,7 +6,12 @@
 const $ = (id) => document.getElementById(id);
 
 /** Aktif geri sayim durumu */
-const cd = { playerId: '', allowed: false, deadline: 0, lastAt: null, lastRecord: null, totalRecords: 0, flag: null };
+const cd = {
+  playerId: '', allowed: false, deadline: 0, lastAt: null, lastRecord: null,
+  totalRecords: 0, flag: null,
+  // Gonder dugmesinin son durumu — on kosullar degisince yeniden uygulanir
+  submitEnabled: false, submitHint: ''
+};
 let timer = null;
 
 /** Garson otomatik tamamlama bileseni */
@@ -91,16 +96,52 @@ function showNoWaiters() {
   input.closest('.field').appendChild(uyari);
 }
 
+/**
+ * "Yeni Sigara Ekle" secenegi icin ayrac deger.
+ * Bir sigara adiyla cakismasin diye alt cizgili: tur adlari serbest metin.
+ */
+const YENI_TUR = '__yeni_sigara__';
+
+/** Su an tek seferlik (liste disi) sigara mi giriliyor? */
+const ozelTurSecili = () => $('cigaretteType').value === YENI_TUR;
+
 async function loadTypes() {
   const { types } = await API.get('/api/cigarette-types');
   typesReady = types.length > 0;
 
   const sel = $('cigaretteType');
-  sel.disabled = !typesReady;
-  sel.innerHTML = typesReady
-    ? '<option value="">— Seçiniz —</option>' +
-      types.map((t) => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')
-    : '<option value="">Önce sigara türü eklenmeli</option>';
+  const onceki = sel.value;
+
+  // "Yeni Sigara Ekle" listeden BAGIMSIZDIR: liste bos olsa da secilebilir,
+  // cunku tek seferlik sigaranin listede karsiligi zaten yoktur.
+  const yeniSecenek = `<option value="${YENI_TUR}">➕ Yeni Sigara Ekle</option>`;
+
+  sel.disabled = false;
+  sel.innerHTML =
+    (typesReady
+      ? '<option value="">— Seçiniz —</option>' +
+        types.map((t) => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')
+      : '<option value="">— Listede sigara yok —</option>') +
+    yeniSecenek;
+
+  // Liste tazelendiginde secim korunur (kayit sonrasi loadTypes cagriliyor)
+  if (onceki && [...sel.options].some((o) => o.value === onceki)) sel.value = onceki;
+  toggleCustomType();
+}
+
+/** Ad alanini yalnizca "Yeni Sigara Ekle" secildiginde goster. */
+function toggleCustomType() {
+  const kutu = $('customTypeBox');
+  if (!kutu) return;
+
+  const acik = ozelTurSecili();
+  kutu.classList.toggle('hidden', !acik);
+  if (acik) $('customTypeName').focus();
+  else $('customTypeName').value = '';
+
+  // On kosullar degisti (liste bosken bile tek seferlik kayit acilabilir):
+  // dugmeyi son duruma gore yeniden degerlendir.
+  applySubmit();
 }
 
 async function loadStats() {
@@ -143,6 +184,7 @@ async function loadRecent() {
         <td data-label="Sigara Türü">
           ${esc(r.cigarette_type)}
           ${r.exchanged_from ? '<span class="pill swap" title="Değişim sonucu">DEĞİŞİM</span>' : ''}
+          ${r.custom_type ? '<span class="pill custom" title="Tek seferlik sigara — ana listede yok, stoktan düşülmedi">LİSTE DIŞI</span>' : ''}
         </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
@@ -335,19 +377,35 @@ function resetCooldown() {
   setSubmit(false, 'Başlamak için Oyuncu ID girin.');
 }
 
+/**
+ * Gonder dugmesinin durumu iki kaynaktan belirlenir:
+ *   · 4 saat kurali (setSubmit ile gelir, cd.submitEnabled'da saklanir)
+ *   · on kosullar (garson/tur tanimli mi) — bunlar sonradan degisebilir
+ * Bu yuzden karar applySubmit'te toplanir; tur secimi degistiginde
+ * sayac durumunu kaybetmeden yeniden hesaplanabilsin.
+ */
 function setSubmit(enabled, hint) {
-  // On kosullar: 4 saat kurali uygun olsa bile garson ve tur tanimli olmali
-  const hazir = waitersReady && typesReady;
-  $('submitBtn').disabled = !(enabled && hazir);
+  cd.submitEnabled = enabled;
+  cd.submitHint = hint || '';
+  applySubmit();
+}
+
+function applySubmit() {
+  // Tek seferlik sigarada listenin dolu olmasi gerekmez: girilen tur
+  // zaten listede olmayan bir sigaradir.
+  const turHazir = typesReady || ozelTurSecili();
+  const hazir = waitersReady && turHazir;
+
+  $('submitBtn').disabled = !(cd.submitEnabled && hazir);
 
   const eksik = [
     !waitersReady ? 'garson' : null,
-    !typesReady ? 'sigara türü' : null
+    !turHazir ? 'sigara türü' : null
   ].filter(Boolean).join(' ve ');
 
-  const metin = (enabled && eksik)
+  const metin = (cd.submitEnabled && eksik)
     ? `Önce sisteme ${eksik} eklenmeli.`
-    : (hint || '');
+    : cd.submitHint;
 
   $('formHint').textContent = metin;
   $('formHint').style.display = metin ? 'block' : 'none';
@@ -380,13 +438,24 @@ function renderFlagBanner() {
 async function submitRecord(e) {
   e.preventDefault();
 
+  /* Tek seferlik sigara: tur adi listeden degil, elle yazilan alandan gelir
+     ve custom_type bayragiyla gonderilir. Sunucu bu kaydi stoktan dusmez. */
+  const ozel = ozelTurSecili();
+  const turAdi = ozel ? $('customTypeName').value.trim() : $('cigaretteType').value;
+
   const payload = {
     player_id: $('playerId').value.trim(),
-    cigarette_type: $('cigaretteType').value,
+    cigarette_type: turAdi,
     quantity: Number($('quantity').value),
     waiter_id: Number($('waiterId').value),
     info: $('info').value.trim()
   };
+  if (ozel) payload.custom_type = true;
+
+  if (ozel && !turAdi) {
+    $('customTypeName').focus();
+    return toast('Sigara adını yazın.', 'error');
+  }
 
   if (!payload.waiter_id) {
     // Alana isim yazilmis ama listeden secilmemis olabilir
@@ -460,9 +529,17 @@ async function submitRecord(e) {
     if (res.early) {
       toast(`⏳ Erken alım — ${res.early.by} onayıyla kaydedildi.`, 'info', 6000);
     }
+    if (res.customType) {
+      toast(
+        `➕ "${res.record.cigarette_type}" tek seferlik kaydedildi — listeye eklenmedi, ` +
+        'stoktan düşülmedi.',
+        'info', 6500
+      );
+    }
 
     // Garson secimi vardiya boyunca ayni kaldigi icin korunur
     $('cigaretteType').value = '';
+    toggleCustomType();          // ad alanini kapat ve temizle
     $('quantity').value = 1;
     $('info').value = '';
 
@@ -497,6 +574,9 @@ function bindEvents() {
     setSubmit(false, 'Kontrol ediliyor...');
     checkPlayer(v);
   });
+
+  // "Yeni Sigara Ekle" secilince ad alani acilir/kapanir
+  $('cigaretteType').addEventListener('change', toggleCustomType);
 
   $('recordForm').addEventListener('submit', submitRecord);
 
