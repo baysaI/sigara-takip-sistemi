@@ -308,7 +308,8 @@ router.get('/', asyncHandler((req, res) => {
   const rows = db.prepare(`
     SELECT id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity, waiter_name,
            username, info, created_at,
-           flag_level, approved_by, early_release, early_remaining_ms, early_approved_by,
+           flag_level, flag_note, approved_by, approval_note,
+           early_release, early_remaining_ms, early_approved_by, early_note,
            superseded_by, exchanged_from, exchanged_at, exchanged_by,
            cancelled_at, cancelled_by, cancel_reason, cancel_late
     FROM records

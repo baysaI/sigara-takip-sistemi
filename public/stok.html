@@ -81,6 +81,39 @@
         </div>
       </section>
 
+      <!-- ==================== TOPLU STOK GİRİŞİ ==================== -->
+      <section class="card card-overflow">
+        <h2>📦 Toplu Stok Girişi</h2>
+        <div class="card-body">
+
+          <!-- Ekle / Belirle ayrımı kritik: ilki mevcut stoğun üstüne
+               ekler (ikmal), ikincisi stoğu verilen değere sabitler (sayım). -->
+          <div class="seg" role="group" aria-label="Toplu stok modu">
+            <button type="button" class="seg-btn active" id="bulkModeAdd">Stoğa Ekle</button>
+            <button type="button" class="seg-btn" id="bulkModeSet">Stoğu Belirle</button>
+          </div>
+
+          <p class="muted mt" id="bulkModeHint">
+            Girilen adet <b>mevcut stoğun üstüne eklenir</b> (ikmal hareketi yazılır).
+          </p>
+
+          <div class="field mt">
+            <label for="bulkStock">
+              Her satıra <b>ürün adı</b> ve <b>adet</b>
+              <span class="muted">(Excel'den iki sütunu kopyalayıp yapıştırabilirsiniz)</span>
+            </label>
+            <textarea id="bulkStock" rows="7"
+              placeholder="CAMEL YELLOW	20&#10;PARLIAMENT BLUE BOX	15&#10;MARLBORO RED BOX;30"></textarea>
+          </div>
+
+          <button class="btn-primary" id="bulkStockBtn">Stokları Uygula</button>
+          <p class="muted mt" id="bulkStockResult">
+            Ayraç olarak sekme, noktalı virgül veya boşluk kullanılabilir.
+            Sistemde olmayan ürün adları atlanır ve size listelenir.
+          </p>
+        </div>
+      </section>
+
       <!-- Stok kartları -->
       <section class="card">
         <h2>Stok Kartları <span class="badge-count" id="cardCount"></span></h2>

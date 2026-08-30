@@ -122,7 +122,7 @@ function renderArchive({ records, pagination, summary }) {
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
-        <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
+        <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
         <td data-label="İşlem">
           <div class="row-actions">
             ${degisebilir

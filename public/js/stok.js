@@ -239,6 +239,81 @@ function parsePriceLines(metin) {
   return { items, okunamayan };
 }
 
+/* ============================================================
+   TOPLU STOK GIRISI
+   ============================================================ */
+
+/** Aktif mod: 'add' mevcut stoga ekler, 'set' verilen degere sabitler. */
+let bulkMode = 'add';
+
+function setBulkMode(mod) {
+  bulkMode = mod;
+  const ekle = mod === 'add';
+  $('bulkModeAdd').classList.toggle('active', ekle);
+  $('bulkModeSet').classList.toggle('active', !ekle);
+  $('bulkModeHint').innerHTML = ekle
+    ? 'Girilen adet <b>mevcut stoğun üstüne eklenir</b> (ikmal hareketi yazılır).'
+    : 'Stok <b>girilen adede sabitlenir</b> (düzeltme hareketi yazılır). ' +
+      'Sayım sonrası stoğu gerçek değere çekmek için kullanın.';
+  $('bulkStockBtn').textContent = ekle ? 'Stokları Uygula' : 'Stokları Belirle';
+}
+
+/**
+ * "AD  ADET" satirlarini ayristirir.
+ * Fiyattan farki: adet TAM SAYI olmali — "20,5 paket" diye bir sey yok.
+ */
+function parseStockLines(metin) {
+  const satirlar = metin.split('\n').map((x) => x.trim()).filter(Boolean);
+  const items = [];
+  const okunamayan = [];
+
+  for (const satir of satirlar) {
+    const m = satir.match(/^(.*?)[\t;,\s]+([0-9]+)\s*(?:adet|paket)?$/i);
+    if (!m) { okunamayan.push(satir); continue; }
+
+    const ad = m[1].replace(/[;\t]+$/, '').trim();
+    const adet = Number.parseInt(m[2], 10);
+
+    if (!ad || !Number.isInteger(adet)) { okunamayan.push(satir); continue; }
+    items.push({ name: ad, amount: adet });
+  }
+  return { items, okunamayan };
+}
+
+async function applyBulkStock() {
+  const { items, okunamayan } = parseStockLines($('bulkStock').value);
+
+  if (!items.length) {
+    return toast('Okunabilir satır bulunamadı. Örnek: CAMEL YELLOW  20', 'error', 6000);
+  }
+
+  const btn = $('bulkStockBtn');
+  const eskiMetin = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Uygulanıyor...';
+
+  try {
+    const r = await API.post('/api/stock/bulk', { items, mode: bulkMode });
+    await loadStock();
+
+    const parcalar = [`${r.updated} ürün işlendi`];
+    if (r.notFound.length) parcalar.push(`${r.notFound.length} ürün sistemde yok`);
+    if (r.invalid.length) parcalar.push(`${r.invalid.length} geçersiz adet`);
+    if (okunamayan.length) parcalar.push(`${okunamayan.length} satır okunamadı`);
+
+    $('bulkStockResult').innerHTML = [
+      parcalar.join(' · '),
+      r.notFound.length ? `<br /><b>Bulunamayan:</b> ${esc(r.notFound.slice(0, 12).join(', '))}` +
+        (r.notFound.length > 12 ? ` (+${r.notFound.length - 12})` : '') : '',
+      okunamayan.length ? `<br /><b>Okunamayan:</b> ${esc(okunamayan.slice(0, 5).join(' | '))}` : ''
+    ].join('');
+
+    if (r.updated) $('bulkStock').value = '';
+    toast(parcalar.join(' · '),
+      r.notFound.length || okunamayan.length || r.invalid.length ? 'error' : 'success', 6000);
+  } catch (err) { toast(err.message, 'error', 6000); }
+  finally { btn.disabled = false; btn.textContent = eskiMetin; }
+}
+
 async function applyBulkPrices() {
   const { items, okunamayan } = parsePriceLines($('bulkPrices').value);
 
@@ -274,4 +349,8 @@ function bindEvents() {
   $('setStockBtn').addEventListener('click', setStock);
   $('addAmount').addEventListener('keydown', (e) => { if (e.key === 'Enter') addStock(); });
   $('bulkPriceBtn')?.addEventListener('click', applyBulkPrices);
+
+  $('bulkStockBtn')?.addEventListener('click', applyBulkStock);
+  $('bulkModeAdd')?.addEventListener('click', () => setBulkMode('add'));
+  $('bulkModeSet')?.addEventListener('click', () => setBulkMode('set'));
 }

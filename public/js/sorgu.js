@@ -78,21 +78,40 @@ function render(status, records) {
       Toplam kayıt: <b>${status.totalRecords}</b>
     </div>`;
 
+  /*
+   * "Toplam kayit" GECERLI kayitlari sayar; asagidaki liste degistirilmis
+   * kayitlari da gosterir (arsivde kaldiklari icin). Iki sayi tutmayinca
+   * hata sanilmasin diye fark aciklaniyor.
+   */
+  const degisen = records.filter((r) => r.superseded_by).length;
+  const not = degisen
+    ? `<p class="muted mt">Listede ${degisen} adet <b>değiştirilmiş</b> kayıt var;
+       bunlar arşivde durur ama "Toplam kayıt" sayısına ve 4 saat kuralına dahil değildir.</p>`
+    : '';
+
   const gecmis = records.length
     ? `<div class="table-scroll mt">
          <table class="responsive">
-           <thead><tr><th>Tarih</th><th>Tür</th><th>Adet</th><th>Garson</th><th>Sigaracı</th></tr></thead>
+           <thead><tr>
+             <th>Tarih</th><th>Tür</th><th>Adet</th><th>Garson</th><th>Sigaracı</th><th>Info</th>
+           </tr></thead>
            <tbody>${records.map((r) => `
-             <tr>
+             <tr${r.superseded_by ? ' class="row-superseded"' : ''}>
                <td data-label="Tarih" class="mono">${formatDateTime(r.created_at)}</td>
-               <td data-label="Tür">${esc(r.cigarette_type)}</td>
+               <td data-label="Tür">
+                 ${esc(r.cigarette_type)}
+                 ${r.custom_type ? '<span class="pill custom" title="Tek seferlik — listede yok, stoktan düşülmedi">LİSTE DIŞI</span>' : ''}
+                 ${r.exchanged_from ? '<span class="pill swap" title="Değişim sonucu">DEĞİŞİM</span>' : ''}
+                 ${r.superseded_by ? '<span class="pill locked" title="Bu kayıt değiştirildi">DEĞİŞTİRİLDİ</span>' : ''}
+               </td>
                <td data-label="Adet">${r.quantity}</td>
                <td data-label="Garson">${esc(r.waiter_name)}</td>
                <td data-label="Sigaracı">${esc(r.username)}</td>
+               <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
              </tr>`).join('')}
            </tbody>
          </table>
-       </div>`
+       </div>${not}`
     : '<p class="muted mt center">Bu ID için geçmiş kayıt yok.</p>';
 
   $('lookupResult').innerHTML = ozet + gecmis;

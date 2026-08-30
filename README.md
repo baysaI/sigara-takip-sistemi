@@ -110,6 +110,38 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## Toplu stok girişi
+
+Stok Paneli'ndeki **Toplu Stok Girişi** kartı, Excel'den iki sütun yapıştırarak
+çok sayıda ürünün stoğunu tek seferde işler (toplu birim fiyat girişiyle aynı
+mantık).
+
+İki mod vardır ve **farkları önemlidir**:
+
+| Mod | Ne yapar | Hareket |
+|---|---|---|
+| **Stoğa Ekle** | Girilen adet mevcut stoğun **üstüne eklenir** | `ikmal` |
+| **Stoğu Belirle** | Stok girilen adede **sabitlenir** | `duzeltme` |
+
+İlk kurulumda stokları sıfırdan girmek için *Stoğu Belirle*, normal ikmalde
+*Stoğa Ekle* kullanılır.
+
+```
+CAMEL YELLOW	20
+PARLIAMENT BLUE BOX	15
+MARLBORO RED BOX;30
+```
+
+- Ayraç: sekme, noktalı virgül veya boşluk. Adet **tam sayı** olmalıdır.
+- Ad eşleşmesi büyük/küçük harf duyarsızdır. Sistemde olmayan ürünler atlanır
+  ve size listelenir; **yeni tür oluşturmaz** (tür eklemek Yönetim'in işidir).
+- Her satır **gerçek bir stok hareketi** yazar — `cigarette_types.stock`
+  doğrudan güncellenmez. Böylece gün sonu mutabakatı ve devreden stok hesabı
+  bozulmaz, ne yapıldığı stok hareket geçmişinde görünür.
+- Tamamı tek transaction: bir satır patlarsa hiçbiri işlenmez, yarım uygulanmış
+  toplu giriş kalmaz.
+- Aynı değere `set` yapılırsa boşuna hareket yazılmaz.
+
 ## Sigara listesi sıralaması
 
 Hızlı Kayıt'taki sigara listesi **alfabetik değil, popülerliğe göre** sıralanır:

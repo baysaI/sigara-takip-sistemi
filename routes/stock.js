@@ -8,7 +8,9 @@
 const express = require('express');
 const { db } = require('../db/database');
 const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
-const { listStock, stockSummary, addStock, setStock, recentMovements } = require('../services/stock');
+const {
+  listStock, stockSummary, addStock, setStock, recentMovements, applyMovement
+} = require('../services/stock');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -140,6 +142,79 @@ router.post('/prices', requireAdmin, asyncHandler((req, res) => {
     updated: guncellenen.length,
     notFound: bulunamayan,
     invalid: hatali
+  });
+}));
+
+/**
+ * POST /api/stock/bulk - TOPLU STOK GIRISI (admin)
+ * Govde: { items: [{ name: 'CAMEL YELLOW', amount: 20 }, ...], mode: 'add'|'set' }
+ *
+ *   mode='add'  girilen adet mevcut stoga EKLENIR  -> hareket sebebi 'ikmal'
+ *   mode='set'  stok girilen adede AYARLANIR       -> hareket sebebi 'duzeltme'
+ *
+ * Ad eslesmesi buyuk/kucuk harf duyarsizdir (COLLATE NOCASE). Her satir
+ * gercek bir stok hareketi yazar; boylece gun sonu mutabakati ve DEVIR
+ * hesabi bozulmaz — dogrudan cigarette_types.stock guncellenmez.
+ *
+ * Tumu TEK transaction: bir satir patlarsa hicbiri islenmez, yarim
+ * uygulanmis toplu giris kalmaz.
+ */
+router.post('/bulk', requireAdmin, asyncHandler((req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const mode = req.body.mode === 'set' ? 'set' : 'add';
+
+  if (!items.length) {
+    return res.status(400).json({ ok: false, error: 'Islenecek satir bulunamadi.' });
+  }
+  if (items.length > 2000) {
+    return res.status(400).json({ ok: false, error: 'Tek seferde en fazla 2000 satir islenebilir.' });
+  }
+
+  const bul = db.prepare('SELECT id, name, stock FROM cigarette_types WHERE name = ?');
+
+  const islenen = [];
+  const bulunamayan = [];
+  const hatali = [];
+
+  db.transaction(() => {
+    for (const it of items) {
+      const ad = String(it.name || '').trim();
+      const adet = Number(it.amount);
+
+      if (!ad) continue;
+      if (!Number.isInteger(adet) || adet < 0 || adet > 1000000) {
+        hatali.push(ad);
+        continue;
+      }
+
+      const tur = bul.get(ad);
+      if (!tur) { bulunamayan.push(ad); continue; }
+
+      const delta = mode === 'set' ? adet - tur.stock : adet;
+      if (delta === 0) { islenen.push({ name: tur.name, delta: 0, balance: tur.stock }); continue; }
+
+      const h = applyMovement({
+        typeId: tur.id,
+        delta,
+        reason: mode === 'set' ? 'duzeltme' : 'ikmal',
+        note: mode === 'set'
+          ? `Toplu stok ayari: ${tur.stock} -> ${adet}`
+          : `Toplu ikmal: +${adet}`,
+        user: req.session.user
+      });
+
+      islenen.push({ name: tur.name, delta, balance: h.balanceAfter });
+    }
+  })();
+
+  res.json({
+    ok: true,
+    mode,
+    updated: islenen.length,
+    items: islenen,
+    notFound: bulunamayan,
+    invalid: hatali,
+    summary: stockSummary()
   });
 }));
 

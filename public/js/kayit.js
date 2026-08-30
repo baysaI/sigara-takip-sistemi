@@ -210,7 +210,7 @@ async function loadRecent() {
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
-        <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
+        <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
         <td data-label="İşlem">
           ${r.superseded_by
             ? '<span class="pill locked" title="Bu kayıt değiştirildi, arşivde kalır">DEĞİŞTİRİLDİ</span>'

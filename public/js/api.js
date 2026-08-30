@@ -172,6 +172,65 @@ function periodDuration(fromISO, nowISO) {
   return `${kalan} dk`;
 }
 
+/* ------------------- Kayıt detayı (Info + onaylar) ------------------- */
+/**
+ * Bir kaydın "neden / kim" bilgisini tek blok halinde üretir.
+ *
+ * Info notu, özel onay ve erken alım bilgileri veritabanında tutuluyordu
+ * ama hiçbir ekranda görünmüyordu — "kim onay verdi" sorusunun cevabı
+ * yalnızca gün sonu raporundaydı. Aynı görünümü Arşiv, Son Kayıtlar ve
+ * Sorgu sayfaları paylaşsın diye burada.
+ *
+ * @param {object} r  records satırı (arşiv uç noktasından)
+ * @returns {string} HTML — kaçışlama içeride yapılır
+ */
+function recordDetailHTML(r) {
+  const satirlar = [];
+
+  if (r.info) satirlar.push(esc(r.info));
+
+  // Erken alım: 4 saat dolmadan, yetkili onayıyla verildi
+  if (r.early_release) {
+    const kim = r.early_approved_by ? `<b>${esc(r.early_approved_by)}</b>` : 'yetkili';
+    const sure = r.early_remaining_ms ? ` (${formatDuration(r.early_remaining_ms)} kalmıştı)` : '';
+    satirlar.push(
+      `<span class="detail-line early">⏳ Erken alım — onay: ${kim}${sure}` +
+      `${r.early_note ? ` · ${esc(r.early_note)}` : ''}</span>`
+    );
+  }
+
+  // Modül 7: özel uyarı / onay ile verildi
+  if (r.flag_level) {
+    const kim = r.approved_by ? `<b>${esc(r.approved_by)}</b>` : 'okundu onayı';
+    satirlar.push(
+      `<span class="detail-line flag">⚠️ ${esc((r.flag_level || '').toUpperCase())} — onay: ${kim}` +
+      `${r.flag_note ? ` · uyarı: ${esc(r.flag_note)}` : ''}` +
+      `${r.approval_note ? ` · not: ${esc(r.approval_note)}` : ''}</span>`
+    );
+  }
+
+  // Sigara değişimi
+  if (r.exchanged_from && r.exchanged_by) {
+    satirlar.push(
+      `<span class="detail-line swap">🔄 Değişimle verildi — ${esc(r.exchanged_by)}` +
+      `${r.exchanged_at ? ` · ${formatDateTime(r.exchanged_at)}` : ''}</span>`
+    );
+  }
+  if (r.superseded_by) {
+    satirlar.push('<span class="detail-line swap">🔄 Bu kayıt değiştirildi, yerine yenisi geçti</span>');
+  }
+
+  // İptal
+  if (r.cancelled_at) {
+    satirlar.push(
+      `<span class="detail-line cancel">🚫 İptal — ${esc(r.cancelled_by || '')}` +
+      `${r.cancel_reason ? ` · ${esc(r.cancel_reason)}` : ''}</span>`
+    );
+  }
+
+  return satirlar.length ? satirlar.join('<br />') : '<span class="muted">—</span>';
+}
+
 /** XSS koruması: kullanıcı verisi innerHTML'e girerken kaçışlanır. */
 function esc(value) {
   if (value == null) return '';

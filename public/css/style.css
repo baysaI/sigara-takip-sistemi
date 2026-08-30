@@ -731,7 +731,15 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 
 /* Satir ici islem dugmeleri (Degistir / Iptal Et) yan yana, dar ekranda alta sarar */
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.info-cell { color: var(--text-faint); font-style: italic; max-width: 220px; }
+.info-cell { color: var(--text-faint); font-style: italic; max-width: 300px; }
+
+/* Kayit detayi: Info notunun altina onay / erken alim / degisim / iptal
+   bilgisi. "Kim onay verdi" sorusu bu satirlarda cevaplanir. */
+.detail-line { font-style: normal; font-size: 12px; display: inline-block; margin-top: 3px; line-height: 1.5; }
+.detail-line.early  { color: #6fb6ff; }
+.detail-line.flag   { color: #ff9ea1; }
+.detail-line.swap   { color: #c3a0ff; }
+.detail-line.cancel { color: #ff9ea1; }
 .empty { text-align: center; padding: 32px 16px; color: var(--text-faint); line-height: 1.7; }
 
 /* ============================================================
