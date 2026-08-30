@@ -24,6 +24,35 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 /* ---------------------------- Middleware ---------------------------- */
+
+/*
+ * Guvenlik basliklari.
+ *
+ * CSP verilebiliyor cunku sayfalarda satir ici <script> ve onclick gibi
+ * yakalayicilar YOK — tum betikler harici dosya. Satir ici style="..."
+ * kullanildigi icin yalnizca style-src'de 'unsafe-inline' var.
+ * Yeni bir sayfaya satir ici script eklenirse burasi da guncellenmeli.
+ */
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',                 // clickjacking
+    'Referrer-Policy': 'same-origin',
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "connect-src 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "object-src 'none'"
+    ].join('; ')
+  });
+  next();
+});
+
 app.use(express.json({ limit: '64kb' }));
 app.use(express.urlencoded({ extended: false }));
 

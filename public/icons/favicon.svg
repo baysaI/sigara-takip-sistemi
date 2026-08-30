@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Sigara Takip Sistemi">
+  <defs>
+    <linearGradient id="zemin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fab23c"/>
+      <stop offset="1" stop-color="#d6840e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="100" height="100" rx="22" fill="url(#zemin)"/>
+
+  <!-- Sigara: kor ucu solda, filtre sagda. Kucuk boyutta "capraz cubuk +
+       turuncu uc" siluetiyle secilsin diye kalin ve capraz. -->
+  <g transform="rotate(-32 50 50)">
+    <rect x="9.2" y="39" width="81.6" height="22" rx="2.5" fill="#261a0c"/>
+    <rect x="11"   y="40.75" width="7.8"  height="18.5" fill="#ff5a14"/>
+    <rect x="18.8" y="40.75" width="5.5"  height="18.5" fill="#4a3e36"/>
+    <rect x="24.3" y="40.75" width="39.8" height="18.5" fill="#fcfaf5"/>
+    <rect x="64.1" y="40.75" width="3.9"  height="18.5" fill="#966028"/>
+    <rect x="68"   y="40.75" width="21"   height="18.5" fill="#ce8c4a"/>
+  </g>
+</svg>

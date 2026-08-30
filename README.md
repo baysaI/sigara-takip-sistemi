@@ -110,6 +110,31 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## Güvenlik
+
+- **Şifreler** bcrypt ile saklanır. Giriş, kullanıcı adının var olup olmadığını
+  sızdırmaz (her iki durumda aynı mesaj), başarılı girişte oturum kimliği
+  yenilenir (session fixation koruması).
+- **Giriş denemesi sınırı:** aynı IP + kullanıcı adı için 15 dakikada 8 hatalı
+  denemeden sonra 15 dakika blok (`429`, `Retry-After` başlığıyla). Blok
+  sırasında doğru şifre de reddedilir — aksi halde blok, saldırgan için
+  "şifreyi buldum" sinyaline dönerdi. Başarılı giriş sayacı sıfırlar.
+  Bellekte tutulur, ek bağımlılık yoktur (`middleware/rateLimit.js`).
+- **HTTP başlıkları:** `X-Content-Type-Options`, `X-Frame-Options: DENY`
+  (clickjacking), `Referrer-Policy` ve bir **CSP**. Sayfalarda satır içi
+  `<script>` ve `onclick` bulunmadığı için CSP `script-src 'self'` olabiliyor;
+  yeni bir sayfaya satır içi script eklenirse `server.js` güncellenmelidir.
+- **Oturum çerezi** `httpOnly` + `sameSite=lax`. `NODE_ENV=production` iken
+  `secure` olur — **bunu ancak HTTPS arkasındaysanız açın**, aksi halde çerez
+  hiç gönderilmez ve giriş yapılamaz.
+
+### Canlı kurulum için
+
+1. `.env` içinde uzun ve rastgele bir `SESSION_SECRET` verin.
+2. `admin` hesabının şifresini ilk girişte değiştirin.
+3. HTTPS kullanıyorsanız `NODE_ENV=production` yapın.
+4. `data/sigara.db` dosyasını düzenli yedekleyin — tüm veri orada.
+
 ## Toplu stok girişi
 
 Stok Paneli'ndeki **Toplu Stok Girişi** kartı, Excel'den iki sütun yapıştırarak
