@@ -94,12 +94,12 @@
         <table class="responsive" id="reconTable">
           <thead>
             <tr>
-              <th>NO</th><th>SİGARA ADI</th><th>DEVİR</th><th>GİRİŞ</th>
+              <th>NO</th><th>SİGARA ADI</th><th>GİRİŞ</th>
               <th>TÜKETİM</th><th>KALAN</th><th>SAYIM</th><th>FARK</th><th>TUTAR</th>
             </tr>
           </thead>
           <tbody id="reconBody">
-            <tr><td colspan="9" class="empty">Yükleniyor...</td></tr>
+            <tr><td colspan="8" class="empty">Yükleniyor...</td></tr>
           </tbody>
           <tfoot id="reconFoot"></tfoot>
         </table>
@@ -107,7 +107,8 @@
 
       <div class="pager">
         <span class="info" id="reconNote">
-          DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.
+          KALAN, önceki dönemden devreden stoğa GİRİŞ eklenip TÜKETİM düşülerek
+          hesaplanır. Sayım girince fark otomatik çıkar.
         </span>
         <button class="btn-ghost btn-sm" id="csvBtn">Excel'e Aktar</button>
         <button class="btn-primary btn-sm" id="saveCountBtn">Sayımı Kaydet</button>

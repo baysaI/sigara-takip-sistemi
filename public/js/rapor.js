@@ -211,7 +211,7 @@ async function loadReconciliation() {
     renderReconciliation();
   } catch (err) {
     recon = null;
-    body.innerHTML = `<tr><td colspan="9" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -225,7 +225,7 @@ function renderReconciliation() {
     (t.farkli ? ` · ${t.farkli} farklı` : '');
 
   if (!recon.rows.length) {
-    body.innerHTML = '<tr><td colspan="9" class="empty">Tanımlı sigara türü yok.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="empty">Tanımlı sigara türü yok.</td></tr>';
     $('reconFoot').innerHTML = '';
     return;
   }
@@ -238,7 +238,6 @@ function renderReconciliation() {
       <tr${r.drift ? ' title="Stok kartı ile hareket geçmişi ayrışmış"' : ''}>
         <td data-label="NO" class="muted">${r.no}</td>
         <td data-label="Sigara Adı"><b>${esc(r.name)}</b>${r.drift ? ' <span class="pill locked">?</span>' : ''}</td>
-        <td data-label="Devir" class="mono">${r.devir}</td>
         <td data-label="Giriş" class="mono">${r.giris ? '+' + r.giris : '0'}</td>
         <td data-label="Tüketim" class="mono">${r.tuketim ? '-' + r.tuketim : '0'}</td>
         <td data-label="Kalan"><b class="mono">${r.kalan}</b></td>
@@ -256,7 +255,6 @@ function renderReconciliation() {
   $('reconFoot').innerHTML = `
     <tr>
       <td colspan="2"><b>TOPLAM</b></td>
-      <td class="mono"><b>${t.devir}</b></td>
       <td class="mono"><b>${t.giris}</b></td>
       <td class="mono"><b>${t.tuketim}</b></td>
       <td class="mono"><b>${t.kalan}</b></td>
@@ -284,7 +282,8 @@ function renderReconciliation() {
   const notlar = [
     t.kayan
       ? `${t.kayan} türde stok kartı ile hareket geçmişi ayrışmış — sayım girip düzeltin.`
-      : 'DEVİR + GİRİŞ − TÜKETİM = KALAN. Sayım girince fark otomatik hesaplanır.'
+      : 'KALAN, önceki dönemden devreden stoğa GİRİŞ eklenip TÜKETİM düşülerek ' +
+        'hesaplanır. Sayım girince fark otomatik çıkar.'
   ];
 
   /*

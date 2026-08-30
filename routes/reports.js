@@ -279,7 +279,7 @@ router.post('/close', asyncHandler((req, res) => {
 
 /* ------------------------------------------------------------------ */
 /* GET /api/reports/reconciliation?dayKey=|closure=                    */
-/* Gun sonu stok mutabakati: DEVIR / GIRIS / TUKETIM / KALAN / SAYIM   */
+/* Gun sonu stok mutabakati: GIRIS / TUKETIM / KALAN / SAYIM           */
 /* ------------------------------------------------------------------ */
 router.get('/reconciliation', asyncHandler((req, res) => {
   const kapsam = resolveScope(req.query);
@@ -345,13 +345,15 @@ router.get('/reconciliation.csv', asyncHandler((req, res) => {
   const satirlar = [
     [baslik],
     [],
-    ['NO', 'SIGARA ADI', 'DEVIR', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
+    // DEVIR sutunu rapordan kaldirildi; KALAN hesabinda kullanilmaya devam
+    // ediyor (bkz. services/reconciliation.js), yalnizca gosterilmiyor.
+    ['NO', 'SIGARA ADI', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
     ...rapor.rows.map((r) => [
-      r.no, r.name, r.devir, r.giris, r.tuketim, r.duzeltme, r.kalan,
+      r.no, r.name, r.giris, r.tuketim, r.duzeltme, r.kalan,
       r.sayim ?? '', r.fark ?? '', sayi(r.unitPrice), sayi(r.tutar.toFixed(2))
     ]),
     [],
-    ['', 'TOPLAM', rapor.totals.devir, rapor.totals.giris, rapor.totals.tuketim,
+    ['', 'TOPLAM', rapor.totals.giris, rapor.totals.tuketim,
      rapor.totals.duzeltme, rapor.totals.kalan, '', '', '', sayi(rapor.totals.tutar.toFixed(2))]
   ];
 

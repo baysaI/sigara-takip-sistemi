@@ -550,15 +550,20 @@ Ayar tek yerdedir: [services/businessDay.js](services/businessDay.js) sunucu tar
 İşletmenin Excel'de tuttuğu gün sonu sayım tablosunun karşılığıdır. Gün Sonu Raporu
 sayfasının en üstünde yer alır:
 
-| NO | SİGARA ADI | DEVİR | GİRİŞ | TÜKETİM | KALAN | SAYIM | FARK | TUTAR |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Camel | 9 | +20 | −3 | 26 | 24 | −2 | 328,23 ₺ |
+| NO | SİGARA ADI | GİRİŞ | TÜKETİM | KALAN | SAYIM | FARK | TUTAR |
+|---|---|---|---|---|---|---|---|
+| 1 | Camel | +20 | −3 | 26 | 24 | −2 | 328,23 ₺ |
 
-Denklem: **DEVİR + GİRİŞ − TÜKETİM = KALAN**
+**KALAN**, önceki dönemden devreden stoğa GİRİŞ eklenip TÜKETİM düşülerek
+hesaplanır.
+
+> **Not — DEVİR sütunu:** Tabloda gösterilmez, ancak hesabın ilk terimi olarak
+> kullanılmaya devam eder (`services/reconciliation.js`). Hesaptan çıkarılırsa
+> KALAN önceki dönemden devreden stoğu yok sayar ve stok kartıyla tutmaz.
+> API yanıtı `devir` alanını döndürmeyi sürdürür.
 
 | Sütun | Nereden gelir |
 |---|---|
-| **DEVİR** | İş günü başlamadan önceki son stok bakiyesi |
 | **GİRİŞ** | Gün içi ikmal (Stok Paneli'nden girilen koli/paket) |
 | **TÜKETİM** | Gün içi kayıtlardan çıkan paket |
 | **KALAN** | Sistemin hesapladığı bakiye |

@@ -3,10 +3,15 @@
  *
  * Isletmenin Excel'de tuttugu gun sonu sayim tablosunun karsiligi:
  *
- *   NO | SIGARA ADI | DEVIR | GIRIS | TUKETIM | KALAN | SAYIM | FARK
+ *   NO | SIGARA ADI | GIRIS | TUKETIM | KALAN | SAYIM | FARK
  *
  * Denklem:  DEVIR + GIRIS - TUKETIM (+/- DUZELTME) = KALAN
- *   DEVIR    donem baslamadan onceki son stok bakiyesi
+ *
+ *   DEVIR    donem baslamadan onceki son stok bakiyesi.
+ *            !! Raporda GOSTERILMEZ (sutunu kaldirildi) ama hesabin ilk
+ *            terimidir ve burada uretilmeye devam eder. Cikarilirsa KALAN
+ *            onceki donemden devreden stogu yok sayar ve stok kartiyla
+ *            tutmaz. API yaniti `devir` alanini dondurmeyi surdurur.
  *   GIRIS    donem ici ikmal (koli/paket girisi)
  *   TUKETIM  donem ici kayitlardan cikan paket
  *   DUZELTME donem ici sayim duzeltmesi / kayit silme iadesi
