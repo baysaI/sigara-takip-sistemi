@@ -105,24 +105,45 @@ const YENI_TUR = '__yeni_sigara__';
 /** Su an tek seferlik (liste disi) sigara mi giriliyor? */
 const ozelTurSecili = () => $('cigaretteType').value === YENI_TUR;
 
+/**
+ * Sigara listesi POPULERLIGE gore siralanir (alfabetik degil): vardiyada
+ * en cok verilen sigaralar ustte, elin oraya gitsin. Sunucu son 30 gunun
+ * satisina bakar ve ilk 10'a popular bayragi dusurur.
+ *
+ * Kalanlar "Diğer sigaralar" grubunda alfabetik durur — bilinen bir adi
+ * ararken listenin geri kalani duzenli kalsin.
+ */
 async function loadTypes() {
-  const { types } = await API.get('/api/cigarette-types');
+  const { types } = await API.get('/api/cigarette-types', { sort: 'popular' });
   typesReady = types.length > 0;
 
   const sel = $('cigaretteType');
   const onceki = sel.value;
 
+  const secenek = (t) =>
+    `<option value="${esc(t.name)}">${esc(t.name)}${t.popular ? ' 🔥 POPÜLER' : ''}</option>`;
+
+  const populer = types.filter((t) => t.popular);
+  const digerleri = types.filter((t) => !t.popular);
+
+  let govde;
+  if (!typesReady) {
+    govde = '<option value="">— Listede sigara yok —</option>';
+  } else if (!populer.length) {
+    // Henuz satis yoksa rozet dagitmanin anlami yok; duz liste
+    govde = '<option value="">— Seçiniz —</option>' + types.map(secenek).join('');
+  } else {
+    govde = '<option value="">— Seçiniz —</option>' +
+      populer.map(secenek).join('') +
+      (digerleri.length
+        ? `<optgroup label="Diğer sigaralar">${digerleri.map(secenek).join('')}</optgroup>`
+        : '');
+  }
+
   // "Yeni Sigara Ekle" listeden BAGIMSIZDIR: liste bos olsa da secilebilir,
   // cunku tek seferlik sigaranin listede karsiligi zaten yoktur.
-  const yeniSecenek = `<option value="${YENI_TUR}">➕ Yeni Sigara Ekle</option>`;
-
   sel.disabled = false;
-  sel.innerHTML =
-    (typesReady
-      ? '<option value="">— Seçiniz —</option>' +
-        types.map((t) => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('')
-      : '<option value="">— Listede sigara yok —</option>') +
-    yeniSecenek;
+  sel.innerHTML = govde + `<option value="${YENI_TUR}">➕ Yeni Sigara Ekle</option>`;
 
   // Liste tazelendiginde secim korunur (kayit sonrasi loadTypes cagriliyor)
   if (onceki && [...sel.options].some((o) => o.value === onceki)) sel.value = onceki;

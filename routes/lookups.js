@@ -16,6 +16,35 @@ const listWaiters = db.prepare('SELECT id, name, is_active FROM waiters ORDER BY
 const listAllWaiters = listWaiters;
 const listTypes = db.prepare('SELECT id, name FROM cigarette_types WHERE is_active = 1 ORDER BY name COLLATE NOCASE');
 
+/* ------------------------------------------------------------------
+   POPULERLIK SIRALAMASI (?sort=popular)
+   Kayit formunda en cok verilen sigaralar ustte olsun diye. Filtre
+   listelerinde kullanilmaz: orada bilinen bir adi aramak icin alfabetik
+   siralama daha kullanisli.
+
+   Olcut: son POPULER_GUN gunde dagitilan PAKET adedi. Sabit "tum zamanlar"
+   yerine kayan pencere; birakilan bir marka zamanla ustten duser, yeni
+   populerlesen yukari cikar.
+
+   Iptal edilmis ve degisimle gecersizlesmis kayitlar sayilmaz — satis
+   gerceklesmemis sayilir.
+   ------------------------------------------------------------------ */
+const POPULER_ADET = 10;   // kac tanesi "POPULER" rozeti alacak
+const POPULER_GUN = 30;    // kac gunluk pencereye bakilacak
+
+const listTypesByPopularity = db.prepare(`
+  SELECT t.id, t.name, COALESCE(SUM(r.quantity), 0) AS sales
+  FROM cigarette_types t
+  LEFT JOIN records r
+    ON r.cigarette_type_id = t.id
+   AND r.created_at >= @since
+   AND r.superseded_by IS NULL
+   AND r.cancelled_at IS NULL
+  WHERE t.is_active = 1
+  GROUP BY t.id, t.name
+  ORDER BY sales DESC, t.name COLLATE NOCASE
+`);
+
 /** GET /api/waiters  (?all=1 -> pasifler de gelir, admin ekrani icin) */
 router.get('/waiters', asyncHandler((req, res) => {
   const rows = req.query.all === '1' ? listAllWaiters.all() : listWaiters.all();
@@ -48,8 +77,31 @@ router.patch('/waiters/:id', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true });
 }));
 
-/** GET /api/cigarette-types */
+/**
+ * GET /api/cigarette-types
+ *   ?all=1          pasifler de gelir (yonetim ekrani)
+ *   ?sort=popular   son 30 gunun satisina gore siralar; ilk 10'a
+ *                   popular:true dusulur (satisi olanlar icinde)
+ */
 router.get('/cigarette-types', asyncHandler((req, res) => {
+  if (req.query.sort === 'popular' && req.query.all !== '1') {
+    const since = new Date(Date.now() - POPULER_GUN * 86400000).toISOString();
+    const rows = listTypesByPopularity.all({ since });
+
+    /* Satisi OLMAYAN tur "populer" sayilmaz: liste 10'dan kisaysa ya da
+       hic satis yoksa rozet bosuna dagitilmasin. */
+    const types = rows.map((t, i) => ({
+      ...t,
+      popular: i < POPULER_ADET && t.sales > 0
+    }));
+
+    return res.json({
+      ok: true,
+      types,
+      popular: { count: types.filter((t) => t.popular).length, days: POPULER_GUN }
+    });
+  }
+
   const rows = req.query.all === '1' ? listAllTypes.all() : listTypes.all();
   res.json({ ok: true, types: rows });
 }));

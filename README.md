@@ -110,6 +110,36 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## Sigara listesi sıralaması
+
+Hızlı Kayıt'taki sigara listesi **alfabetik değil, popülerliğe göre** sıralanır:
+son **30 günde** en çok dağıtılan sigaralar en üstte olur. İlk 10 tanesi
+`🔥 POPÜLER` ibaresiyle işaretlenir, kalanlar altta **Diğer sigaralar** grubunda
+alfabetik durur.
+
+```
+— Seçiniz —
+BENSON GOLD          🔥 POPÜLER
+MARLBORO RED         🔥 POPÜLER
+...
+── Diğer sigaralar ──
+Cafe Creme Blue
+Craven-A
+➕ Yeni Sigara Ekle
+```
+
+- Ölçüt sabit "tüm zamanlar" değil **kayan 30 günlük pencere**: bırakılan bir
+  marka zamanla üstten düşer, yeni popülerleşen yukarı çıkar.
+- **Satışı olmayan tür popüler işaretlenmez** — liste 10'dan kısaysa ya da hiç
+  satış yoksa rozet boşuna dağıtılmaz.
+- İptal edilmiş ve sigara değişimiyle geçersizleşmiş kayıtlar sayılmaz.
+- Sıralama yalnızca **seçim** listesinde uygulanır. Arşiv ve İptaller
+  sayfalarındaki **filtreler alfabetik kalır** — orada bilinen bir adı ararsınız,
+  popülerlik işe yaramaz. API'de ayrım `?sort=popular` ile yapılır.
+
+Pencere ve rozet sayısı `routes/lookups.js` içindeki `POPULER_GUN` ve
+`POPULER_ADET` sabitleridir.
+
 ## Yeni Sigara Ekle (tek seferlik)
 
 Sigara türü listesinin en altında **➕ Yeni Sigara Ekle** seçeneği vardır.
