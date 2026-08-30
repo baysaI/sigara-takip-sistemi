@@ -184,7 +184,7 @@ async function loadRecent() {
     $('recentCount').textContent = `${summary.total} kayıt`;
 
     if (!records.length) {
-      body.innerHTML = '<tr><td colspan="7" class="empty">Henüz kayıt yok.</td></tr>';
+      body.innerHTML = '<tr><td colspan="8" class="empty">Henüz kayıt yok.</td></tr>';
       return;
     }
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
@@ -210,6 +210,7 @@ async function loadRecent() {
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${esc(r.waiter_name)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
+        <td data-label="Info" class="info-cell">${r.info ? esc(r.info) : '—'}</td>
         <td data-label="İşlem">
           ${r.superseded_by
             ? '<span class="pill locked" title="Bu kayıt değiştirildi, arşivde kalır">DEĞİŞTİRİLDİ</span>'
@@ -220,7 +221,7 @@ async function loadRecent() {
       </tr>`;
     }).join('');
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="7" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 

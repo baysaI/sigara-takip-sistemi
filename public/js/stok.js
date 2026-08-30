@@ -27,7 +27,9 @@ async function loadStock() {
     $('stTypes').textContent    = summary.types;
     $('stTotal').textContent    = summary.totalPackets;
     $('stCritical').textContent = summary.critical;
-    $('stOut').textContent      = summary.out;
+    // "Tükenen" karti kaldirildi. summary.out API'de duruyor: stok
+    // kartlarinin TÜKENDİ rozeti ve kayit anindaki stok uyarilari onu
+    // kullanmaya devam ediyor.
     $('cardCount').textContent  = `${cards.length} tür · ${summary.totalPackets} paket`;
 
     // İkmal ve düzeltme açılır menülerini doldur
