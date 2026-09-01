@@ -103,7 +103,8 @@ function renderArchive({ records, pagination, summary }) {
        */
       const acikDonemde = !App.period || r.created_at >= App.period.from;
       const degisebilir = !r.superseded_by && acikDonemde;
-      const iptalEdilebilir = App.user.role === 'admin' && !r.superseded_by;
+      // Iptal sigaraciya da acik: iadeyi tezgahta alan kisi o.
+      const iptalEdilebilir = !r.superseded_by;
 
       return `
       <tr${r.superseded_by ? ' class="row-superseded"' : ''}>

@@ -14,18 +14,16 @@
 const $ = (id) => document.getElementById(id);
 
 /** Tablo sutun sayisi — yoneticide "Islem" sutunu da var. */
-const SUTUN = () => (App.user && App.user.role === 'admin' ? 9 : 8);
+const SUTUN = () => 9;   // Islem sutunu artik herkeste var
 
 const state = { page: 1 };
 const refilter = () => { state.page = 1; loadCancellations(); };
 
 App.ready(async () => {
-  // Yonetici iptali geri alabilir; basligi ona gore ekle
-  if (App.user.role === 'admin') {
-    document.querySelector('#cancelBody')
-      .closest('table').querySelector('thead tr')
-      .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
-  }
+  // Geri alma sigaraciya da acik; sutun herkese eklenir
+  document.querySelector('#cancelBody')
+    .closest('table').querySelector('thead tr')
+    .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
   await loadFilterOptions();
   await loadCancellations();
   bindEvents();
@@ -99,21 +97,18 @@ async function loadCancellations() {
         <td data-label="Neden" class="info-cell">${r.cancel_reason ? esc(r.cancel_reason) : '—'}</td>
         <td data-label="İptal Eden"><b>${esc(r.cancelled_by)}</b></td>
         <td data-label="Garson" class="muted">${esc(r.waiter_name)}</td>
-        ${App.user.role === 'admin' ? `
         <td data-label="İşlem">
           ${r.canUndo
             ? `<button class="btn-ghost btn-sm" data-undo="${r.id}">Geri Al</button>`
             : `<span class="muted" title="Satışın günü kapandı — geri almak kapanmış raporu değiştirirdi">kilitli</span>`}
-        </td>` : ''}
+        </td>
       </tr>`).join('');
 
-    if (App.user.role === 'admin') {
-      body.querySelectorAll('[data-undo]').forEach((btn) =>
-        btn.addEventListener('click', () => {
-          const kayit = records.find((x) => String(x.id) === btn.dataset.undo);
-          if (kayit) geriAl(kayit);
-        }));
-    }
+    body.querySelectorAll('[data-undo]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const kayit = records.find((x) => String(x.id) === btn.dataset.undo);
+        if (kayit) geriAl(kayit);
+      }));
   }
 
   $('cancelCount').textContent = `${summary.total} iptal · ${summary.totalQuantity} paket iade`;

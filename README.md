@@ -120,7 +120,7 @@ geçerli olur (kullanıcının açık sayfası varsa yenilemesi gerekir).
 |---|:---:|:---:|
 | Hızlı Kayıt, Arşiv, Sorgu, Stok | ✅ | ✅ |
 | İptaller — görüntüleme | ✅ | ✅ |
-| İptaller — iptal etme / geri alma | — | ✅ |
+| İptaller — iptal etme / geri alma | ✅ | ✅ |
 | **Uyarılar** — tanımlama, kaldırma, silme | ✅ | ✅ |
 | **Rapor** — görüntüleme, sayım, **günü kapatma** | ✅ | ✅ |
 | Toplu stok / fiyat, kritik eşik | — | ✅ |

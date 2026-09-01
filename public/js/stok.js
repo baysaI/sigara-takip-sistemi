@@ -14,6 +14,26 @@ const DURUM = {
 /** Son yuklenen stok kartlari — onizleme mevcut degeri buradan okur. */
 let kartlar = [];
 
+/** Hareket sebebinin okunur karsiligi. */
+const SEBEP = { ikmal: 'ikmal', kayit: 'kayıt', duzeltme: 'düzeltme' };
+
+/**
+ * Stok kartinda "bu stogu en son kim, ne zaman, ne kadar degistirdi".
+ * Hareket gecmisini tarayip aramak yerine kartin uzerinde dursun.
+ */
+function sonIslemHTML(c) {
+  if (!c.last_by) return '<span class="muted">—</span>';
+
+  const isaret = c.last_delta > 0 ? `+${c.last_delta}` : String(c.last_delta);
+  const sinif = c.last_delta > 0 ? 'free' : 'locked';
+
+  return `<span class="pill ${sinif}">${isaret}</span> ` +
+         `<b>${esc(c.last_by)}</b> ` +
+         `<span class="muted">· ${SEBEP[c.last_reason] || esc(c.last_reason)} · ` +
+         `${timeAgo(c.last_at)}</span>` +
+         (c.last_note ? `<br /><span class="muted">${esc(c.last_note)}</span>` : '');
+}
+
 /**
  * Iki islemin sonucunu ONCEDEN yazar.
  *
@@ -80,7 +100,7 @@ async function loadStock() {
     tazeleOnizleme();
 
     if (!cards.length) {
-      body.innerHTML = `<tr><td colspan="5" class="empty">
+      body.innerHTML = `<tr><td colspan="6" class="empty">
         Henüz sigara türü tanımlanmamış.<br />
         <span class="muted">Yönetim sayfasından tür ekleyin.</span></td></tr>`;
       return;
@@ -95,6 +115,7 @@ async function loadStock() {
           <b class="stock-pill stock-${c.state}" style="font-size:16px">${c.stock}</b>
           <span class="muted">paket</span>
         </td>
+        <td data-label="Son İşlem" class="info-cell">${sonIslemHTML(c)}</td>
         <td data-label="Birim Fiyat">
           <span class="muted price-view" data-id="${c.id}" data-price="${c.unit_price || 0}">
             ${(c.unit_price || 0).toFixed(2)} ₺ ${App.user.role === 'admin' ? '<b style="color:var(--accent)">✎</b>' : ''}
@@ -116,7 +137,7 @@ async function loadStock() {
         el.addEventListener('click', () => editPrice(el)));
     }
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="5" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 

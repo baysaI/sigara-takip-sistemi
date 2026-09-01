@@ -492,6 +492,10 @@ router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
 /* GET  /api/records/cancelled     Iptal Edilenler / Arsiv listesi     */
 /* POST /api/records/:id/cancel    satisi iptal et (yumusak)           */
 /*                                                                     */
+/* Iptal ve geri alma SIGARACIYA DA ACIK: iadeyi tezgahta alan kisi o.  */
+/* Kayit silinmedigi ve her islem kim/ne zaman diye kayda gectigi icin  */
+/* geri donusu olan bir islem.                                          */
+/*                                                                     */
 /* Kayit SILINMEZ: aktif listeden cikar, tum gecmisiyle iptal          */
 /* bolumunde durur. Stok iade edilir; satis donemi kapanmissa iade     */
 /* cari doneme duzeltme olarak duser (bkz. services/cancellation.js).  */
@@ -510,7 +514,7 @@ router.get('/cancelled', asyncHandler((req, res) => {
   res.json({ ok: true, ...sonuc, serverTime: new Date().toISOString() });
 }));
 
-router.post('/:id/cancel', requireAdmin, asyncHandler((req, res) => {
+router.post('/:id/cancel', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) {
     return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
@@ -542,7 +546,7 @@ router.post('/:id/cancel', requireAdmin, asyncHandler((req, res) => {
 /* Satis yeniden aktif kayit olur, stok tekrar duser.                  */
 /* Kapanmis raporu degistirecek geri almalar reddedilir                */
 /* (bkz. services/cancellation.js assertUncancellable).                */
-router.post('/:id/uncancel', requireAdmin, asyncHandler((req, res) => {
+router.post('/:id/uncancel', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id)) {
     return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });

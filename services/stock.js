@@ -29,13 +29,30 @@ function stockState(stock, critical) {
   return 'ok';
 }
 
-/** Tum stok kartlari (Stok Paneli listesi). */
+/**
+ * Tum stok kartlari (Stok Paneli listesi).
+ *
+ * Her kart, o turun SON stok hareketini de tasir: kim, ne zaman, ne kadar.
+ * "Bu stogu kim ekledi" sorusunun cevabi hareket gecmisini tarayarak
+ * degil, karta bakarak bulunsun diye.
+ */
 function listStock({ includeInactive = false } = {}) {
   const rows = db.prepare(`
-    SELECT id, name, stock, critical_level, is_active, unit_price
-    FROM cigarette_types
-    ${includeInactive ? '' : 'WHERE is_active = 1'}
-    ORDER BY name COLLATE NOCASE
+    SELECT t.id, t.name, t.stock, t.critical_level, t.is_active, t.unit_price,
+           m.username   AS last_by,
+           m.created_at AS last_at,
+           m.delta      AS last_delta,
+           m.reason     AS last_reason,
+           m.note       AS last_note
+    FROM cigarette_types t
+    LEFT JOIN stock_movements m ON m.id = (
+      SELECT id FROM stock_movements
+      WHERE type_id = t.id
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    )
+    ${includeInactive ? '' : 'WHERE t.is_active = 1'}
+    ORDER BY t.name COLLATE NOCASE
   `).all();
 
   return rows.map((t) => ({ ...t, state: stockState(t.stock, t.critical_level) }));
