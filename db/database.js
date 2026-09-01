@@ -234,6 +234,20 @@ CREATE TABLE IF NOT EXISTS record_cancellations (
   reverted_at    TEXT,
   reverted_by    TEXT
 );
+-- ---------------------------------------------------------------
+-- settings: calisma aninda degistirilebilen ayarlar
+--   Sigara kurali (kac saatte bir) artik .env'e bagli degil; yonetici
+--   Yonetim sayfasindan degistirir ve sunucuyu yeniden baslatmak
+--   GEREKMEZ. .env'deki deger yalnizca ILK kurulumda tohum olarak
+--   kullanilir (bkz. services/settings.js).
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TEXT,
+  updated_by TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_cancel_created ON record_cancellations (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_cancel_record  ON record_cancellations (record_id);
 CREATE INDEX IF NOT EXISTS idx_cancel_player  ON record_cancellations (player_id);

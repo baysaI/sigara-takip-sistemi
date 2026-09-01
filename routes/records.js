@@ -11,7 +11,8 @@ const { exchangeRecord, exchangeableRecords, assertExchangeable } = require('../
 const {
   cancelRecord, uncancelRecord, assertCancellable, assertUncancellable, listCancellations
 } = require('../services/cancellation');
-const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, COOLDOWN_HOURS } = require('../config');
+const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } = require('../config');
+const { cooldownHours } = require('../services/settings');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -104,7 +105,7 @@ router.post('/', asyncHandler((req, res) => {
     if (!onaylandi) {
       return res.status(409).json({
         ok: false,
-        error: `${playerId} icin ${COOLDOWN_HOURS} saat kurali dolmadi.`,
+        error: `${playerId} icin ${cooldownHours()} saat kurali dolmadi.`,
         status,
         canOverride: true            // arayuz onay ekrani acabilir
       });
@@ -342,7 +343,7 @@ router.get('/', asyncHandler((req, res) => {
 router.get('/stats', asyncHandler((req, res) => {
   // Istatistikler ACIK DONEMI kapsar: gun sonu raporu alinana kadar surer.
   const gun = openPeriod();
-  const cooldownStart = new Date(Date.now() - COOLDOWN_HOURS * 60 * 60 * 1000).toISOString();
+  const cooldownStart = new Date(Date.now() - cooldownHours() * 60 * 60 * 1000).toISOString();
 
   const last24h = db.prepare(`
     SELECT COUNT(*) AS records, COALESCE(SUM(quantity),0) AS quantity,

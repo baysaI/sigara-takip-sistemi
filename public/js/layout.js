@@ -57,7 +57,11 @@ const NAV_ITEMS = [
   { href: '/iptal.html',   icon: '🚫', label: 'İptaller' },
   { href: '/sorgu.html',   icon: '🔍', label: 'Sorgu' },
   { href: '/stok.html',    icon: '📦', label: 'Stok' },
-  { href: '/rapor.html',   icon: '📊', label: 'Rapor', adminOnly: true },
+  // Uyari tanimlamasi gereken kisi tezgahtaki sigaracidir; Yonetim'den
+  // ayri sayfaya alindi ki hesap yonetimi acilmadan kullanilabilsin.
+  { href: '/uyari.html',   icon: '⚠️', label: 'Uyarılar' },
+  // Vardiyayi sigaraci yonetiyor, gun sonu raporunu da o aliyor.
+  { href: '/rapor.html',   icon: '📊', label: 'Rapor' },
   { href: '/yonetim.html', icon: '⚙️', label: 'Yönetim', adminOnly: true }
 ];
 

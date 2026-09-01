@@ -38,7 +38,7 @@ router.get('/:playerId', asyncHandler((req, res) => {
 }));
 
 /** POST /api/flags - uyari olustur / guncelle (admin) */
-router.post('/', requireAdmin, asyncHandler((req, res) => {
+router.post('/', asyncHandler((req, res) => {
   const playerId = normalizePlayerId(req.body.player_id);
   const level = String(req.body.level || '').trim();
   const note = String(req.body.note || '').trim();
@@ -60,7 +60,7 @@ router.post('/', requireAdmin, asyncHandler((req, res) => {
 }));
 
 /** PATCH /api/flags/:id - uyariyi kaldir / geri getir (admin) */
-router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
+router.patch('/:id', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const isActive = req.body.is_active ? 1 : 0;
 
@@ -73,7 +73,7 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
 }));
 
 /** DELETE /api/flags/:id - uyari kaydini tamamen sil (admin) */
-router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
+router.delete('/:id', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const flag = db.prepare('SELECT player_id FROM player_flags WHERE id = ?').get(id);
   if (!flag) return res.status(404).json({ ok: false, error: 'Uyari kaydi bulunamadi.' });

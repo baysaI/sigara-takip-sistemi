@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 App.ready(async () => {
   if (App.user.role !== 'admin') return showDenied();
 
-  await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadFlags(), loadOverview()]);
+  await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadSettings(), loadOverview()]);
   bindEvents();
 });
 
@@ -236,7 +236,15 @@ async function loadUsers() {
         <td data-label="Kullanıcı"><b>${esc(u.username)}</b>${kendisi ? ' <span class="muted">(siz)</span>' : ''}</td>
         <td data-label="Ad Soyad">${u.full_name ? esc(u.full_name) : '—'}</td>
         <td data-label="Yetki">
-          <span class="pill">${u.role === 'admin' ? 'YÖNETİCİ' : 'SİGARACI'}</span>
+          ${kendisi
+            /* Kendi yetkini degistiremezsin: son yoneticinin kendini
+               sigaraciya alip sistemi yonetimsiz birakmasini onler.
+               Sunucu da ayni kurali uygular. */
+            ? `<span class="pill">${u.role === 'admin' ? 'YÖNETİCİ' : 'SİGARACI'}</span>`
+            : `<select class="role-select" data-role="${u.id}" data-current="${u.role}">
+                 <option value="admin"    ${u.role === 'admin'    ? 'selected' : ''}>Yönetici</option>
+                 <option value="sigaraci" ${u.role === 'sigaraci' ? 'selected' : ''}>Sigaracı</option>
+               </select>`}
         </td>
         <td data-label="Durum">
           <span class="pill ${u.is_active ? 'free' : 'locked'}">${u.is_active ? 'AKTİF' : 'PASİF'}</span>
@@ -251,6 +259,11 @@ async function loadUsers() {
         </td>
       </tr>`;
     }).join('');
+
+    /* Yetki degisimi — secim degisince onay sorulur, vazgecilirse
+       acilir liste eski degerine dondurulur. */
+    body.querySelectorAll('[data-role]').forEach((sel) =>
+      sel.addEventListener('change', () => degistirYetki(sel)));
 
     body.querySelectorAll('[data-user]').forEach((btn) =>
       btn.addEventListener('click', async () => {
@@ -354,85 +367,101 @@ async function addUser() {
 }
 
 
-/* ============================================================
-   MODUL 7 — OYUNCU UYARILARI
-   ============================================================ */
-const FLAG_SINIF = { warning: 'player', approval: 'locked', blocked: 'locked' };
+/**
+ * Kullanicinin yetkisini degistirir.
+ * Sunucu iki kurali ayrica uygular: kendi yetkini kaldiramazsin ve
+ * sistemde en az bir aktif yonetici kalmalidir.
+ */
+async function degistirYetki(sel) {
+  const id = sel.dataset.role;
+  const eski = sel.dataset.current;
+  const yeni = sel.value;
+  if (eski === yeni) return;
 
-async function loadFlags() {
-  const body = $('flagBody');
+  const ad = sel.closest('tr').querySelector('td b')?.textContent || 'Kullanıcı';
+  const yoneticiOluyor = yeni === 'admin';
+
+  const onay = await confirmDelete({
+    title: 'Yetkiyi değiştir',
+    icon: '🔑',
+    body: `<b>${esc(ad)}</b> kullanıcısının yetkisi ` +
+      `<b>${eski === 'admin' ? 'Yönetici' : 'Sigaracı'}</b> → ` +
+      `<b>${yoneticiOluyor ? 'Yönetici' : 'Sigaracı'}</b> olacak.<br /><br />` +
+      (yoneticiOluyor
+        ? 'Yönetici olunca <b>hesap yönetimi, veri sıfırlama ve sigara kuralı</b> ayarlarına erişir.'
+        : 'Sigaracı olunca Yönetim sayfasına erişemez. Kayıt, arşiv, stok, rapor ve uyarılar açık kalır.'),
+    warning: 'Kullanıcının açık oturumu varsa değişikliği görmesi için sayfayı yenilemesi gerekir.',
+    confirmText: 'Yetkiyi Değiştir'
+  });
+
+  if (!onay) { sel.value = eski; return; }
+
+  sel.disabled = true;
   try {
-    const { flags } = await API.get('/api/flags', { all: '1' });
-    const aktif = flags.filter((f) => f.is_active);
-    $('flagCount').textContent = aktif.length ? `${aktif.length} aktif uyarı` : 'yok';
-
-    if (!flags.length) {
-      body.innerHTML = `<tr><td colspan="5" class="empty">
-        Tanımlı uyarı yok.<br />
-        <span class="muted">Özel durumu olan oyuncular için yukarıdan uyarı ekleyin.</span>
-      </td></tr>`;
-      return;
-    }
-
-    body.innerHTML = flags.map((f) => `
-      <tr${f.is_active ? '' : ' style="opacity:.5"'}>
-        <td data-label="Oyuncu"><span class="pill player">${esc(f.player_id)}</span></td>
-        <td data-label="Seviye"><span class="pill ${FLAG_SINIF[f.level]}">${esc(f.label)}</span></td>
-        <td data-label="Not" class="info-cell">${esc(f.note)}</td>
-        <td data-label="Ekleyen" class="muted">${esc(f.updated_by || f.created_by)}</td>
-        <td data-label="İşlem">
-          <button class="btn-ghost btn-sm" data-flag="${f.id}" data-active="${f.is_active ? 0 : 1}">
-            ${f.is_active ? 'Kaldır' : 'Geri getir'}
-          </button>
-          <button class="btn-danger btn-sm" data-flag-del="${f.id}" data-name="${esc(f.player_id)}">Sil</button>
-        </td>
-      </tr>`).join('');
-
-    body.querySelectorAll('[data-flag]').forEach((btn) =>
-      btn.addEventListener('click', async () => {
-        try {
-          await API.patch(`/api/flags/${btn.dataset.flag}`, { is_active: btn.dataset.active === '1' });
-          await loadFlags();
-          toast(btn.dataset.active === '1' ? 'Uyarı geri getirildi.' : 'Uyarı kaldırıldı.', 'success');
-        } catch (err) { toast(err.message, 'error'); }
-      }));
-    body.querySelectorAll('[data-flag-del]').forEach((btn) =>
-      btn.addEventListener('click', () => silUyari(btn.dataset.flagDel, btn.dataset.name)));
+    await API.patch(`/api/users/${id}`, { role: yeni });
+    await loadUsers();
+    toast(`${ad} artık ${yoneticiOluyor ? 'yönetici' : 'sigaracı'}.`, 'success', 5000);
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="5" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    toast(err.message, 'error', 6000);
+    sel.value = eski;
+    sel.disabled = false;
   }
 }
 
-async function silUyari(id, oyuncu) {
-  const onay = await confirmDelete({
-    title: 'Uyarıyı sil',
-    body: `<b>${esc(oyuncu)}</b> için tanımlı uyarı kaydı tamamen silinecek.`
-  });
-  if (!onay) return;
+/* ============================================================
+   SIGARA KURALI — calisma aninda degisen ayar
+   ============================================================ */
+let ayarlar = null;
+
+async function loadSettings() {
   try {
-    await API.request(`/api/flags/${id}`, { method: 'DELETE' });
-    await Promise.all([loadFlags(), loadOverview()]);
-    toast('Uyarı silindi.', 'success');
-  } catch (err) { toast(err.message, 'error'); }
+    ayarlar = await API.get('/api/settings');
+    $('cooldownHours').value = ayarlar.cooldownHours;
+
+    const m = ayarlar.meta?.cooldown_hours;
+    $('cooldownInfo').textContent = m?.updatedAt
+      ? `Şu an ${ayarlar.cooldownHours} saat · son değişiklik ${formatDateTime(m.updatedAt)} (${m.updatedBy || '—'})`
+      : `Şu an ${ayarlar.cooldownHours} saat · henüz değiştirilmedi`;
+  } catch (err) {
+    $('cooldownInfo').textContent = `Ayarlar yüklenemedi: ${err.message}`;
+  }
 }
 
-async function addFlag() {
-  const player_id = $('flagPlayer').value.trim();
-  const level = $('flagLevel').value;
-  const note = $('flagNote').value.trim();
+async function saveCooldown() {
+  const saat = Number($('cooldownHours').value);
+  const sinir = ayarlar?.limits?.cooldownHours || { min: 0.25, max: 72 };
 
-  if (!player_id) return toast('Oyuncu ID girin.', 'error');
-  if (note.length < 3) return toast('Uyarı notu en az 3 karakter olmalıdır.', 'error');
+  if (!Number.isFinite(saat) || saat < sinir.min || saat > sinir.max) {
+    return toast(`Süre ${sinir.min} ile ${sinir.max} saat arasında olmalıdır.`, 'error');
+  }
 
-  const btn = $('addFlagBtn');
+  const eski = ayarlar?.cooldownHours;
+  if (saat === eski) return toast('Süre zaten bu değerde.', 'info');
+
+  /* Kural degisimi bekleyen oyuncularin durumunu aninda degistirir;
+     yonetici ne olacagini bilerek onaylasin. */
+  const onay = await confirmDelete({
+    title: 'Sigara kuralını değiştir',
+    icon: '⏱️',
+    body: `Süre <b>${eski} saat</b> → <b>${saat} saat</b> olarak değişecek.<br /><br />` +
+      (saat < eski
+        ? 'Süre <b>kısalıyor</b>: şu an bekleyen oyuncuların bir kısmı anında uygun hale gelecek.'
+        : 'Süre <b>uzuyor</b>: şu an uygun olan oyuncuların bir kısmı yeniden beklemeye düşecek.'),
+    warning: 'Değişiklik anında geçerli olur. Açık sayfalarda güncel değerin görünmesi için yenilenmeleri gerekir.',
+    confirmText: 'Süreyi Değiştir'
+  });
+  if (!onay) return;
+
+  const btn = $('saveCooldownBtn');
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
-    const r = await API.post('/api/flags', { player_id, level, note });
-    $('flagPlayer').value = ''; $('flagNote').value = '';
-    await loadFlags();
-    toast(`${r.flag.player_id} için uyarı tanımlandı.`, 'success');
+    await API.patch('/api/settings', { cooldownHours: saat });
+    await loadSettings();
+    App.cooldownHours = saat;
+    App.cooldownMs = saat * 60 * 60 * 1000;
+    toast(`Sigara kuralı ${saat} saat olarak güncellendi.`, 'success', 5000);
   } catch (err) { toast(err.message, 'error'); }
-  finally { btn.disabled = false; btn.textContent = 'Uyarı Tanımla'; }
+  finally { btn.disabled = false; btn.textContent = 'Süreyi Kaydet'; }
 }
 
 /* ============================================================
@@ -448,7 +477,9 @@ function bindEvents() {
   $('newType').addEventListener('keydown', (e) => { if (e.key === 'Enter') addType(); });
 
   $('addUserBtn').addEventListener('click', addUser);
-  $('addFlagBtn').addEventListener('click', addFlag);
+  $('saveCooldownBtn').addEventListener('click', saveCooldown);
+  document.querySelectorAll('[data-hours]').forEach((b) =>
+    b.addEventListener('click', () => { $('cooldownHours').value = b.dataset.hours; }));
 
   // Tehlikeli bolge
   $('resetPickBtn')?.addEventListener('click', () => runReset([]));
@@ -501,7 +532,7 @@ async function runReset(preselect) {
       .map((x) => `${x.label}: ${x.deleted}`)
       .join(' · ');
 
-    await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadFlags(), loadOverview()]);
+    await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadSettings(), loadOverview()]);
     toast(ozet ? `Silindi — ${ozet}` : 'Silinecek kayıt bulunamadı.', 'success', 7000);
   } catch (err) {
     toast(err.message, 'error', 6000);

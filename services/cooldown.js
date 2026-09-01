@@ -6,7 +6,12 @@
 'use strict';
 
 const { db } = require('../db/database');
-const { COOLDOWN_MS, COOLDOWN_HOURS } = require('../config');
+/*
+ * Sure DEGERI MODUL BASINDA YAKALANMAZ: yonetici sigara kuralini
+ * calisma aninda degistirebiliyor (Yonetim > Sigara Kurali). Sabit
+ * olarak alinsaydi degisiklik ancak yeniden baslatinca etkili olurdu.
+ */
+const { cooldownMs, cooldownHours } = require('./settings');
 
 /** Bosluk/buyuk-kucuk harf farkindan dolayi ayni oyuncunun iki kayda bolunmesini engeller. */
 function normalizePlayerId(raw) {
@@ -61,7 +66,7 @@ function getCooldownStatus(rawPlayerId) {
 
   const base = {
     playerId,
-    cooldownHours: COOLDOWN_HOURS,
+    cooldownHours: cooldownHours(),
     serverTime: new Date(now).toISOString()
   };
 
@@ -79,7 +84,7 @@ function getCooldownStatus(rawPlayerId) {
   }
 
   const lastMs = Date.parse(last.created_at);
-  const nextMs = lastMs + COOLDOWN_MS;
+  const nextMs = lastMs + cooldownMs();
   const remainingMs = Math.max(0, nextMs - now);
 
   return {

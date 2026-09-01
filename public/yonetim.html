@@ -139,44 +139,36 @@
       </section>
 
       <!-- ==================== ÖZEL UYARI / ONAY (Modül 7) ==================== -->
+      <!-- ============ SİGARA KURALI (çalışma anında değişir) ============ -->
       <section class="card admin-wide">
-        <h2>⚠️ Oyuncu Uyarıları <span class="badge-count" id="flagCount"></span></h2>
+        <h2>⏱️ Sigara Kuralı</h2>
         <div class="card-body">
-          <div class="filters">
-            <div class="field">
-              <label for="flagPlayer">Oyuncu ID <span class="req">*</span></label>
-              <input type="text" id="flagPlayer" maxlength="40" placeholder="ör. 1247" />
-            </div>
-            <div class="field">
-              <label for="flagLevel">Seviye <span class="req">*</span></label>
-              <select id="flagLevel">
-                <option value="warning">Uyarı — okundu onayı yeterli</option>
-                <option value="approval">Yetkili onayı gerekli</option>
-                <option value="blocked">Bloke — sigara verilemez</option>
-              </select>
-            </div>
-          </div>
-          <div class="field mt">
-            <label for="flagNote">Uyarı Notu <span class="req">*</span>
-              <span class="muted">(sigaracının önüne bu metin çıkar)</span></label>
-            <textarea id="flagNote" rows="3" maxlength="500"
-              placeholder="ör. Bu oyuncuya salon şefi onayı olmadan sigara verilmeyecek."></textarea>
-          </div>
-          <button class="btn-primary" id="addFlagBtn">Uyarı Tanımla</button>
-          <p class="muted mt center">
-            4 saat kuralı dolmuş olsa bile bu oyuncularda kayıt öncesi onay ekranı açılır.
+          <p class="muted">
+            Bir oyuncunun iki alımı arasında geçmesi gereken süre. Değişiklik
+            <b>anında geçerli olur</b>, sunucuyu yeniden başlatmak gerekmez.
           </p>
-        </div>
 
-        <div class="table-scroll">
-          <table class="responsive">
-            <thead>
-              <tr><th>Oyuncu</th><th>Seviye</th><th>Not</th><th>Ekleyen</th><th>İşlem</th></tr>
-            </thead>
-            <tbody id="flagBody">
-              <tr><td colspan="5" class="empty">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
+          <div class="filters mt">
+            <div class="field">
+              <label for="cooldownHours">Süre (saat) <span class="req">*</span></label>
+              <input type="number" id="cooldownHours" min="0.25" max="72" step="0.25"
+                     inputmode="decimal" />
+            </div>
+            <div class="filter-actions quick-range">
+              <button class="btn-ghost btn-sm" data-hours="2">2 saat</button>
+              <button class="btn-ghost btn-sm" data-hours="3">3 saat</button>
+              <button class="btn-ghost btn-sm" data-hours="4">4 saat</button>
+            </div>
+          </div>
+
+          <button class="btn-primary mt" id="saveCooldownBtn">Süreyi Kaydet</button>
+          <p class="muted mt" id="cooldownInfo">—</p>
+
+          <p class="muted mt">
+            <b>Dikkat:</b> süre kısaltılırsa bekleyen oyuncuların bir kısmı anında
+            uygun hale gelir; uzatılırsa uygun olanların bir kısmı yeniden beklemeye
+            düşer. Kural geçmişe dönük değil, <b>son alım saatine</b> göre hesaplanır.
+          </p>
         </div>
       </section>
 

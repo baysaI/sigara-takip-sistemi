@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#161c24" />
+  <title>Oyuncu Uyarıları — Sigara Takip Sistemi</title>
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/icons/icon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
+  <link rel="stylesheet" href="/css/style.css?v=1.1.0" />
+</head>
+<body>
+
+  <main class="container">
+
+    <div class="page-head">
+      <h1>⚠️ Oyuncu Uyarıları</h1>
+      <p>Özel durumu olan oyuncular için uyarı tanımlayın. 4 saat kuralı dolmuş
+         olsa bile bu oyuncularda kayıt öncesi onay ekranı açılır.</p>
+    </div>
+
+    <section class="card">
+      <h2>Yeni Uyarı Tanımla</h2>
+      <div class="card-body">
+        <div class="filters">
+          <div class="field">
+            <label for="flagPlayer">Oyuncu ID <span class="req">*</span></label>
+            <input type="text" id="flagPlayer" maxlength="40" placeholder="ör. 1247" />
+          </div>
+          <div class="field">
+            <label for="flagLevel">Seviye <span class="req">*</span></label>
+            <select id="flagLevel">
+              <option value="warning">Uyarı — okundu onayı yeterli</option>
+              <option value="approval">Yetkili onayı gerekli</option>
+              <option value="blocked">Bloke — sigara verilemez</option>
+            </select>
+          </div>
+        </div>
+        <div class="field mt">
+          <label for="flagNote">Uyarı Notu <span class="req">*</span>
+            <span class="muted">(sigaracının önüne bu metin çıkar)</span></label>
+          <textarea id="flagNote" rows="3" maxlength="500"
+            placeholder="ör. Bu oyuncuya salon şefi onayı olmadan sigara verilmeyecek."></textarea>
+        </div>
+        <button class="btn-primary" id="addFlagBtn">Uyarı Tanımla</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Tanımlı Uyarılar <span class="badge-count" id="flagCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr><th>Oyuncu</th><th>Seviye</th><th>Not</th><th>Ekleyen</th><th>İşlem</th></tr>
+          </thead>
+          <tbody id="flagBody">
+            <tr><td colspan="5" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="info">
+          <b>Kaldır</b> uyarıyı pasife alır (geri getirilebilir), <b>Sil</b> kaydı tamamen siler.
+        </span>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="/js/api.js?v=1.1.0"></script>
+  <script src="/js/layout.js?v=1.1.0"></script>
+  <script src="/js/danger.js?v=1.1.0"></script>
+  <script src="/js/uyari.js?v=1.1.0"></script>
+</body>
+</html>

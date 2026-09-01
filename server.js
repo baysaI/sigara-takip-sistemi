@@ -9,6 +9,7 @@ const config = require('./config');
 const { db } = require('./db/database');
 const { requireAuth } = require('./middleware/auth');
 const { openPeriod } = require('./services/businessDay');
+const settings = require('./services/settings');
 
 const authRoutes = require('./routes/auth');
 const lookupRoutes = require('./routes/lookups');
@@ -18,6 +19,7 @@ const flagRoutes = require('./routes/flags');
 const stockRoutes = require('./routes/stock');
 const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -74,7 +76,7 @@ app.use(session({
 /* ------------------------- Korumali sayfalar ------------------------ */
 // Oturum gerektiren sayfalar. express.static'ten ONCE tanimlanir,
 // yoksa statik katman dosyayi kontrolsuz servis eder.
-const PROTECTED_PAGES = ['kayit', 'arsiv', 'iptal', 'sorgu', 'stok', 'rapor', 'yonetim'];
+const PROTECTED_PAGES = ['kayit', 'arsiv', 'iptal', 'sorgu', 'stok', 'uyari', 'rapor', 'yonetim'];
 
 app.get(['/', '/index.html'], (req, res) => {
   res.redirect(req.session?.user ? '/kayit.html' : '/login.html');
@@ -83,9 +85,9 @@ app.get(['/', '/index.html'], (req, res) => {
 app.get(PROTECTED_PAGES.map((p) => `/${p}.html`), requireAuth, (req, res) => {
   const page = path.basename(req.path);
 
-  // Yonetim ve rapor sayfalari admin disina servis edilmez (asil koruma API'de,
+  // Yonetim sayfasi admin disina servis edilmez (asil koruma API'de,
   // bu sadece sayfanin bosuna acilmasini engeller).
-  const ADMIN_PAGES = ['yonetim.html', 'rapor.html'];
+  const ADMIN_PAGES = ['yonetim.html'];
   if (ADMIN_PAGES.includes(page) && req.session.user.role !== 'admin') {
     return res.redirect('/kayit.html');
   }
@@ -115,7 +117,7 @@ app.use('/api/auth', authRoutes);
 app.get('/api/config', (req, res) => {
   res.json({
     ok: true,
-    cooldownHours: config.COOLDOWN_HOURS,
+    cooldownHours: settings.cooldownHours(),
     // Gun degisimi artik saate bagli degil: acik donem, gun sonu raporu
     // alinana kadar surer. Arayuz "iş günü" etiketini bundan uretir.
     period: openPeriod(),
@@ -130,6 +132,7 @@ app.use('/api/flags', flagRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/settings', settingsRoutes);
 
 
 /* --------------------------- Hata yakalama -------------------------- */
@@ -160,7 +163,7 @@ const server = app.listen(config.PORT, () => {
   console.log('==============================================');
   console.log('  SIGARA TAKIP SISTEMI');
   console.log(`  http://localhost:${config.PORT}`);
-  console.log(`  Kural: ${config.COOLDOWN_HOURS} saatte bir`);
+  console.log(`  Kural: ${settings.cooldownHours()} saatte bir`);
   console.log(`  Kayitli kullanici: ${userCount}`);
   if (userCount === 0) console.log('  ! Once "npm run seed" calistirin.');
   console.log('==============================================');

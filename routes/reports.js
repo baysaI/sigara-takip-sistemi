@@ -20,7 +20,7 @@
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
+const { requireAuth, asyncHandler } = require('../middleware/auth');
 const { listStock, stockSummary } = require('../services/stock');
 const { LEVEL_LABELS } = require('../services/flags');
 const {
@@ -33,7 +33,10 @@ const { cancellationsInRange } = require('../services/cancellation');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireAdmin);   // gun sonu raporu yalnizca yoneticiye
+/*
+ * Rapor SIGARACIYA DA ACIK: vardiyayi o yonetiyor, gun sonu raporunu
+ * da o aliyor (gunu kapatmak dahil). Yalnizca oturum sarti var.
+ */
 
 /**
  * Raporun toplamlarina hangi kayitlar girer.

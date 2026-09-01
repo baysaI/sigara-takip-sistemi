@@ -733,6 +733,9 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 
 /* Satir ici islem dugmeleri (Degistir / Iptal Et) yan yana, dar ekranda alta sarar */
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* Kullanici listesindeki yetki secimi — tablo satirini sismesin diye kompakt */
+.role-select { width: auto; min-width: 118px; padding: 6px 10px; font-size: 13px; }
 .info-cell { color: var(--text-faint); font-style: italic; max-width: 300px; }
 
 /* Kayit detayi: Info notunun altina onay / erken alim / degisim / iptal

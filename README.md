@@ -110,6 +110,49 @@ Değişim yapıldığında:
 
 Gün sonu raporunda *"Sigara Değişimleri"* başlığı altında ayrı listelenir.
 
+## Yetkiler
+
+İki rol vardır: **Yönetici** ve **Sigaracı**. Yetki, Yönetim → Sigaracı
+Hesapları listesindeki açılır menüden değiştirilebilir; değişiklik anında
+geçerli olur (kullanıcının açık sayfası varsa yenilemesi gerekir).
+
+| Bölüm | Sigaracı | Yönetici |
+|---|:---:|:---:|
+| Hızlı Kayıt, Arşiv, Sorgu, Stok | ✅ | ✅ |
+| İptaller — görüntüleme | ✅ | ✅ |
+| İptaller — iptal etme / geri alma | — | ✅ |
+| **Uyarılar** — tanımlama, kaldırma, silme | ✅ | ✅ |
+| **Rapor** — görüntüleme, sayım, **günü kapatma** | ✅ | ✅ |
+| Toplu stok / fiyat, kritik eşik | — | ✅ |
+| Yönetim (garson, tür, hesap, veri sıfırlama) | — | ✅ |
+| **Sigara kuralı ayarı** | — | ✅ |
+
+Vardiyayı sigaracı yönettiği için gün sonu raporunu alma (ve dolayısıyla günü
+kapatma) yetkisi ondadır. Uyarı tanımlaması gereken kişi de tezgahtaki
+sigaracıdır; bu yüzden **Uyarılar** Yönetim'den ayrı bir sayfaya alındı —
+aksi halde uyarıları açmak hesap yönetimini ve veri sıfırlamayı da açardı.
+
+İki koruma sunucuda zorunludur ve arayüzden bağımsızdır:
+**kendi yönetici yetkinizi kaldıramazsınız** ve **sistemde en az bir aktif
+yönetici kalmalıdır**.
+
+## Sigara kuralı (süre ayarı)
+
+Bir oyuncunun iki alımı arasında geçmesi gereken süre **Yönetim → Sigara
+Kuralı**'ndan değiştirilir. 4 saat → 3 saat → 2 saat gibi. Değişiklik
+**anında geçerli olur, sunucuyu yeniden başlatmak gerekmez.**
+
+- Süre kısaltılırsa bekleyen oyuncuların bir kısmı anında uygun hale gelir;
+  uzatılırsa uygun olanların bir kısmı yeniden beklemeye düşer. Kural geçmişe
+  dönük değil, her zaman **son alım saatine** göre hesaplanır.
+- Sınır: 0,25 – 72 saat. Kim ne zaman değiştirmiş kayıt altına alınır.
+- Değer `settings` tablosunda tutulur. `.env`'deki `COOLDOWN_HOURS` yalnızca
+  **ilk kurulumda** tohum değeridir; sonrasında dikkate alınmaz.
+
+> Kodda dikkat: süreyi modül başında `const X = cooldownMs()` diye
+> yakalamayın — `services/settings.js` fonksiyonlarını her ihtiyaç anında
+> çağırın, yoksa ayar değişse de eski değer kullanılır.
+
 ## Güvenlik
 
 - **Şifreler** bcrypt ile saklanır. Giriş, kullanıcı adının var olup olmadığını
@@ -344,7 +387,8 @@ sigara/
 | `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
-| `/rapor.html` | Gün sonu raporu | **admin** |
+| `/uyari.html` | Oyuncu uyarıları — tanımla, kaldır, sil | oturum |
+| `/rapor.html` | Gün sonu raporu, gün kapatma | oturum |
 | `/yonetim.html` | Garson, tür, hesap ve uyarı yönetimi | **admin** |
 
 Oturumsuz erişim `/login.html` adresine yönlendirilir; `/yonetim.html` sigaracı
