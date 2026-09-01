@@ -17,7 +17,34 @@ function requireAdmin(req, res, next) {
   return res.status(403).json({ ok: false, error: 'Bu islem icin yonetici yetkisi gerekli.' });
 }
 
+/**
+ * Sadece KOK HESAP (users.is_root = 1) — piramidin en ustu.
+ *
+ * Veri sifirlama gibi geri donusu olmayan islemler icin. Yonetici olmak
+ * yetmez; yalnizca korumali kok hesap yapabilir.
+ *
+ * Bayrak OTURUMDAN DEGIL veritabanindan okunur: yetki oturum acikken
+ * degistirilmis olabilir ve bu ucta bayat bilgiyle karar vermek istemeyiz.
+ * Nadir cagrilan bir uc oldugu icin ek sorgunun maliyeti onemsiz.
+ */
+function requireRoot(req, res, next) {
+  const id = req.session?.user?.id;
+  if (!id) {
+    return res.status(401).json({ ok: false, error: 'Oturum bulunamadi. Lutfen giris yapin.' });
+  }
+
+  const { db } = require('../db/database');
+  const satir = db.prepare('SELECT is_root FROM users WHERE id = ?').get(id);
+
+  if (satir?.is_root) return next();
+
+  return res.status(403).json({
+    ok: false,
+    error: 'Bu bölüme yalnızca korumalı kök hesap erişebilir.'
+  });
+}
+
 /** Tum route'lari try/catch ile sarmalamamak icin kucuk yardimci. */
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-module.exports = { requireAuth, requireAdmin, asyncHandler };
+module.exports = { requireAuth, requireAdmin, requireRoot, asyncHandler };

@@ -200,7 +200,9 @@
       </section>
 
       <!-- ==================== TEHLİKELİ BÖLGE ==================== -->
-      <section class="card admin-wide danger-zone">
+      <!-- Yalnizca KOK HESAP gorur; yonetici olmak yetmez.
+           Sunucu da /api/admin ucunu requireRoot ile korur. -->
+      <section class="card admin-wide danger-zone hidden" id="dangerZone">
         <h2>🗑️ Veri Sıfırlama <span class="badge-count" id="dbSize"></span></h2>
         <div class="card-body">
           <p class="muted">

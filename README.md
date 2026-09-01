@@ -148,6 +148,16 @@ Kurulumdaki **`admin`** hesabı korumalıdır (`users.is_root = 1`). Listede
 | Yetkisini düşürmek | ⛔ | ⛔ |
 | Silmek | ⛔ | ⛔ |
 | Veri sıfırlamayla silmek | ⛔ | ⛔ |
+| **Veri Sıfırlama bölümünü kullanmak** | ⛔ | ✅ |
+
+Son satır ayrı bir kural: **Veri Sıfırlama yalnızca kök hesaptadır.** Yönetici
+olmak yetmez — bölüm diğer yöneticilerde hiç görünmez ve `/api/admin` ucu
+`requireRoot` ile korunur. Sistemin geri dönüşü olmayan tek işlemi budur,
+bu yüzden piramidin en üstünde durur.
+
+> Kök bayrağı `GET /api/auth/me` çağrısında **veritabanından tazelenir**.
+> Yetki oturum açıkken değişirse kullanıcı yeniden giriş yapmak zorunda
+> kalmaz; pasife alınan bir hesabın oturumu da ilk sayfa açılışında düşer.
 
 Beşinci satır önemli: veri sıfırlamadaki *Sigaracı hesapları* kapsamı
 "kendi hesabınız hariç herkesi sil" demekti — başka bir yönetici oradan kök

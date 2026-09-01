@@ -591,9 +591,20 @@ let resetScopes = [];
 let resetWord = 'SIFIRLA';
 
 /** Hangi veriden kac kayit var — sifirlama karti icin. */
+/**
+ * Veri sifirlama bolumu — YALNIZCA KOK HESAP.
+ *
+ * Kart varsayilan olarak gizli gelir ve ancak kok hesapta acilir. Boylece
+ * sayfa yuklenirken bir an bile gorunmez. Asil koruma sunucudadir
+ * (routes/admin.js -> requireRoot); buradaki gizleme, yetkisi olmayan
+ * yoneticiye bosuna dugme gostermemek icindir.
+ */
 async function loadOverview() {
   const body = $('overviewBody');
   if (!body) return;
+
+  if (!App.user.is_root) return;          // kart gizli kalir
+  $('dangerZone')?.classList.remove('hidden');
 
   try {
     const { scopes, confirmWord, dbSize } = await API.get('/api/admin/overview');

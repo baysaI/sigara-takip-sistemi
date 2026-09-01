@@ -1,18 +1,22 @@
 /**
- * Yonetici bakim uclari — toplu silme ve sifirlama.
+ * Bakim uclari — toplu silme ve sifirlama.
  *
- * Bu islemler GERI ALINAMAZ. Kazayla tetiklenmemesi icin istek govdesinde
- * confirm alani zorunludur ve tam olarak CONFIRM_WORD olmalidir.
+ * YALNIZCA KOK HESAP. Yonetici olmak yetmez: bunlar sistemin geri donusu
+ * olmayan tek islemleri, o yuzden piramidin en ustunde durur. Kok hesap
+ * korumasinin geri kalani icin bkz. routes/users.js.
+ *
+ * Kazayla tetiklenmemesi icin istek govdesinde confirm alani zorunludur
+ * ve tam olarak CONFIRM_WORD olmalidir.
  */
 'use strict';
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
+const { requireAuth, requireRoot, asyncHandler } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireRoot);
 
 const CONFIRM_WORD = 'SIFIRLA';
 
