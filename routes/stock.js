@@ -1,13 +1,14 @@
 /**
  * MODUL 8 — Stok paneli uclari.
- * Goruntuleme tum kullanicilara acik (sigaraci stogu gormeli),
- * ikmal ve duzeltme oturum acmis herkese; kritik esik degisikligi yoneticiye.
+ * Stok isleri tezgahta yurur: goruntuleme, ikmal, sayim duzeltmesi, toplu
+ * giris, birim fiyat ve kritik esik — hepsi oturum acmis her kullaniciya
+ * acik. Yonetici ayrimi yok.
  */
 'use strict';
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
+const { requireAuth, asyncHandler } = require('../middleware/auth');
 const {
   listStock, stockSummary, addStock, setStock, recentMovements, applyMovement
 } = require('../services/stock');
@@ -68,8 +69,8 @@ router.post('/set', asyncHandler((req, res) => {
   res.json({ ok: true, type: sonuc.type.name, balance: sonuc.balanceAfter, state: sonuc.state });
 }));
 
-/** PATCH /api/stock/:id/critical - kritik esik (admin) */
-router.patch('/:id/critical', requireAdmin, asyncHandler((req, res) => {
+/** PATCH /api/stock/:id/critical - kritik esik */
+router.patch('/:id/critical', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const level = Number.parseInt(req.body.critical_level, 10);
 
@@ -82,8 +83,8 @@ router.patch('/:id/critical', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true });
 }));
 
-/** PATCH /api/stock/:id/price - birim fiyat (admin) */
-router.patch('/:id/price', requireAdmin, asyncHandler((req, res) => {
+/** PATCH /api/stock/:id/price - birim fiyat */
+router.patch('/:id/price', asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const price = Number(req.body.unit_price);
 
@@ -98,11 +99,11 @@ router.patch('/:id/price', requireAdmin, asyncHandler((req, res) => {
 }));
 
 /**
- * POST /api/stock/prices - toplu birim fiyat (admin)
+ * POST /api/stock/prices - toplu birim fiyat
  * Govde: { items: [{ name: 'CAMEL YELLOW', price: 104.65 }, ...] }
  * Ad eslesmesi buyuk/kucuk harf duyarsizdir (COLLATE NOCASE).
  */
-router.post('/prices', requireAdmin, asyncHandler((req, res) => {
+router.post('/prices', asyncHandler((req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
   if (!items.length) {
     return res.status(400).json({ ok: false, error: 'Islenecek satir bulunamadi.' });
@@ -146,7 +147,7 @@ router.post('/prices', requireAdmin, asyncHandler((req, res) => {
 }));
 
 /**
- * POST /api/stock/bulk - TOPLU STOK GIRISI (admin)
+ * POST /api/stock/bulk - TOPLU STOK GIRISI
  * Govde: { items: [{ name: 'CAMEL YELLOW', amount: 20 }, ...], mode: 'add'|'set' }
  *
  *   mode='add'  girilen adet mevcut stoga EKLENIR  -> hareket sebebi 'ikmal'
@@ -159,7 +160,7 @@ router.post('/prices', requireAdmin, asyncHandler((req, res) => {
  * Tumu TEK transaction: bir satir patlarsa hicbiri islenmez, yarim
  * uygulanmis toplu giris kalmaz.
  */
-router.post('/bulk', requireAdmin, asyncHandler((req, res) => {
+router.post('/bulk', asyncHandler((req, res) => {
   const items = Array.isArray(req.body.items) ? req.body.items : [];
   const mode = req.body.mode === 'set' ? 'set' : 'add';
 

@@ -67,9 +67,6 @@ function tazeleOnizleme() {
 }
 
 App.ready(async () => {
-  // Fiyat belirleme yonetici isi; sigaraciya bu kart gosterilmez
-  if (App.user.role !== 'admin') $('priceCard')?.remove();
-
   await Promise.all([loadStock(), loadMovements()]);
   bindEvents();
 });
@@ -118,24 +115,23 @@ async function loadStock() {
         <td data-label="Son İşlem" class="info-cell">${sonIslemHTML(c)}</td>
         <td data-label="Birim Fiyat">
           <span class="muted price-view" data-id="${c.id}" data-price="${c.unit_price || 0}">
-            ${(c.unit_price || 0).toFixed(2)} ₺ ${App.user.role === 'admin' ? '<b style="color:var(--accent)">✎</b>' : ''}
+            ${(c.unit_price || 0).toFixed(2)} ₺ <b style="color:var(--accent)">✎</b>
           </span>
         </td>
         <td data-label="Kritik Eşik">
           <span class="muted crit-view" data-id="${c.id}" data-level="${c.critical_level}">
-            ${c.critical_level} paket ${App.user.role === 'admin' ? '<b style="color:var(--accent)">✎</b>' : ''}
+            ${c.critical_level} paket <b style="color:var(--accent)">✎</b>
           </span>
         </td>
         <td data-label="Durum"><span class="pill ${d.sinif}">${d.etiket}</span></td>
       </tr>`;
     }).join('');
 
-    if (App.user.role === 'admin') {
-      body.querySelectorAll('.crit-view').forEach((el) =>
-        el.addEventListener('click', () => editCritical(el)));
-      body.querySelectorAll('.price-view').forEach((el) =>
-        el.addEventListener('click', () => editPrice(el)));
-    }
+    // Fiyat ve kritik esik duzenlemesi herkese acik (stok isleri tezgahta yurur)
+    body.querySelectorAll('.crit-view').forEach((el) =>
+      el.addEventListener('click', () => editCritical(el)));
+    body.querySelectorAll('.price-view').forEach((el) =>
+      el.addEventListener('click', () => editPrice(el)));
   } catch (err) {
     body.innerHTML = `<tr><td colspan="6" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
   }

@@ -123,8 +123,8 @@ geçerli olur (kullanıcının açık sayfası varsa yenilemesi gerekir).
 | İptaller — iptal etme / geri alma | ✅ | ✅ |
 | **Uyarılar** — tanımlama, kaldırma, silme | ✅ | ✅ |
 | **Rapor** — görüntüleme, sayım, **günü kapatma** | ✅ | ✅ |
-| Toplu stok / fiyat, kritik eşik | — | ✅ |
-| Yönetim (garson, tür, hesap, veri sıfırlama) | — | ✅ |
+| Toplu stok / fiyat, kritik eşik | ✅ | ✅ |
+| Yönetim (garson, tür, hesap, yedekleme) | — | ✅ |
 | **Sigara kuralı ayarı** | — | ✅ |
 
 Vardiyayı sigaracı yönettiği için gün sonu raporunu alma (ve dolayısıyla günü
