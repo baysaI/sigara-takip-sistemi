@@ -20,13 +20,13 @@ App.ready(async () => {
     .closest('table').querySelector('thead tr')
     .insertAdjacentHTML('beforeend', '<th>İşlem</th>');
   /*
-   * Tarih filtresi TAKVIM gunune gore calisir (00:00-23:59). Is gunu artik
-   * saatle degil, gun sonu raporunun alinmasiyla degistigi icin bir takvim
-   * tarihini sabit bir donem araligina cevirmek mumkun degil — donem bazli
-   * dokum icin Gun Sonu Raporu sayfasi kullanilir.
+   * Tarih filtresi TAKVIM gunune gore calisir; saat girilirse o saatten
+   * o saate. Is gunu artik saatle degil, gun sonu raporunun alinmasiyla
+   * degistigi icin bir takvim tarihini sabit bir donem araligina cevirmek
+   * mumkun degil — donem bazli dokum icin Gun Sonu Raporu sayfasi var.
    */
   const not = $('dayNote');
-  if (not) not.textContent = '· Tarih filtresi takvim gününe göredir (00:00–23:59).';
+  if (not) not.textContent = '· Tarih ve saate göre filtrelenir; saat boşsa tüm gün.';
 
   await loadFilterOptions();
   await loadArchive();
@@ -59,9 +59,11 @@ async function loadFilterOptions() {
 }
 
 function currentFilters() {
-  // Takvim gunu siniri: baslangic 00:00, bitis 23:59:59.999 (yerel saat)
-  const from = localDateToISO($('fFrom').value, false);
-  const to = localDateToISO($('fTo').value || $('fFrom').value, true);
+  /* Tarih + saat. Saat bos birakilirsa gun siniri kullanilir
+     (baslangic 00:00, bitis 23:59:59.999) — eski davranis korunur.
+     Saat girilince vardiya araligi kurulabilir: dun 22:00 → bugun 04:00. */
+  const from = localDateTimeToISO($('fFrom').value, $('fFromTime').value, false);
+  const to = localDateTimeToISO($('fTo').value || $('fFrom').value, $('fToTime').value, true);
 
   return {
     playerId: $('fPlayer').value.trim(),
@@ -239,11 +241,11 @@ async function iptalEt(kayit) {
 function bindEvents() {
   $('fPlayer').addEventListener('input', debounce(refilter, 350));
   // Garson filtresi kendi onSelect'i ile tetiklenir
-  ['fType', 'fUser', 'fFrom', 'fTo'].forEach((id) =>
+  ['fType', 'fUser', 'fFrom', 'fTo', 'fFromTime', 'fToTime'].forEach((id) =>
     $(id).addEventListener('change', refilter));
 
   $('clearFilters').addEventListener('click', () => {
-    ['fPlayer', 'fType', 'fUser', 'fFrom', 'fTo'].forEach((id) => ($(id).value = ''));
+    ['fPlayer', 'fType', 'fUser', 'fFrom', 'fTo', 'fFromTime', 'fToTime'].forEach((id) => ($(id).value = ''));
     waiterAC.reset();
     refilter();
   });

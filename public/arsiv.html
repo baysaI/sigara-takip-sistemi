@@ -47,18 +47,29 @@
             <label for="fUser">Sigaracı</label>
             <select id="fUser"><option value="">Tümü</option></select>
           </div>
-          <div class="field">
+          <div class="field field-wide">
             <label for="fFrom">Başlangıç</label>
-            <input type="date" id="fFrom" />
+            <div class="row-tight">
+              <input type="date" id="fFrom" />
+              <input type="time" id="fFromTime" aria-label="Başlangıç saati" />
+            </div>
           </div>
-          <div class="field">
+          <div class="field field-wide">
             <label for="fTo">Bitiş</label>
-            <input type="date" id="fTo" />
+            <div class="row-tight">
+              <input type="date" id="fTo" />
+              <input type="time" id="fToTime" aria-label="Bitiş saati" />
+            </div>
           </div>
           <div class="filter-actions">
             <button class="btn-ghost btn-sm" id="clearFilters">Filtreleri Temizle</button>
           </div>
         </div>
+
+        <p class="muted mt">
+          Saat boş bırakılırsa gün başından gün sonuna alınır. Vardiya gece
+          yarısını aşıyorsa saat girin — ör. <b>dün 22:00</b> → <b>bugün 04:00</b>.
+        </p>
       </div>
     </section>
 

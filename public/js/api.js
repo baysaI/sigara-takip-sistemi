@@ -137,6 +137,34 @@ function localDateToISO(dateStr, endOfDay = false) {
   return dt.toISOString();
 }
 
+/**
+ * Tarih + SAAT alanlarını ISO'ya çevirir.
+ *
+ * Saat boş bırakılırsa gün sınırı kullanılır (başlangıç 00:00, bitiş
+ * 23:59:59.999) — yani saat girilmediğinde davranış eskisiyle aynıdır.
+ * Vardiya gece yarısını aştığı için saat seçebilmek gerekiyor:
+ * "dün 22:00 – bugün 04:00" gibi bir aralık ancak böyle kurulabilir.
+ *
+ * @param {string} dateStr YYYY-MM-DD
+ * @param {string} timeStr HH:MM (boş olabilir)
+ * @param {boolean} endOfDay Saat boşsa gün sonuna mı çekilsin
+ */
+function localDateTimeToISO(dateStr, timeStr, endOfDay = false) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+
+  if (!timeStr) return localDateToISO(dateStr, endOfDay);
+
+  const [sa, dk] = timeStr.split(':').map(Number);
+  // Bitiş saatinde o dakikanın tamamı dahil olsun: 04:00 seçilince
+  // 04:00:59.999'a kadar sayılır, aksi halde tam 04:00 kaydı düşerdi.
+  const dt = endOfDay
+    ? new Date(y, m - 1, d, sa || 0, dk || 0, 59, 999)
+    : new Date(y, m - 1, d, sa || 0, dk || 0, 0, 0);
+
+  return dt.toISOString();
+}
+
 /* ---------------------- İş günü (gün değişimi) ---------------------- */
 /*
  * Gün değişimi SAATE BAĞLI DEĞİLDİR. Açık dönem, yönetici Gün Sonu
