@@ -138,28 +138,32 @@
         </div>
       </section>
 
-      <!-- Stok kartları -->
-      <section class="card">
-        <h2>Stok Kartları <span class="badge-count" id="cardCount"></span></h2>
-        <div class="table-scroll">
-          <table class="responsive">
-            <thead>
-              <tr>
-                <th>Sigara Türü</th><th>Kalan</th><th>Son İşlem</th>
-                <th>Birim Fiyat</th><th>Kritik Eşik</th><th>Durum</th>
-              </tr>
-            </thead>
-            <tbody id="stockBody">
-              <tr><td colspan="6" class="empty">Yükleniyor...</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pager">
-          <span class="info">Kritik eşiğin altına düşen türler kırmızı gösterilir.</span>
-        </div>
-      </section>
-
     </div>
+
+    <!-- Stok kartları: 6 sütunlu tablo, .split içinde yarım genişlikte
+         sıkışıp yatay taşıyordu. Tam genişliğe alındı. -->
+    <section class="card">
+      <h2>Stok Kartları <span class="badge-count" id="cardCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>Sigara Türü</th><th>Kalan</th><th>Son İşlem</th>
+              <th>Birim Fiyat</th><th>Kritik Eşik</th><th>Durum</th>
+            </tr>
+          </thead>
+          <tbody id="stockBody">
+            <tr><td colspan="6" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="info">
+          Kritik eşiğin altına düşen türler kırmızı gösterilir.
+          Fiyat ve kritik eşiğe tıklayarak satır içinde düzenleyebilirsiniz.
+        </span>
+      </div>
+    </section>
 
     <!-- Hareket geçmişi -->
     <section class="card">

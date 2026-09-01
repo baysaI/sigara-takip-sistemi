@@ -737,6 +737,16 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 /* Kullanici listesindeki yetki secimi — tablo satirini sismesin diye kompakt */
 .role-select { width: auto; min-width: 118px; padding: 6px 10px; font-size: 13px; }
 
+/* Stok kartindaki "Son İşlem": tek satir kalsin, satiri sismesin.
+   Not ve tam tarih title ipucunda. */
+.last-move { display: inline-block; white-space: nowrap; font-size: 13px; }
+.last-move .muted { font-size: 12px; }
+
+/* Dar ekranda satirlar karta donuyor; orada sarmasi sorun degil */
+@media (max-width: 720px) {
+  .last-move { white-space: normal; }
+}
+
 /* Korumali kok hesap: piramidin en ustu, baska yonetici degistiremez */
 .pill.root { background: var(--accent-soft); border-color: rgba(245, 166, 35, .55); color: var(--accent); }
 .row-root  { background: rgba(245, 166, 35, .045); }

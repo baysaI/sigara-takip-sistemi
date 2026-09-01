@@ -18,20 +18,42 @@ let kartlar = [];
 const SEBEP = { ikmal: 'ikmal', kayit: 'kayıt', duzeltme: 'düzeltme' };
 
 /**
+ * "X saat Y dakika önce" bu hucrede satiri iki-uc satira boluyordu.
+ * Tabloda tek birim yeter: 18 sa / 5 dk / 3 gün.
+ */
+function kisaSure(iso) {
+  const dk = Math.floor((Date.now() - Date.parse(iso)) / 60000);
+  if (!Number.isFinite(dk) || dk < 0) return '';
+  if (dk < 1) return 'az önce';
+  if (dk < 60) return `${dk} dk`;
+  if (dk < 1440) return `${Math.floor(dk / 60)} sa`;
+  return `${Math.floor(dk / 1440)} gün`;
+}
+
+/**
  * Stok kartinda "bu stogu en son kim, ne zaman, ne kadar degistirdi".
  * Hareket gecmisini tarayip aramak yerine kartin uzerinde dursun.
+ *
+ * TEK SATIR tutulur: not ve tam tarih ipucuna (title) alindi, yoksa
+ * uzun notlar satiri uc-dort katina cikariyor ve tablo okunmaz oluyordu.
  */
 function sonIslemHTML(c) {
   if (!c.last_by) return '<span class="muted">—</span>';
 
   const isaret = c.last_delta > 0 ? `+${c.last_delta}` : String(c.last_delta);
   const sinif = c.last_delta > 0 ? 'free' : 'locked';
+  const sebep = SEBEP[c.last_reason] || c.last_reason;
 
-  return `<span class="pill ${sinif}">${isaret}</span> ` +
-         `<b>${esc(c.last_by)}</b> ` +
-         `<span class="muted">· ${SEBEP[c.last_reason] || esc(c.last_reason)} · ` +
-         `${timeAgo(c.last_at)}</span>` +
-         (c.last_note ? `<br /><span class="muted">${esc(c.last_note)}</span>` : '');
+  const ipucu = [
+    `${c.last_by} · ${sebep} · ${formatDateTime(c.last_at)}`,
+    c.last_note || ''
+  ].filter(Boolean).join('\n');
+
+  return `<span class="last-move" title="${esc(ipucu)}">` +
+         `<span class="pill ${sinif}">${isaret}</span> ` +
+         `<b>${esc(c.last_by)}</b>` +
+         `<span class="muted"> · ${esc(sebep)} · ${kisaSure(c.last_at)}</span>` +
+         '</span>';
 }
 
 /**
@@ -112,7 +134,7 @@ async function loadStock() {
           <b class="stock-pill stock-${c.state}" style="font-size:16px">${c.stock}</b>
           <span class="muted">paket</span>
         </td>
-        <td data-label="Son İşlem" class="info-cell">${sonIslemHTML(c)}</td>
+        <td data-label="Son İşlem">${sonIslemHTML(c)}</td>
         <td data-label="Birim Fiyat">
           <span class="muted price-view" data-id="${c.id}" data-price="${c.unit_price || 0}">
             ${(c.unit_price || 0).toFixed(2)} ₺ <b style="color:var(--accent)">✎</b>
