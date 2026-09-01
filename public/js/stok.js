@@ -11,6 +11,41 @@ const DURUM = {
   out:      { etiket: 'TÜKENDİ',  sinif: 'locked' }
 };
 
+/** Son yuklenen stok kartlari — onizleme mevcut degeri buradan okur. */
+let kartlar = [];
+
+/**
+ * Iki islemin sonucunu ONCEDEN yazar.
+ *
+ * "Stoğa Ekle" mevcudun uzerine ekler, "Stoğu Eşitle" ise uzerine yazar.
+ * Ikisi ayni kartta dururken karistiriliyordu: kullanici 5 paket varken
+ * 10 yazip esitleyince sonucu 15 sanip 10 goruyordu. Sonucu tiklamadan
+ * once gostermek bu yanilgiyi tamamen kaldirir.
+ */
+function tazeleOnizleme() {
+  const bul = (id) => kartlar.find((c) => String(c.id) === $(id).value);
+
+  const ekleKart = bul('addType');
+  const adet = Number($('addAmount').value);
+  $('addPreview').innerHTML = !ekleKart
+    ? 'Sigara türü seçin.'
+    : (!Number.isInteger(adet) || adet < 1
+        ? `<b>${esc(ekleKart.name)}</b>: şu an ${ekleKart.stock} paket. Geçerli bir adet girin.`
+        : `<b>${esc(ekleKart.name)}</b>: ${ekleKart.stock} → ` +
+          `<b>${ekleKart.stock + adet}</b> paket (+${adet})`);
+
+  const setKart = bul('setType');
+  const hedef = Number($('setTarget').value);
+  $('setPreview').innerHTML = !setKart
+    ? 'Sigara türü seçin.'
+    : (!Number.isInteger(hedef) || hedef < 0
+        ? `<b>${esc(setKart.name)}</b>: şu an ${setKart.stock} paket. Geçerli bir sayım girin.`
+        : `<b>${esc(setKart.name)}</b>: ${setKart.stock} → <b>${hedef}</b> paket ` +
+          `(${hedef === setKart.stock ? 'değişmez'
+             : hedef > setKart.stock ? `+${hedef - setKart.stock} fark`
+             : `${hedef - setKart.stock} fark`})`);
+}
+
 App.ready(async () => {
   // Fiyat belirleme yonetici isi; sigaraciya bu kart gosterilmez
   if (App.user.role !== 'admin') $('priceCard')?.remove();
@@ -40,6 +75,9 @@ async function loadStock() {
       sel.innerHTML = secenekler;
       if (keep) sel.value = keep;
     });
+
+    kartlar = cards;      // onizleme mevcut stogu buradan okur
+    tazeleOnizleme();
 
     if (!cards.length) {
       body.innerHTML = `<tr><td colspan="5" class="empty">
@@ -204,14 +242,24 @@ async function setStock() {
   if (!typeId) return toast('Sigara türü seçin.', 'error');
   if (!Number.isInteger(target) || target < 0) return toast('Geçerli bir miktar girin.', 'error');
 
+  // Onceki degeri sakla: bildirimde "neydi -> ne oldu" yazilsin ki
+  // "esitleme" ile "ekleme" bir daha karistirilmasin.
+  const onceki = kartlar.find((c) => c.id === typeId)?.stock;
+
   const btn = $('setStockBtn');
-  btn.disabled = true;
+  btn.disabled = true; btn.textContent = 'Eşitleniyor...';
   try {
     const r = await API.post('/api/stock/set', { type_id: typeId, target });
     await Promise.all([loadStock(), loadMovements()]);
-    toast(`${r.type} stoğu ${r.balance} pakete ayarlandı.`, 'success');
+
+    toast(
+      onceki === undefined
+        ? `${r.type} stoğu ${r.balance} pakete eşitlendi.`
+        : `${r.type}: ${onceki} → ${r.balance} paket olarak eşitlendi (eklenmedi).`,
+      'success', 5000
+    );
   } catch (err) { toast(err.message, 'error'); }
-  finally { btn.disabled = false; }
+  finally { btn.disabled = false; btn.textContent = 'Stoğu Eşitle'; }
 }
 
 /**
@@ -348,6 +396,12 @@ function bindEvents() {
   $('addStockBtn').addEventListener('click', addStock);
   $('setStockBtn').addEventListener('click', setStock);
   $('addAmount').addEventListener('keydown', (e) => { if (e.key === 'Enter') addStock(); });
+
+  // Onizleme: tur veya adet degistikce sonucu aninda yaz
+  ['addType', 'addAmount', 'setType', 'setTarget'].forEach((id) => {
+    $(id).addEventListener('input', tazeleOnizleme);
+    $(id).addEventListener('change', tazeleOnizleme);
+  });
   $('bulkPriceBtn')?.addEventListener('click', applyBulkPrices);
 
   $('bulkStockBtn')?.addEventListener('click', applyBulkStock);

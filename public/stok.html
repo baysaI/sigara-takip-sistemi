@@ -31,11 +31,15 @@
 
     <div class="split">
 
-      <!-- İkmal -->
+      <!-- İkmal: mevcut stoğun ÜZERİNE ekler -->
       <section class="card">
         <h2>➕ Stok Ekle (İkmal)</h2>
         <div class="card-body">
-          <div class="field">
+          <p class="muted">
+            Girilen adet <b>mevcut stoğun üzerine eklenir</b>. Yeni gelen mal için.
+          </p>
+
+          <div class="field mt">
             <label for="addType">Sigara Türü <span class="req">*</span></label>
             <select id="addType"><option value="">— Seçiniz —</option></select>
           </div>
@@ -49,21 +53,35 @@
               <input type="text" id="addNote" maxlength="120" placeholder="ör. 2 koli geldi" />
             </div>
           </div>
-          <button class="btn-primary" id="addStockBtn">Stoğa Ekle</button>
+
+          <!-- Sonucu ONCEDEN goster: "ekledim ama degismedi" yanilgisini
+               ortadan kaldiran sey bu satir. -->
+          <p class="muted mt" id="addPreview">Sigara türü seçin.</p>
+          <button class="btn-primary mt" id="addStockBtn">Stoğa Ekle</button>
+        </div>
+      </section>
+
+      <!-- Sayim duzeltmesi: EKLEMEZ, esitler. Ikmalle ayni kartta durdugu
+           surece karistiriliyordu; ayri karta alindi. -->
+      <section class="card">
+        <h2>🧮 Sayım Düzeltmesi</h2>
+        <div class="card-body">
+          <p class="muted">
+            Stoğu <b>eklemez</b> — saydığınız değere <b>eşitler</b>.
+            Fiziksel sayımdan sonra, sistem ile raf arasındaki farkı kapatmak için.
+          </p>
 
           <div class="field mt">
-            <label for="setType">Sayım Düzeltmesi <span class="muted">(mevcudu hedefe getirir)</span></label>
+            <label for="setType">Sigara Türü <span class="req">*</span></label>
             <select id="setType"><option value="">— Seçiniz —</option></select>
           </div>
-          <div class="row">
-            <div class="field">
-              <label for="setTarget">Sayılan Miktar</label>
-              <input type="number" id="setTarget" min="0" max="100000" value="0" inputmode="numeric" />
-            </div>
-            <div class="field" style="display:flex;align-items:flex-end">
-              <button class="btn-ghost btn-block" id="setStockBtn">Düzelt</button>
-            </div>
+          <div class="field">
+            <label for="setTarget">Sayılan Miktar <span class="req">*</span></label>
+            <input type="number" id="setTarget" min="0" max="100000" value="0" inputmode="numeric" />
           </div>
+
+          <p class="muted mt" id="setPreview">Sigara türü seçin.</p>
+          <button class="btn-ghost mt" id="setStockBtn">Stoğu Eşitle</button>
         </div>
       </section>
 
