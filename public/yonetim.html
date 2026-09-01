@@ -172,6 +172,33 @@
         </div>
       </section>
 
+      <!-- ==================== YEDEKLEME ==================== -->
+      <section class="card admin-wide">
+        <h2>💾 Yedekleme <span class="badge-count" id="backupCount"></span></h2>
+        <div class="card-body">
+          <p class="muted" id="backupState">Yükleniyor...</p>
+
+          <p class="muted mt">
+            <b>Dikkat:</b> yedekler sunucudaki aynı diskte durur. Yanlışlıkla
+            silmeye ve bozulmaya karşı korur, <b>disk arızasına karşı korumaz</b>.
+            Ara sıra bir yedeği indirip başka bir yerde saklayın.
+          </p>
+
+          <button class="btn-primary mt" id="backupNowBtn">Şimdi Yedek Al</button>
+        </div>
+
+        <div class="table-scroll">
+          <table class="responsive">
+            <thead>
+              <tr><th>Dosya</th><th>Tarih</th><th>Boyut</th><th>İşlem</th></tr>
+            </thead>
+            <tbody id="backupBody">
+              <tr><td colspan="4" class="empty">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ==================== TEHLİKELİ BÖLGE ==================== -->
       <section class="card admin-wide danger-zone">
         <h2>🗑️ Veri Sıfırlama <span class="badge-count" id="dbSize"></span></h2>

@@ -182,6 +182,40 @@ Kuralı**'ndan değiştirilir. 4 saat → 3 saat → 2 saat gibi. Değişiklik
 > yakalamayın — `services/settings.js` fonksiyonlarını her ihtiyaç anında
 > çağırın, yoksa ayar değişse de eski değer kullanılır.
 
+## Otomatik yedekleme
+
+Veritabanı **6 saatte bir** otomatik yedeklenir. Yönetim → Yedekleme
+bölümünden yedekler listelenir, elle yedek alınabilir, **indirilebilir** ve
+silinebilir.
+
+**Dosya kopyalanmaz, online backup API'si kullanılır.** Veritabanı WAL
+modunda çalışır; sunucu açıkken `sigara.db` dosyasını olduğu gibi kopyalamak
+henüz ana dosyaya işlenmemiş işlemleri dışarıda bırakır ve elde tutarsız —
+hatta açılmayan — bir kopya kalır. `better-sqlite3`'ün `db.backup()` çağrısı
+eşzamanlı yazma altında bile bütünlüklü kopya üretir.
+
+Her yedekten sonra kopya **açılıp doğrulanır** (`PRAGMA integrity_check` +
+şema kontrolü). Açılmayan bir yedek, yedek değildir.
+
+| Ayar (`.env`) | Varsayılan | Açıklama |
+|---|---|---|
+| `BACKUP_INTERVAL_HOURS` | `6` | Kaç saatte bir. `0` = kapalı |
+| `BACKUP_KEEP` | `28` | Kaç kopya saklanır (6 sa × 28 ≈ 1 hafta) |
+| `BACKUP_DIR` | `backups/` | Yedek klasörü |
+
+- Açılışta hemen yedek alınmaz; yalnızca en son yedek aralık kadar eskiyse
+  alınır. Böylece sık yeniden başlatma klasörü doldurmaz.
+- Saklama sınırı aşılınca en eskiler silinir.
+- **Tek kalan yedek silinemez.**
+- İndirme/silme uçları dosya adını sıkı doğrular; `../../.env` gibi adlarla
+  başka dosyalara erişilemez.
+
+> ⚠️ **Yedekler aynı diskte durur.** Bu, yanlışlıkla silmeye ve veri
+> bozulmasına karşı korur; **disk arızasına veya sunucu kaybına karşı
+> korumaz.** Ara sıra bir yedeği indirip başka bir yerde saklayın. Kalıcı
+> çözüm isterseniz `BACKUP_DIR`'i başka bir diske ya da eşitlenen bir klasöre
+> yönlendirin.
+
 ## Güvenlik
 
 - **Şifreler** bcrypt ile saklanır. Giriş, kullanıcı adının var olup olmadığını

@@ -20,6 +20,8 @@ const stockRoutes = require('./routes/stock');
 const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
 const settingsRoutes = require('./routes/settings');
+const backupRoutes = require('./routes/backup');
+const backup = require('./services/backup');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -133,6 +135,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/backup', backupRoutes);
 
 
 /* --------------------------- Hata yakalama -------------------------- */
@@ -167,6 +170,9 @@ const server = app.listen(config.PORT, () => {
   console.log(`  Kayitli kullanici: ${userCount}`);
   if (userCount === 0) console.log('  ! Once "npm run seed" calistirin.');
   console.log('==============================================');
+
+  // Otomatik yedekleme zamanlayicisi (BACKUP_INTERVAL_HOURS=0 ile kapatilir)
+  backup.start();
 });
 
 // Port doluysa yigin izi yerine ne yapilacagini soyle.
