@@ -74,9 +74,17 @@ const SCOPES = {
     }
   },
   users: {
-    label: 'Sigaracı hesapları (kendi hesabınız hariç)',
-    count: (userId) => db.prepare('SELECT COUNT(*) c FROM users WHERE id != ?').get(userId).c,
-    run: (userId) => db.prepare('DELETE FROM users WHERE id != ?').run(userId).changes
+    /*
+     * KOK HESAP HARIC TUTULUR (is_root = 0 sarti).
+     * Aksi halde baska bir yonetici, veri sifirlama ekranindan korumali
+     * hesabi komple silebilirdi — sifre korumasini anlamsiz kilan bir
+     * arka kapi olurdu.
+     */
+    label: 'Sigaracı hesapları (kendi hesabınız ve kök hesap hariç)',
+    count: (userId) =>
+      db.prepare('SELECT COUNT(*) c FROM users WHERE id != ? AND is_root = 0').get(userId).c,
+    run: (userId) =>
+      db.prepare('DELETE FROM users WHERE id != ? AND is_root = 0').run(userId).changes
   }
 };
 

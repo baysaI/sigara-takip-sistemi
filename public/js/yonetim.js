@@ -231,12 +231,26 @@ async function loadUsers() {
 
     body.innerHTML = users.map((u) => {
       const kendisi = u.id === App.user.id;
+
+      /*
+       * KOK HESAP: baska bir yonetici hicbir seyini degistiremez.
+       * Sunucu da ayni kurali uygular; buradaki kilit yalnizca bosuna
+       * tiklamayi onler ve nedenini soyler.
+       * Kendi sifresini degistirmek serbesttir, yoksa kurulum sifresinde
+       * kilitli kalirdi.
+       */
+      const kok = !!u.is_root;
+      const kilitli = kok && !kendisi;
+
       return `
-      <tr>
-        <td data-label="Kullanıcı"><b>${esc(u.username)}</b>${kendisi ? ' <span class="muted">(siz)</span>' : ''}</td>
+      <tr${kok ? ' class="row-root"' : ''}>
+        <td data-label="Kullanıcı">
+          <b>${esc(u.username)}</b>${kendisi ? ' <span class="muted">(siz)</span>' : ''}
+          ${kok ? '<span class="pill root" title="Korumalı kök hesap — başka yönetici değiştiremez">KÖK</span>' : ''}
+        </td>
         <td data-label="Ad Soyad">${u.full_name ? esc(u.full_name) : '—'}</td>
         <td data-label="Yetki">
-          ${kendisi
+          ${kendisi || kilitli
             /* Kendi yetkini degistiremezsin: son yoneticinin kendini
                sigaraciya alip sistemi yonetimsiz birakmasini onler.
                Sunucu da ayni kurali uygular. */
@@ -250,12 +264,16 @@ async function loadUsers() {
           <span class="pill ${u.is_active ? 'free' : 'locked'}">${u.is_active ? 'AKTİF' : 'PASİF'}</span>
         </td>
         <td data-label="İşlem">
-          <button class="btn-ghost btn-sm" data-pw="${u.id}" data-username="${esc(u.username)}">Şifre</button>
-          ${kendisi ? '' : `
-            <button class="btn-ghost btn-sm" data-user="${u.id}" data-active="${u.is_active ? 0 : 1}">
-              ${u.is_active ? 'Pasife al' : 'Aktifleştir'}
-            </button>
-            <button class="btn-danger btn-sm" data-user-del="${u.id}" data-name="${esc(u.username)}">Sil</button>`}
+          <div class="row-actions">
+            ${kilitli
+              ? '<span class="muted" title="Kök hesabın şifresini yalnızca kendisi değiştirebilir">korumalı</span>'
+              : `<button class="btn-ghost btn-sm" data-pw="${u.id}" data-username="${esc(u.username)}">Şifre</button>`}
+            ${kendisi || kilitli ? '' : `
+              <button class="btn-ghost btn-sm" data-user="${u.id}" data-active="${u.is_active ? 0 : 1}">
+                ${u.is_active ? 'Pasife al' : 'Aktifleştir'}
+              </button>
+              <button class="btn-danger btn-sm" data-user-del="${u.id}" data-name="${esc(u.username)}">Sil</button>`}
+          </div>
         </td>
       </tr>`;
     }).join('');

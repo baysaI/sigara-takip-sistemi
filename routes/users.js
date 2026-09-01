@@ -16,13 +16,35 @@ const MIN_PASSWORD = 6;
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,30}$/;
 
 const listAll = db.prepare(`
-  SELECT id, username, full_name, role, is_active, created_at
-  FROM users ORDER BY role DESC, username COLLATE NOCASE
+  SELECT id, username, full_name, role, is_active, is_root, created_at
+  FROM users ORDER BY is_root DESC, role DESC, username COLLATE NOCASE
 `);
 const listNames = db.prepare(
   'SELECT username FROM users WHERE is_active = 1 ORDER BY username COLLATE NOCASE'
 );
-const byId = db.prepare('SELECT id, username, full_name, role, is_active FROM users WHERE id = ?');
+const byId = db.prepare('SELECT id, username, full_name, role, is_active, is_root FROM users WHERE id = ?');
+
+/**
+ * KOK HESAP KORUMASI — piramidin en ustu.
+ *
+ * Kok hesaba BASKA hicbir yonetici dokunamaz: sifre sifirlama, pasife
+ * alma, yetki dusurme ve silme kapalidir. Yalnizca hesabin sahibi
+ * (o hesapla giris yapmis olan) kendi sifresini degistirebilir; aksi
+ * halde kurulum sifresinde kilitli kalirdi.
+ *
+ * @returns {null|{status:number, error:string}} engel varsa aciklamasi
+ */
+function kokEngeli(hedef, istekSahibi, islem) {
+  if (!hedef.is_root) return null;
+  if (hedef.id === istekSahibi.id && islem === 'password') return null;   // kendi sifresi
+
+  return {
+    status: 403,
+    error: hedef.id === istekSahibi.id
+      ? 'Kök hesapta yalnızca şifre değiştirilebilir.'
+      : `"${hedef.username}" korumalı kök hesaptır; başka bir yönetici tarafından değiştirilemez.`
+  };
+}
 
 /** Sistemin yonetici olmadan kalmasini engeller. */
 function activeAdminCount(exceptId) {
@@ -91,6 +113,9 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
 
   /* --- Aktif / pasif --- */
   if (Object.prototype.hasOwnProperty.call(req.body, 'is_active')) {
+    const engel = kokEngeli(user, req.session.user, 'is_active');
+    if (engel) return res.status(engel.status).json({ ok: false, error: engel.error });
+
     const isActive = req.body.is_active ? 1 : 0;
 
     if (!isActive && kendisi) {
@@ -102,8 +127,13 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
     db.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(isActive, id);
   }
 
-  /* --- Sifre sifirlama --- */
+  /* --- Sifre sifirlama ---
+     Kok hesabin sifresini YALNIZCA kendisi degistirebilir; baska bir
+     yonetici sifirlayip hesabi ele geciremez. */
   if (req.body.password != null) {
+    const engel = kokEngeli(user, req.session.user, 'password');
+    if (engel) return res.status(engel.status).json({ ok: false, error: engel.error });
+
     const password = String(req.body.password);
     if (password.length < MIN_PASSWORD) {
       return res.status(400).json({ ok: false, error: `Sifre en az ${MIN_PASSWORD} karakter olmalidir.` });
@@ -113,6 +143,9 @@ router.patch('/:id', requireAdmin, asyncHandler((req, res) => {
 
   /* --- Rol --- */
   if (req.body.role) {
+    const engel = kokEngeli(user, req.session.user, 'role');
+    if (engel) return res.status(engel.status).json({ ok: false, error: engel.error });
+
     const role = req.body.role === 'admin' ? 'admin' : 'sigaraci';
 
     if (role !== 'admin' && kendisi) {
@@ -134,6 +167,9 @@ router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const user = byId.get(id);
   if (!user) return res.status(404).json({ ok: false, error: 'Kullanici bulunamadi.' });
+
+  const engel = kokEngeli(user, req.session.user, 'delete');
+  if (engel) return res.status(engel.status).json({ ok: false, error: engel.error });
 
   if (id === req.session.user.id) {
     return res.status(400).json({ ok: false, error: 'Kendi hesabinizi silemezsiniz.' });

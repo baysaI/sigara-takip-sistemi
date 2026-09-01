@@ -736,6 +736,10 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 
 /* Kullanici listesindeki yetki secimi — tablo satirini sismesin diye kompakt */
 .role-select { width: auto; min-width: 118px; padding: 6px 10px; font-size: 13px; }
+
+/* Korumali kok hesap: piramidin en ustu, baska yonetici degistiremez */
+.pill.root { background: var(--accent-soft); border-color: rgba(245, 166, 35, .55); color: var(--accent); }
+.row-root  { background: rgba(245, 166, 35, .045); }
 .info-cell { color: var(--text-faint); font-style: italic; max-width: 300px; }
 
 /* Kayit detayi: Info notunun altina onay / erken alim / degisim / iptal

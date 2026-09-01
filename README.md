@@ -136,6 +136,35 @@ aksi halde uyarıları açmak hesap yönetimini ve veri sıfırlamayı da açard
 **kendi yönetici yetkinizi kaldıramazsınız** ve **sistemde en az bir aktif
 yönetici kalmalıdır**.
 
+### Kök hesap — piramidin en üstü
+
+Kurulumdaki **`admin`** hesabı korumalıdır (`users.is_root = 1`). Listede
+`KÖK` rozetiyle görünür ve **başka hiçbir yönetici ona dokunamaz**:
+
+| İşlem | Diğer yönetici | Kök hesabın kendisi |
+|---|:---:|:---:|
+| Şifresini değiştirmek | ⛔ | ✅ |
+| Pasife almak | ⛔ | ⛔ |
+| Yetkisini düşürmek | ⛔ | ⛔ |
+| Silmek | ⛔ | ⛔ |
+| Veri sıfırlamayla silmek | ⛔ | ⛔ |
+
+Beşinci satır önemli: veri sıfırlamadaki *Sigaracı hesapları* kapsamı
+"kendi hesabınız hariç herkesi sil" demekti — başka bir yönetici oradan kök
+hesabı komple silebilirdi. Kapsam artık `is_root = 0` şartıyla çalışır, aksi
+halde şifre koruması anlamsız bir arka kapıyla delinirdi.
+
+Kök hesap **kendi şifresini değiştirebilir** (yoksa kurulum şifresinde kilitli
+kalırdı) ama kendi yetkisini bile düşüremez.
+
+> ⚠️ **Şifre kurtarma yoktur.** Kök hesabın şifresi unutulursa hiçbir yönetici
+> sıfırlayamaz. Tek yol sunucuda `data/sigara.db` dosyasına doğrudan erişip
+> `password_hash` alanını değiştirmektir. Şifreyi güvenli bir yerde saklayın.
+
+Bayrak taşınabilir: veritabanında `UPDATE users SET is_root = 1 WHERE id = ?`
+ile başka bir hesaba verilebilir (aynı anda birden fazla kök olabilir, sistem
+buna izin verir ama önerilmez).
+
 ## Sigara kuralı (süre ayarı)
 
 Bir oyuncunun iki alımı arasında geçmesi gereken süre **Yönetim → Sigara

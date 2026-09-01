@@ -314,6 +314,38 @@ addColumn('record_cancellations', 'reverted_at', 'TEXT');
 addColumn('record_cancellations', 'reverted_by', 'TEXT');
 
 /*
+ * KOK HESAP (is_root) — piramidin en ustu.
+ *
+ * Kurulumdaki "admin" hesabi baska hicbir yonetici tarafindan
+ * degistirilemez: sifresi sifirlanamaz, pasife alinamaz, yetkisi
+ * dusurulemez, silinemez ve veri sifirlamada silinmez. Yalnizca kendisi
+ * (o hesapla giris yapmis olan) kendi sifresini degistirebilir.
+ *
+ * Neden ayri sutun: 'admin' adina veya id=1'e bakmak kirilgan olurdu.
+ * Bayrak satirin kendisinde durur, sorgulanabilir ve tasinabilir.
+ */
+addColumn('users', 'is_root', 'INTEGER NOT NULL DEFAULT 0');
+
+/*
+ * Kok hesabi bir kereye mahsus isaretle. Zaten isaretli bir hesap varsa
+ * dokunulmaz — yonetici bayragi elle tasimissa geri alinmasin.
+ * Aday: once 'admin' kullanicisi, yoksa en dusuk id'li yonetici.
+ */
+(function kokIsaretle() {
+  const varMi = db.prepare('SELECT COUNT(*) c FROM users WHERE is_root = 1').get().c;
+  if (varMi) return;
+
+  const aday =
+    db.prepare("SELECT id FROM users WHERE username = 'admin' COLLATE NOCASE").get() ||
+    db.prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1").get();
+
+  if (!aday) return;   // hic kullanici yok (seed henuz calismamis)
+
+  db.prepare('UPDATE users SET is_root = 1 WHERE id = ?').run(aday.id);
+  console.log(`[migrasyon] Kok hesap isaretlendi (id ${aday.id}) — baska yonetici degistiremez.`);
+})();
+
+/*
  * Tek seferlik ("liste disi") sigara — "Yeni Sigara Ekle".
  *
  * Markette alinan, ana listede olmayan bir sigara icin kullanilir. Tur
