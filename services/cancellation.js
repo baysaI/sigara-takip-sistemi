@@ -280,7 +280,7 @@ function listCancellations({
   `).get(params);
 
   const rows = db.prepare(`
-    SELECT r.id, r.player_id, r.cigarette_type, r.quantity, r.waiter_name,
+    SELECT r.id, r.player_id, r.cigarette_type, r.quantity, r.waiter_name, r.custom_waiter,
            r.username, r.info, r.created_at, r.exchanged_from,
            r.flag_level, r.early_release,
            c.id AS cancel_id, c.reason AS cancel_reason, c.username AS cancelled_by,

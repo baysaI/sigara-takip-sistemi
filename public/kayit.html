@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.1.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.2.0" />
 </head>
 <body>
 
@@ -77,13 +77,20 @@
               <div class="field">
                 <label for="waiterSearch">Alan Garson <span class="req">*</span></label>
                 <!-- Uzun garson listesi: adı yazılır, eşleşenler açılır, biri seçilir.
-                     Seçilen garsonun id'si waiterId gizli alanında tutulur. -->
+                     Seçilen garsonun id'si waiterId gizli alanında tutulur.
+
+                     Listede olmayan bir ad yazılırsa altta "➕ ... tek seferlik
+                     garson" seçeneği çıkar. Bu ad garson listesine EKLENMEZ;
+                     yalnızca o kayda yazılır (ekstra çalışan kişiler için). -->
                 <div class="ac">
                   <input type="text" id="waiterSearch" placeholder="Garson adı yazın..."
                          enterkeyhint="done" />
                   <input type="hidden" id="waiterId" name="waiter_id" />
                   <ul class="ac-list" id="waiterList"></ul>
                 </div>
+                <p class="muted mt hidden" id="customWaiterNote">
+                  Bu ad <b>garson listesine eklenmez</b>, yalnızca bu kayda yazılır.
+                </p>
               </div>
             </div>
 
@@ -127,11 +134,11 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.1.0"></script>
-  <script src="/js/layout.js?v=1.1.0"></script>
-  <script src="/js/autocomplete.js?v=1.1.0"></script>
-  <script src="/js/approval.js?v=1.1.0"></script>
-  <script src="/js/degisim.js?v=1.1.0"></script>
-  <script src="/js/kayit.js?v=1.1.0"></script>
+  <script src="/js/api.js?v=1.2.0"></script>
+  <script src="/js/layout.js?v=1.2.0"></script>
+  <script src="/js/autocomplete.js?v=1.2.0"></script>
+  <script src="/js/approval.js?v=1.2.0"></script>
+  <script src="/js/degisim.js?v=1.2.0"></script>
+  <script src="/js/kayit.js?v=1.2.0"></script>
 </body>
 </html>

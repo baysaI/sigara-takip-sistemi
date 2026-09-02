@@ -456,7 +456,7 @@ sigara/
 |---|---|---|
 | `/login.html` | Giriş | herkes |
 | `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
-| `/arsiv.html` | Filtreler + tam arşiv + sayfalama | oturum |
+| `/arsiv.html` | Filtreler + tam arşiv + sayfalama + Excel dökümü | oturum |
 | `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
@@ -477,13 +477,41 @@ Kadro kalabalık olabileceği için "Alan Garson" alanı açılır liste değil,
   eşleşen harfler vurgulanır.
 - Türkçe karakterlere duyarlıdır — `ILK` yazınca `Ilker`, `ıspanak` ile `Ispanak` eşleşir.
 - Ok tuşları + Enter, ya da dokunma/tıklama ile seçilir.
-- **Serbest metin kabul edilmez.** Listede olmayan bir ad yazılırsa alan kırmızıya döner
-  ve kayıt gönderilmez; sunucu da geçersiz garson id'sini `400` ile reddeder.
-- Tam ad yazılıp alandan çıkılırsa (ya da tek eşleşme kalırsa) otomatik seçilir —
-  `zeynep` yazıp geçmek `Zeynep`'i seçer.
+- Tam ad yazılıp alandan çıkılırsa otomatik seçilir — `zeynep` yazıp geçmek `Zeynep`'i seçer.
 - Seçilen garson kayıttan sonra korunur; aynı vardiyada arka arkaya kayıt hızlanır.
+- Listede olmayan bir ad yazılırsa altta **➕ Yeni Garson Ekle** seçeneği çıkar
+  (aşağıya bakın).
 
-Aynı alan Arşiv sayfasındaki garson filtresinde de kullanılır.
+Aynı alan Arşiv sayfasındaki garson filtresinde de kullanılır — orada serbest
+metin kabul edilmez, seçim listeden yapılır.
+
+### Yeni Garson Ekle (tek seferlik)
+
+O gün **ekstra çalışan**, kadroda olmayan biri sigarayı aldığında kullanılır.
+Adı yazın; açılır listenin altında turuncu renkte
+
+> ➕ "Ekstra Mehmet" — tek seferlik garson
+
+seçeneği çıkar. Seçilince ad kayda işlenir.
+
+- Ad **garson listesine eklenmez**; bir dahaki sefere listede çıkmaz. Kalıcı
+  liste bir kerelik isimlerle şişmez.
+- Kayıtta `waiter_id` boş kalır, `waiter_name` yazdığınız ad olur. Arşiv,
+  Sorgu, İptaller ve gün sonu raporunun **garson dökümünde normal görünür**;
+  `LİSTE DIŞI` rozetiyle işaretlenir.
+- Sigara değişimi yapılırsa yerine geçen kayıt bu bilgiyi devralır.
+
+**Yazılan ad zaten kayıtlı bir garsona denk geliyorsa** (büyük/küçük harf farkı
+dahil) tek seferlik sayılmaz: sistem listedeki kayda bağlar ve bunu ekranda
+söyler. Böylece aynı kişi arşivde iki farklı şekilde birikmez.
+
+Bu yüzden alan artık **garson listesi boşken de kilitlenmez** — uyarı yine
+çıkar (kalıcı ekip Yönetim'den tanımlanmalıdır) ama tek seferlik adla kayıt
+açılabilir.
+
+> Kalıcı olarak çalışacak biri için bunu kullanmayın; Yönetim → Garsonlar'dan
+> ekleyin. Aksi halde adı her seferinde elle yazmanız gerekir ve Arşiv'in
+> garson filtresinde seçilemez.
 
 ### Garson ekleme
 
@@ -507,10 +535,85 @@ Garsonlarda aktif/pasif ayrımı yoktur; listede olan herkes kayıt formunda se�
 
 ### Garson veya tür tanımlı değilken
 
-Hızlı Kayıt sayfasında ilgili alan devre dışı kalır ve 4 saat kuralı uygun olsa bile
-*Kaydı Oluştur* düğmesi açılmaz. İpucu satırı eksik olanı adıyla söyler
-(`Önce sisteme garson ve sigara türü eklenmeli.`). Yönetici uyarıdan doğrudan Yönetim
-sayfasına geçebilir; sigaracıya yöneticiye başvurması söylenir.
+Hızlı Kayıt sayfasında uyarı çıkar ve *Kaydı Oluştur* düğmesi açılmaz; ipucu
+satırı eksik olanı adıyla söyler (`Önce sisteme garson ve sigara türü eklenmeli.`).
+Yönetici uyarıdan doğrudan Yönetim sayfasına geçebilir; sigaracıya yöneticiye
+başvurması söylenir.
+
+Her iki alanın da **tek seferlik kaçış yolu** vardır: liste boş olsa bile
+*Yeni Garson Ekle* / *Yeni Sigara Ekle* ile kayıt açılabilir. Tezgâh, tanım
+eksikliği yüzünden tıkanmaz.
+
+## Arşivde saat araması
+
+Arşiv sayfasında saati **iki ayrı biçimde** süzebilirsiniz. İkisi farklı işler
+görür ve birlikte kullanılabilir.
+
+### 1. Tarih + saat — tek bir sürekli aralık
+
+*Başlangıç* ve *Bitiş* alanlarının yanındaki saat kutuları. Bir vardiyayı baştan
+sona almak içindir:
+
+> `01.09.2026 22:00` → `02.09.2026 04:00`
+
+Saat boş bırakılırsa gün sınırı kullanılır (başlangıç `00:00`, bitiş `23:59`).
+
+> ⚠️ Bu alanlar **tarihe bağlıdır**. Yalnızca saat girip tarihi boş bırakırsanız
+> filtre uygulanmaz — aradığınız "her günün şu saati" ise aşağıdaki alanı kullanın.
+
+### 2. Saat aralığı (her gün) — tarihten bağımsız
+
+*Saat aralığı* alanındaki iki açılır menü. Kaydın yerel saatini **her güne ayrı
+ayrı** uygular; "hangi gün olursa olsun" araması budur:
+
+| Seçim | Anlamı |
+|---|---|
+| `14:00` – `14:00` | Her gün 14:00–14:59 arası (belirli bir saat) |
+| `08:00` – `17:00` | Her gün 08:00–17:59 arası (gündüz) |
+| `22:00` – `04:00` | Her gün 22:00–04:59 arası (**gece yarısını aşar**) |
+| Tek uç seçili | Tek saat aranmış sayılır |
+
+- **İki uç da dahildir** ve seçilen saatin tamamını kapsar: `14` seçmek
+  14:00–14:59 demektir.
+- Başlangıç bitişten büyükse aralık gece yarısını aşar ve `saat ≥ 22 VEYA saat ≤ 4`
+  olarak uygulanır.
+- Tarih aralığıyla birlikte kullanılabilir: *"son bir ayın her gecesi 22–04 arası"*
+  için tarihleri ay başı/sonu, saat aralığını `22:00`–`04:00` yapın.
+- Filtre kutusunun altındaki satır seçimin karşılığını cümleyle yazar.
+
+Saat, kaydın **yerel saatidir** (sunucunun saat dilimi) — iş günü etiketleri de
+aynı eksende üretilir.
+
+## Arşivi Excel'e aktarma
+
+Filtrelerin yanındaki **Excel'e Aktar** düğmesi, o an ekranda uygulanan
+filtrelerin **aynısıyla** eşleşen tüm kayıtları CSV olarak indirir.
+
+- **Sayfalama yoktur:** ekranda 25 kayıt görüyor olsanız da dosyada eşleşen
+  kayıtların tamamı bulunur.
+- **Hiçbir kayıt silinmez veya değiştirilmez.** Uç yalnızca okur.
+- Dosya adı `sigara-arsiv-YYYYAAGG-SSDD.csv` biçimindedir.
+- Gün sonu mutabakat dökümüyle aynı biçim: **noktalı virgül** ayraç ve
+  **BOM'lu UTF-8** — Türkçe Excel dosyayı çift tıklayınca doğru açar,
+  karakterler bozulmaz.
+
+Dosyanın başında dökümün ne zaman alındığı, **hangi filtrelerin açık olduğu**
+ve toplam yazar; altında sütunlar gelir:
+
+`NO · TARİH · SAAT · OYUNCU ID · SİGARA TÜRÜ · ADET · GARSON · SİGARACI ·
+DURUM · LİSTE DIŞI · ERKEN ALIM ONAYI · UYARI ONAYI · INFO`
+
+- `DURUM` — `Normal`, `Değiştirildi`, `Değişimle verildi`, `İptal`, `İptal (geç)`
+- `LİSTE DIŞI` — tek seferlik giriş varsa `Sigara`, `Garson` ya da `Sigara + Garson`
+- Tarih ve saat **ayrı sütunlardır**; Excel'de saate göre sıralamak ve pivot
+  almak için.
+
+İptal edilen kayıtlar — ekrandaki listede olduğu gibi — dökümde de varsayılan
+olarak **yer almaz**; `?includeCancelled=1` ile eklenirler. Özet satırındaki
+paket toplamı değiştirilmiş ve aynı dönemde iptal edilmiş kayıtları saymaz.
+
+> Çok büyük arşivlerde döküm 50.000 satırda kesilir ve dosyanın sonuna bunu
+> söyleyen bir satır düşülür. Böyle bir durumda tarih aralığını daraltın.
 
 ## Erken alım — süresi dolmadan verme
 
@@ -818,9 +921,22 @@ Ayrıntılar:
 `records` tablosunda garson adı ve sigaracı kullanıcı adı **snapshot** olarak da
 tutulur: bir garson sonradan pasife alınsa veya adı değişse bile geçmiş kayıtlar bozulmaz.
 
+Tek seferlik girişler iki bayrakla işaretlenir — ikisi de kalıcı tanım
+listelerine dokunmaz:
+
+| Sütun | Anlamı |
+|---|---|
+| `custom_type` | Liste dışı sigara: `cigarette_type_id` boş, stok hareketi yazılmaz |
+| `custom_waiter` | Liste dışı garson: `waiter_id` boş, `waiter_name` elle yazılan ad |
+
 Zaman damgaları ISO-8601 UTC (`2026-08-23T15:04:05.123Z`) saklanır. Bu format hem
 kronolojik hem sözlüksel sıralandığı için tarih aralığı filtresi doğrudan
 `created_at BETWEEN ?` ile çalışır. Arayüz saatleri kullanıcının yerel saat dilimine çevirir.
+
+Saat araması (`hourFrom`/`hourTo`) bu UTC damgayı SQLite'ın `'localtime'`
+çeviricisiyle yerel saate döndürüp karşılaştırır. Sütun üzerinde fonksiyon
+olduğu için bu koşul `created_at` indeksini kullanamaz; tarih filtresi aralığı
+zaten daralttığından pratikte sorun çıkarmaz.
 
 ## API
 
@@ -865,12 +981,17 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/records/check?playerId=X` | **4 saat kontrolü** — kalan süre, son alım |
 | `POST` | `/api/records` | Yeni kayıt (süre dolmadıysa `409`; `early_approved` + `early_approved_by` ile erken alım) |
 | `GET` | `/api/records` | Filtreli arşiv + sayfalama |
+| `GET` | `/api/records/export.csv` | Arşiv dökümü — aynı filtreler, sayfalama yok |
 | `GET` | `/api/records/stats` | Panel özet kartları |
 
 ### Arşiv filtre parametreleri
 
 `playerId` (kısmi arama), `waiter`, `type`, `user`, `from`, `to` (ISO tarih-saat),
-`page`, `pageSize` (varsayılan 50, en fazla 500).
+`hourFrom`, `hourTo` (0–23), `page`, `pageSize` (varsayılan 50, en fazla 500).
+
+`from`/`to` **tek bir sürekli aralık** kurar; `hourFrom`/`hourTo` ise kaydın
+yerel saatini **her güne ayrı ayrı** uygular. İkisi birlikte kullanılabilir.
+Ayrıntı için aşağıdaki *Arşivde saat araması* bölümüne bakın.
 
 ### `/api/records/check` yanıtı
 

@@ -26,8 +26,9 @@ App.ready(async () => {
    * mumkun degil — donem bazli dokum icin Gun Sonu Raporu sayfasi var.
    */
   const not = $('dayNote');
-  if (not) not.textContent = '· Tarih ve saate göre filtrelenir; saat boşsa tüm gün.';
+  if (not) not.textContent = '· Tarih aralığı ve/veya günden bağımsız saat aralığı ile filtrelenir.';
 
+  fillHourOptions();
   await loadFilterOptions();
   await loadArchive();
   bindEvents();
@@ -58,6 +59,54 @@ async function loadFilterOptions() {
     (users.users || []).map((u) => `<option value="${esc(u.username)}">${esc(u.username)}</option>`).join('');
 }
 
+/* ------------------------- Saat aralığı -------------------------
+ * Tarih aralığından BAĞIMSIZ süzgeç: "hangi gün olursa olsun 22:00–04:00".
+ *
+ * Tarih+saat kutuları tek bir sürekli aralık kurar ("1 Eylül 22:00'dan
+ * 2 Eylül 04:00'a"). Aranan çoğu zaman bu değil — gece vardiyasının bir
+ * aylık dökümü gibi. Burası her güne ayrı ayrı uygulanır; ikisi birlikte
+ * de kullanılabilir.
+ *
+ * İki uç da DAHİLDİR ve saatin tamamını kapsar: 14 → 14 seçimi
+ * 14:00–14:59 arasıdır ("belirli bir saat"). Sunucu aynı kuralı uygular.
+ */
+function fillHourOptions() {
+  const secenekler = '<option value="">Tümü</option>' +
+    Array.from({ length: 24 }, (_, s) =>
+      `<option value="${s}">${String(s).padStart(2, '0')}:00</option>`).join('');
+
+  $('fHourFrom').innerHTML = secenekler;
+  $('fHourTo').innerHTML = secenekler;
+}
+
+/** Seçilen saat aralığını insan diline çevirir (boşsa ''). */
+function hourRangeLabel() {
+  const bas = $('fHourFrom').value;
+  const bit = $('fHourTo').value;
+  if (bas === '' && bit === '') return '';
+
+  // Tek uç seçilmişse tek saat aranıyor demektir — sunucu da böyle yorumlar.
+  const b = Number(bas === '' ? bit : bas);
+  const s = Number(bit === '' ? bas : bit);
+
+  const ss = (n) => `${String(n).padStart(2, '0')}:00`;
+  const bitis = `${String(s).padStart(2, '0')}:59`;
+
+  if (b === s) return `Her gün ${ss(b)}–${bitis} arası kayıtlar.`;
+  return b < s
+    ? `Her gün ${ss(b)}–${bitis} arası kayıtlar.`
+    : `Her gün ${ss(b)}–${bitis} arası (gece yarısını aşan aralık) kayıtlar.`;
+}
+
+/** Filtre kutusunun altındaki açıklamayı seçime göre günceller. */
+function updateFilterHint() {
+  const saat = hourRangeLabel();
+  $('filterHint').innerHTML = saat
+    ? `<b>${esc(saat)}</b> Tarih aralığı da seçilirse ikisi birlikte uygulanır.`
+    : 'Tarih saatleri tek bir sürekli aralık kurar (ör. <b>dün 22:00</b> → <b>bugün 04:00</b>). ' +
+      'Her güne ayrı uygulanan bir saat süzgeci için <b>Saat aralığı</b> alanını kullanın.';
+}
+
 function currentFilters() {
   /* Tarih + saat. Saat bos birakilirsa gun siniri kullanilir
      (baslangic 00:00, bitis 23:59:59.999) — eski davranis korunur.
@@ -72,6 +121,9 @@ function currentFilters() {
     user: $('fUser').value,
     from,
     to,
+    // Bos string API.get tarafinda zaten elenir
+    hourFrom: $('fHourFrom').value,
+    hourTo: $('fHourTo').value,
     page: state.page,
     pageSize: state.pageSize
   };
@@ -123,7 +175,7 @@ function renderArchive({ records, pagination, summary }) {
           ${r.custom_type ? '<span class="pill custom" title="Tek seferlik sigara — ana listede yok, stok kartı olmadığı için stoktan düşülmedi">LİSTE DIŞI</span>' : ''}
         </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
-        <td data-label="Garson">${esc(r.waiter_name)}</td>
+        <td data-label="Garson">${waiterCellHTML(r)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
         <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
         <td data-label="İşlem">
@@ -239,16 +291,38 @@ async function iptalEt(kayit) {
 }
 
 function bindEvents() {
+  const ALANLAR = ['fType', 'fUser', 'fFrom', 'fTo', 'fFromTime', 'fToTime', 'fHourFrom', 'fHourTo'];
+
   $('fPlayer').addEventListener('input', debounce(refilter, 350));
   // Garson filtresi kendi onSelect'i ile tetiklenir
-  ['fType', 'fUser', 'fFrom', 'fTo', 'fFromTime', 'fToTime'].forEach((id) =>
-    $(id).addEventListener('change', refilter));
+  ALANLAR.forEach((id) => $(id).addEventListener('change', () => {
+    updateFilterHint();
+    refilter();
+  }));
 
   $('clearFilters').addEventListener('click', () => {
-    ['fPlayer', 'fType', 'fUser', 'fFrom', 'fTo', 'fFromTime', 'fToTime'].forEach((id) => ($(id).value = ''));
+    ['fPlayer', ...ALANLAR].forEach((id) => ($(id).value = ''));
     waiterAC.reset();
+    updateFilterHint();
     refilter();
   });
+
+  /*
+   * Excel'e aktar — ekrandaki filtrelerin AYNISIYLA, sayfalama olmadan.
+   * Sunucu dosyayi Content-Disposition ile gonderdigi icin adres degistirmek
+   * yeterli: sayfa yerinde kalir, tarayici indirmeyi baslatir.
+   * (Gun sonu raporundaki "Excel'e Aktar" ile ayni yontem.)
+   */
+  $('csvBtn').addEventListener('click', () => {
+    const { page, pageSize, ...suzgec } = currentFilters();   // dokum sayfalanmaz
+    const qs = new URLSearchParams(
+      Object.entries(suzgec).filter(([, v]) => v !== '' && v != null)
+    );
+    window.location.href = `/api/records/export.csv?${qs}`;
+    toast('Excel dosyası hazırlanıyor — indirilenler klasörüne düşecek.', 'info');
+  });
+
+  updateFilterHint();   // acilistaki metin
 
   // Sayfa degisince listenin basina don (telefonda onemli)
   const go = (delta) => {

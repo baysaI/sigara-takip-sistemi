@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.1.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.2.0" />
 </head>
 <body>
 
@@ -61,15 +61,27 @@
               <input type="time" id="fToTime" aria-label="Bitiş saati" />
             </div>
           </div>
+          <!-- Tarihten BAĞIMSIZ saat süzgeci: "hangi gün olursa olsun
+               22:00–04:00 arası". Yukarıdaki tarih+saat aralığı tek bir
+               sürekli aralık kurar; bu ise her güne ayrı ayrı uygulanır. -->
+          <div class="field field-wide">
+            <label for="fHourFrom">Saat aralığı <span class="muted">(her gün)</span></label>
+            <div class="row-tight">
+              <select id="fHourFrom" aria-label="Başlangıç saati (her gün)"></select>
+              <span class="muted" aria-hidden="true">–</span>
+              <select id="fHourTo" aria-label="Bitiş saati (her gün)"></select>
+            </div>
+          </div>
+
           <div class="filter-actions">
             <button class="btn-ghost btn-sm" id="clearFilters">Filtreleri Temizle</button>
+            <!-- Ekrandaki filtrelerin aynısıyla tüm eşleşen kayıtları indirir.
+                 Yalnızca okur; hiçbir kaydı silmez veya değiştirmez. -->
+            <button class="btn-ghost btn-sm" id="csvBtn">Excel'e Aktar</button>
           </div>
         </div>
 
-        <p class="muted mt">
-          Saat boş bırakılırsa gün başından gün sonuna alınır. Vardiya gece
-          yarısını aşıyorsa saat girin — ör. <b>dün 22:00</b> → <b>bugün 04:00</b>.
-        </p>
+        <p class="muted mt" id="filterHint"></p>
       </div>
     </section>
 
@@ -101,11 +113,11 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.1.0"></script>
-  <script src="/js/layout.js?v=1.1.0"></script>
-  <script src="/js/autocomplete.js?v=1.1.0"></script>
-  <script src="/js/danger.js?v=1.1.0"></script>
-  <script src="/js/degisim.js?v=1.1.0"></script>
-  <script src="/js/arsiv.js?v=1.1.0"></script>
+  <script src="/js/api.js?v=1.2.0"></script>
+  <script src="/js/layout.js?v=1.2.0"></script>
+  <script src="/js/autocomplete.js?v=1.2.0"></script>
+  <script src="/js/danger.js?v=1.2.0"></script>
+  <script src="/js/degisim.js?v=1.2.0"></script>
+  <script src="/js/arsiv.js?v=1.2.0"></script>
 </body>
 </html>

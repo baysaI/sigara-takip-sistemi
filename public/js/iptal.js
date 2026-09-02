@@ -96,7 +96,7 @@ async function loadCancellations() {
         <td data-label="Satış Tarihi" class="mono muted">${formatDateTime(r.created_at)}</td>
         <td data-label="Neden" class="info-cell">${r.cancel_reason ? esc(r.cancel_reason) : '—'}</td>
         <td data-label="İptal Eden"><b>${esc(r.cancelled_by)}</b></td>
-        <td data-label="Garson" class="muted">${esc(r.waiter_name)}</td>
+        <td data-label="Garson" class="muted">${waiterCellHTML(r)}</td>
         <td data-label="İşlem">
           ${r.canUndo
             ? `<button class="btn-ghost btn-sm" data-undo="${r.id}">Geri Al</button>`

@@ -35,13 +35,15 @@ const recordByIdStmt = db.prepare('SELECT * FROM records WHERE id = ?');
 
 const insertExchangedRecordStmt = db.prepare(`
   INSERT INTO records
-    (player_id, cigarette_type, cigarette_type_id, quantity, waiter_id, waiter_name,
+    (player_id, cigarette_type, cigarette_type_id, quantity,
+     waiter_id, waiter_name, custom_waiter,
      user_id, username, info, created_at,
      flag_level, flag_note, approved_by, approval_note,
      early_release, early_remaining_ms, early_approved_by, early_note,
      exchanged_from, exchanged_at, exchanged_by)
   VALUES
-    (@player_id, @cigarette_type, @cigarette_type_id, @quantity, @waiter_id, @waiter_name,
+    (@player_id, @cigarette_type, @cigarette_type_id, @quantity,
+     @waiter_id, @waiter_name, @custom_waiter,
      @user_id, @username, @info, @created_at,
      @flag_level, @flag_note, @approved_by, @approval_note,
      @early_release, @early_remaining_ms, @early_approved_by, @early_note,
@@ -143,6 +145,9 @@ const exchangeRecord = db.transaction(({ recordId, toTypeId, note = null, user }
     quantity: kayit.quantity,
     waiter_id: kayit.waiter_id,
     waiter_name: kayit.waiter_name,
+    // Tek seferlik garson bayragi da tasinir: degisim garsonu degistirmez,
+    // yeni kayit "liste disi garson" rozetini kaybetmemeli.
+    custom_waiter: kayit.custom_waiter,
     // Sigaraci alani orijinal kaydi acan kisidir; degisimi yapan
     // exchanged_by'da tutulur ki islem dokumu carpitilmasin.
     user_id: kayit.user_id,

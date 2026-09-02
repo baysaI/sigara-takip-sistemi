@@ -105,7 +105,7 @@ function render(status, records) {
                  ${r.superseded_by ? '<span class="pill locked" title="Bu kayıt değiştirildi">DEĞİŞTİRİLDİ</span>' : ''}
                </td>
                <td data-label="Adet">${r.quantity}</td>
-               <td data-label="Garson">${esc(r.waiter_name)}</td>
+               <td data-label="Garson">${waiterCellHTML(r)}</td>
                <td data-label="Sigaracı">${esc(r.username)}</td>
                <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
              </tr>`).join('')}

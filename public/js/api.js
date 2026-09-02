@@ -259,6 +259,22 @@ function recordDetailHTML(r) {
   return satirlar.length ? satirlar.join('<br />') : '<span class="muted">—</span>';
 }
 
+/**
+ * Garson hücresi: ad + gerekiyorsa "tek seferlik" rozeti.
+ *
+ * Tek seferlik garson kalıcı listeye eklenmediği için arşive bakan kişi
+ * adı listede arayıp bulamaz. Rozet bunu açıkça söyler — tek seferlik
+ * sigaradaki (custom_type) "LİSTE DIŞI" rozetiyle aynı dil.
+ *
+ * @param {object} r  records satırı
+ * @returns {string} HTML — kaçışlama içeride yapılır
+ */
+function waiterCellHTML(r) {
+  return esc(r.waiter_name) + (r.custom_waiter
+    ? ' <span class="pill custom" title="Tek seferlik garson — kayıtlı garson listesinde yok">LİSTE DIŞI</span>'
+    : '');
+}
+
 /** XSS koruması: kullanıcı verisi innerHTML'e girerken kaçışlanır. */
 function esc(value) {
   if (value == null) return '';

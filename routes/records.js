@@ -33,14 +33,17 @@ router.use(requireAuth);
 const AKTIF = 'superseded_by IS NULL AND (cancelled_at IS NULL OR cancel_late = 1)';
 
 const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
+const waiterByNameStmt = db.prepare('SELECT id, name FROM waiters WHERE name = ?');
 
 const insertRecordStmt = db.prepare(`
   INSERT INTO records
-    (player_id, cigarette_type, cigarette_type_id, custom_type, quantity, waiter_id, waiter_name,
+    (player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
+     waiter_id, waiter_name, custom_waiter,
      user_id, username, info, created_at, flag_level, flag_note, approved_by, approval_note,
      early_release, early_remaining_ms, early_approved_by, early_note)
   VALUES
-    (@player_id, @cigarette_type, @cigarette_type_id, @custom_type, @quantity, @waiter_id, @waiter_name,
+    (@player_id, @cigarette_type, @cigarette_type_id, @custom_type, @quantity,
+     @waiter_id, @waiter_name, @custom_waiter,
      @user_id, @username, @info, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
      @early_release, @early_remaining_ms, @early_approved_by, @early_note)
 `);
@@ -71,6 +74,16 @@ router.post('/', asyncHandler((req, res) => {
   const waiterId = Number.parseInt(req.body.waiter_id, 10);
   const info = String(req.body.info || '').trim() || null;
 
+  /* --- Garson: listeden mi, TEK SEFERLIK mi? ---
+     "Yeni Garson Ekle" ile yazilan ad waiters tablosuna eklenmez; kayda
+     yalnizca ad olarak islenir (waiter_id = NULL). Ayni adda kayitli bir
+     garson zaten varsa tek seferlik sayilmaz: normal yola dusulur ki ayni
+     kisi arsivde iki farkli sekilde gorunmesin. */
+  const ozelGarsonAdi = String(req.body.waiter_name || '').trim();
+  const ozelGarsonIstendi = req.body.custom_waiter === true;
+  const kayitliGarson = ozelGarsonIstendi ? waiterByNameStmt.get(ozelGarsonAdi) : null;
+  const ozelGarson = ozelGarsonIstendi && !kayitliGarson;
+
   // --- Zorunlu alan dogrulamalari ---
   const errors = [];
   if (!playerId) errors.push('Oyuncu ID zorunludur.');
@@ -79,14 +92,23 @@ router.post('/', asyncHandler((req, res) => {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
     errors.push('Adet 1-100 arasinda bir tam sayi olmalidir.');
   }
-  if (!Number.isInteger(waiterId)) errors.push('Alan garson secilmelidir.');
+  if (ozelGarsonIstendi) {
+    if (!ozelGarsonAdi) errors.push('Garson adi zorunludur.');
+    else if (ozelGarsonAdi.length > 60) errors.push('Garson adi en fazla 60 karakter olabilir.');
+  } else if (!Number.isInteger(waiterId)) {
+    errors.push('Alan garson secilmelidir.');
+  }
   if (info && info.length > 255) errors.push('Info alani en fazla 255 karakter olabilir.');
 
   if (errors.length) {
     return res.status(400).json({ ok: false, error: errors.join(' ') });
   }
 
-  const waiter = waiterByIdStmt.get(waiterId);
+  // Tek seferlik garsonun kartina bakilmaz; digerinde secim dogrulanir.
+  const waiter = ozelGarson
+    ? { id: null, name: ozelGarsonAdi }
+    : (kayitliGarson || waiterByIdStmt.get(waiterId));
+
   if (!waiter) {
     return res.status(400).json({ ok: false, error: 'Secilen garson bulunamadi.' });
   }
@@ -192,8 +214,10 @@ router.post('/', asyncHandler((req, res) => {
       cigarette_type_id: ozelTur ? null : type.id,
       custom_type: ozelTur ? 1 : 0,
       quantity,
+      // Tek seferlik garsonda kart yok: id bostur, ad kullanicinin yazdigi gibi saklanir.
       waiter_id: waiter.id,
       waiter_name: waiter.name,
+      custom_waiter: ozelGarson ? 1 : 0,
       user_id: req.session.user.id,
       username: req.session.user.username,   // islemi yapan sigaraci otomatik kaydedilir
       info,
@@ -232,6 +256,10 @@ router.post('/', asyncHandler((req, res) => {
     record: recordByIdStmt.get(recordId),
     status: getCooldownStatus(playerId),   // yeni geri sayim durumu
     customType: ozelTur,
+    customWaiter: ozelGarson,
+    // Yazilan ad kayitli bir garsona denk geldiyse tek seferlik sayilmadi;
+    // arayuz bunu kullaniciya soyleyebilsin.
+    waiterMatched: ozelGarsonIstendi && !!kayitliGarson ? kayitliGarson.name : null,
     stock: hareket
       ? {
           name: type.name,
@@ -244,9 +272,120 @@ router.post('/', asyncHandler((req, res) => {
   });
 }));
 
+/**
+ * Arsiv suzgecini kurar — LISTE ve CSV DOKUMU ayni yerden beslenir.
+ *
+ * Ayri ayri yazilsalardi zamanla ayrisirlardi: ekranda gordugu 40 kaydi
+ * disari aktaran kisi 60 satirlik bir dosya alirdi. Tek kaynak olmasinin
+ * sebebi bu.
+ *
+ * @param {object} query  req.query
+ * @returns {{whereSql:string, params:object, applied:object}}
+ *          applied — dokum basligina yazilacak "hangi filtreler acikti"
+ */
+function buildArchiveFilter(query) {
+  const where = [];
+  const params = {};
+  const applied = {};
+
+  if (query.includeCancelled !== '1') where.push('cancelled_at IS NULL');
+  else applied.includeCancelled = true;
+
+  if (query.playerId) {
+    where.push('player_id LIKE @playerId');
+    params.playerId = `%${normalizePlayerId(query.playerId)}%`;
+    applied.playerId = normalizePlayerId(query.playerId);
+  }
+  if (query.waiter) {
+    where.push('waiter_name = @waiter');
+    params.waiter = String(query.waiter).trim();
+    applied.waiter = params.waiter;
+  }
+  if (query.type) {
+    where.push('cigarette_type = @type');
+    params.type = String(query.type).trim();
+    applied.type = params.type;
+  }
+  if (query.user) {
+    where.push('username = @user');
+    params.user = String(query.user).trim();
+    applied.user = params.user;
+  }
+  if (query.from) {
+    where.push('created_at >= @from');
+    params.from = String(query.from);
+    applied.from = params.from;
+  }
+  if (query.to) {
+    where.push('created_at <= @to');
+    params.to = String(query.to);
+    applied.to = params.to;
+  }
+
+  /* --- SAAT ARALIGI — takvim gununden BAGIMSIZ ---
+   *
+   * from/to bir surekli aralik verir: "1 Eylul 22:00'dan 2 Eylul 04:00'a".
+   * Aranan sey cogu zaman bu degil: "hangi gun olursa olsun gece 22-04
+   * arasi ne verilmis". Bunu tarih filtresiyle kurmak mumkun degil, bu
+   * yuzden kaydin YEREL saati (0-23) ayrica suzulur. Ikisi birlikte de
+   * kullanilabilir: "son bir ayin her gecesi 22-04 arasi".
+   *
+   * 'localtime' cevirici sunucunun saat dilimini kullanir; is gunu
+   * etiketleri de ayni eksende uretildigi icin tutarlidir
+   * (bkz. services/businessDay.js).
+   *
+   * Iki uc de DAHILDIR ve saatin tamamini kapsar: 14 -> 14 secimi
+   * 14:00-14:59 arasidir ("belirli bir saat"). hourFrom > hourTo ise
+   * aralik gece yarisini asar ve OR'a doner: 22 -> 04 = saat>=22 VEYA saat<=4.
+   *
+   * Not: sutun uzerinde fonksiyon oldugu icin bu kosul created_at
+   * indeksini kullanamaz. Tarih filtresi zaten araligi daralttigindan
+   * pratikte sorun degil.
+   */
+  const saatAyikla = (v) => {
+    const n = Number.parseInt(v, 10);
+    return Number.isInteger(n) && n >= 0 && n <= 23 ? n : null;
+  };
+  let hourFrom = saatAyikla(query.hourFrom);
+  let hourTo = saatAyikla(query.hourTo);
+
+  // Tek uc verilmisse tek bir saat aranmis demektir.
+  if (hourFrom === null && hourTo !== null) hourFrom = hourTo;
+  if (hourTo === null && hourFrom !== null) hourTo = hourFrom;
+
+  if (hourFrom !== null) {
+    const saat = "CAST(strftime('%H', created_at, 'localtime') AS INTEGER)";
+    where.push(hourFrom <= hourTo
+      ? `${saat} BETWEEN @hourFrom AND @hourTo`
+      : `(${saat} >= @hourFrom OR ${saat} <= @hourTo)`);
+    params.hourFrom = hourFrom;
+    params.hourTo = hourTo;
+    applied.hourFrom = hourFrom;
+    applied.hourTo = hourTo;
+  }
+
+  return {
+    whereSql: where.length ? `WHERE ${where.join(' AND ')}` : '',
+    params,
+    applied
+  };
+}
+
+/** Arsiv satirlarinin sutun listesi — liste ve dokum ayni alanlari okur. */
+const ARCHIVE_COLUMNS = `
+  id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
+  waiter_name, custom_waiter,
+  username, info, created_at,
+  flag_level, flag_note, approved_by, approval_note,
+  early_release, early_remaining_ms, early_approved_by, early_note,
+  superseded_by, exchanged_from, exchanged_at, exchanged_by,
+  cancelled_at, cancelled_by, cancel_reason, cancel_late
+`;
+
 /* ------------------------------------------------------------------ */
 /* GET /api/records - filtreli arsiv                                   */
-/* Parametreler: playerId, waiter, type, user, from, to, page, pageSize */
+/* Parametreler: playerId, waiter, type, user, from, to,               */
+/*               hourFrom, hourTo, page, pageSize                      */
 /* from/to: ISO tarih-saat (frontend yerel tarihi ISO'ya cevirir)       */
 /*                                                                     */
 /* Iptal edilen satislar bu listede GORUNMEZ: aktif kayitlardan cikip  */
@@ -254,37 +393,7 @@ router.post('/', asyncHandler((req, res) => {
 /* ?includeCancelled=1 ile yine de dahil edilebilir.                   */
 /* ------------------------------------------------------------------ */
 router.get('/', asyncHandler((req, res) => {
-  const where = [];
-  const params = {};
-
-  if (req.query.includeCancelled !== '1') where.push('cancelled_at IS NULL');
-
-  if (req.query.playerId) {
-    where.push('player_id LIKE @playerId');
-    params.playerId = `%${normalizePlayerId(req.query.playerId)}%`;
-  }
-  if (req.query.waiter) {
-    where.push('waiter_name = @waiter');
-    params.waiter = String(req.query.waiter).trim();
-  }
-  if (req.query.type) {
-    where.push('cigarette_type = @type');
-    params.type = String(req.query.type).trim();
-  }
-  if (req.query.user) {
-    where.push('username = @user');
-    params.user = String(req.query.user).trim();
-  }
-  if (req.query.from) {
-    where.push('created_at >= @from');
-    params.from = String(req.query.from);
-  }
-  if (req.query.to) {
-    where.push('created_at <= @to');
-    params.to = String(req.query.to);
-  }
-
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const { whereSql, params } = buildArchiveFilter(req.query);
 
   const pageSize = Math.min(
     MAX_PAGE_SIZE,
@@ -307,12 +416,7 @@ router.get('/', asyncHandler((req, res) => {
   `).get(params);
 
   const rows = db.prepare(`
-    SELECT id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity, waiter_name,
-           username, info, created_at,
-           flag_level, flag_note, approved_by, approval_note,
-           early_release, early_remaining_ms, early_approved_by, early_note,
-           superseded_by, exchanged_from, exchanged_at, exchanged_by,
-           cancelled_at, cancelled_by, cancel_reason, cancel_late
+    SELECT ${ARCHIVE_COLUMNS}
     FROM records
     ${whereSql}
     ORDER BY created_at DESC, id DESC
@@ -335,6 +439,124 @@ router.get('/', asyncHandler((req, res) => {
     },
     serverTime: new Date().toISOString()
   });
+}));
+
+/* ------------------------------------------------------------------ */
+/* GET /api/records/export.csv - arsiv dokumu (Excel)                  */
+/*                                                                     */
+/* Ekrandaki filtrelerin AYNISINI alir ve eslesen TUM kayitlari verir  */
+/* (sayfalama yok). Kayitlari SILMEZ; yalnizca okur.                   */
+/*                                                                     */
+/* Gun sonu raporundaki mutabakat dokumuyle ayni bicim: noktali virgul */
+/* ayrac, BOM'lu UTF-8 — Turkce Excel dosyayi cift tiklayinca dogru    */
+/* acsin (bkz. routes/reports.js reconciliation.csv).                  */
+/* ------------------------------------------------------------------ */
+
+/** Tek satirin durumu — arsivdeki rozetlerin metin karsiligi. */
+function durumMetni(r) {
+  if (r.cancelled_at) return r.cancel_late ? 'İptal (geç)' : 'İptal';
+  if (r.superseded_by) return 'Değiştirildi';
+  if (r.exchanged_from) return 'Değişimle verildi';
+  return 'Normal';
+}
+
+/** Tek seferlik girisler tek sutunda toplanir. */
+function listeDisiMetni(r) {
+  const p = [];
+  if (r.custom_type) p.push('Sigara');
+  if (r.custom_waiter) p.push('Garson');
+  return p.join(' + ');
+}
+
+router.get('/export.csv', asyncHandler((req, res) => {
+  const { whereSql, params, applied } = buildArchiveFilter(req.query);
+
+  /* Cok buyuk arsivlerde tarayiciyi ve belleği bogmamak icin ust sinir.
+     Asilirsa dosyanin sonuna acik bir not dusulur — sessizce kirpilmis
+     bir dokum, eksik oldugu bilinmeyen bir dokumdur. */
+  const SINIR = 50000;
+
+  const rows = db.prepare(`
+    SELECT ${ARCHIVE_COLUMNS}
+    FROM records
+    ${whereSql}
+    ORDER BY created_at DESC, id DESC
+    LIMIT @limit
+  `).all({ ...params, limit: SINIR + 1 });
+
+  const kirpildi = rows.length > SINIR;
+  if (kirpildi) rows.length = SINIR;
+
+  const toplamPaket = rows.reduce(
+    (t, r) => t + ((r.superseded_by || (r.cancelled_at && !r.cancel_late)) ? 0 : r.quantity), 0);
+
+  /* --- Bicimleyiciler (reconciliation.csv ile ayni kurallar) --- */
+  const alan = (v) => {
+    const s = String(v ?? '');
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const iki = (n) => String(n).padStart(2, '0');
+  const tarih = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : `${iki(d.getDate())}.${iki(d.getMonth() + 1)}.${d.getFullYear()}`;
+  };
+  const saat = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : `${iki(d.getHours())}:${iki(d.getMinutes())}:${iki(d.getSeconds())}`;
+  };
+
+  /* --- Basliktaki "hangi filtreler acikti" satiri --- */
+  const suzgecler = [];
+  if (applied.playerId) suzgecler.push(`Oyuncu: ${applied.playerId}`);
+  if (applied.waiter) suzgecler.push(`Garson: ${applied.waiter}`);
+  if (applied.type) suzgecler.push(`Tür: ${applied.type}`);
+  if (applied.user) suzgecler.push(`Sigaracı: ${applied.user}`);
+  if (applied.from) suzgecler.push(`Başlangıç: ${tarih(applied.from)} ${saat(applied.from)}`);
+  if (applied.to) suzgecler.push(`Bitiş: ${tarih(applied.to)} ${saat(applied.to)}`);
+  if (applied.hourFrom != null) {
+    suzgecler.push(`Saat aralığı (her gün): ${iki(applied.hourFrom)}:00-${iki(applied.hourTo)}:59`);
+  }
+  if (applied.includeCancelled) suzgecler.push('İptal edilenler dahil');
+
+  const simdi = new Date();
+
+  const satirlar = [
+    ['ARŞİV DÖKÜMÜ'],
+    [`Alındığı an: ${tarih(simdi.toISOString())} ${saat(simdi.toISOString())}`],
+    [`Filtre: ${suzgecler.length ? suzgecler.join(' | ') : 'yok (tüm arşiv)'}`],
+    [`Toplam: ${rows.length} kayıt, ${toplamPaket} paket`],
+    [],
+    ['NO', 'TARİH', 'SAAT', 'OYUNCU ID', 'SİGARA TÜRÜ', 'ADET', 'GARSON', 'SİGARACI',
+     'DURUM', 'LİSTE DIŞI', 'ERKEN ALIM ONAYI', 'UYARI ONAYI', 'INFO'],
+    ...rows.map((r, i) => [
+      i + 1,
+      tarih(r.created_at),
+      saat(r.created_at),
+      r.player_id,
+      r.cigarette_type,
+      r.quantity,
+      r.waiter_name,
+      r.username,
+      durumMetni(r),
+      listeDisiMetni(r),
+      r.early_release ? (r.early_approved_by || 'onaylandı') : '',
+      r.flag_level ? `${r.flag_level}${r.approved_by ? ` — ${r.approved_by}` : ''}` : '',
+      r.info || ''
+    ])
+  ];
+
+  if (kirpildi) {
+    satirlar.push([], [`! Döküm ${SINIR} satırda kesildi. Daha dar bir tarih aralığı seçin.`]);
+  }
+
+  const csv = satirlar.map((s) => s.map(alan).join(';')).join('\r\n');
+
+  const damga = `${simdi.getFullYear()}${iki(simdi.getMonth() + 1)}${iki(simdi.getDate())}` +
+                `-${iki(simdi.getHours())}${iki(simdi.getMinutes())}`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="sigara-arsiv-${damga}.csv"`);
+  res.send('﻿' + csv);   // BOM: Excel Turkce karakterleri dogru acsin
 }));
 
 /* ------------------------------------------------------------------ */

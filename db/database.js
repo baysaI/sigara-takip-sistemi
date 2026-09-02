@@ -359,6 +359,22 @@ addColumn('users', 'is_root', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('records', 'custom_type', 'INTEGER NOT NULL DEFAULT 0');
 db.exec('CREATE INDEX IF NOT EXISTS idx_records_custom ON records (custom_type)');
 
+/*
+ * Tek seferlik ("liste disi") GARSON — "Yeni Garson Ekle".
+ *
+ * O gun ekstra calisan, kadroda olmayan biri sigarayi alirken kullanilir.
+ * Ad waiters tablosuna EKLENMEZ: kalici garson listesi bir kerelik
+ * isimlerle sismez, dropdown temiz kalir. Bu yuzden
+ *   waiter_id = NULL  ve  waiter_name = elle yazilan ad.
+ *
+ * waiter_name zaten "snapshot" oldugu icin (garson silinse bile arsiv
+ * bozulmaz) kayit tarafinda baska bir sey degismez: arsivde, sorguda ve
+ * gun sonu raporunun garson dokumunde normal sekilde gorunur. Bayrak
+ * yalnizca "bu ad listeden secilmedi" bilgisini tasir — tek seferlik
+ * sigarada (custom_type) oldugu gibi.
+ */
+addColumn('records', 'custom_waiter', 'INTEGER NOT NULL DEFAULT 0');
+
 // Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_records_superseded ON records (superseded_by);

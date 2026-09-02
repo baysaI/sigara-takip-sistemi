@@ -1,7 +1,10 @@
 /* ============================================================
    Otomatik tamamlama — uzun listeler icin (ornek: garson secimi)
    Kullanici adi yazar, eslesenler altta listelenir, biri secilir.
-   Serbest metin kabul edilmez: secim mutlaka listeden yapilir.
+
+   Serbest metin VARSAYILAN OLARAK kabul edilmez: secim listeden yapilir.
+   `custom` secenegi verilirse listede olmayan bir ad da "tek seferlik"
+   deger olarak secilebilir (bkz. Hizli Kayit > Yeni Garson Ekle).
    ============================================================ */
 'use strict';
 
@@ -14,9 +17,13 @@
  * @param {(item|null)=>void} [opts.onSelect]
  * @param {number} [opts.maxResults=50]
  * @param {boolean} [opts.allowEmpty=false]  Bos birakilabilir mi (filtre alanlari icin)
+ * @param {{label:(text:string)=>string, hint?:string}} [opts.custom]
+ *        Verilirse listede eslesmeyen ad "tek seferlik" secilebilir.
+ *        Secildiginde item {id:null, name, custom:true} seklinde doner ve
+ *        gizli alan BOS birakilir — kalici bir kaydin id'si yoktur.
  */
 function createAutocomplete(opts) {
-  const { input, hidden, list, onSelect, maxResults = 50, allowEmpty = false } = opts;
+  const { input, hidden, list, onSelect, maxResults = 50, allowEmpty = false, custom = null } = opts;
   let items = opts.items || [];
   let matches = [];
   let activeIndex = -1;
@@ -52,8 +59,26 @@ function createAutocomplete(opts) {
     return esc(name.slice(0, i)) + '<b>' + esc(name.slice(i, i + q.length)) + '</b>' + esc(name.slice(i + q.length));
   }
 
+  /**
+   * Yazilan ad listede yoksa uretilen "tek seferlik" secenek.
+   * Listede birebir karsiligi varsa uretilmez: kalici kaydi secmek dogrudur.
+   */
+  function customCandidate(query) {
+    if (!custom) return null;
+    const text = String(query ?? '').trim();
+    if (!text) return null;
+    if (items.some((it) => norm(it.name) === norm(text))) return null;
+    return { id: null, name: text, custom: true };
+  }
+
   function render(query) {
     matches = filter(query);
+
+    // Tek seferlik secenek listenin SONUNA eklenir ve varsayilan olarak
+    // secili gelmez: kayitli bir garson varken elin oraya gitmesin.
+    const aday = customCandidate(query);
+    if (aday) matches = [...matches, aday];
+
     activeIndex = matches.length ? 0 : -1;
 
     if (!matches.length) {
@@ -62,10 +87,16 @@ function createAutocomplete(opts) {
       const gizlenen = items.length > maxResults && !norm(query)
         ? `<li class="ac-empty" role="presentation">${items.length} kayıttan ilk ${maxResults} tanesi — yazarak daraltın</li>`
         : '';
+      const ipucu = aday && custom.hint
+        ? `<li class="ac-empty" role="presentation">${esc(custom.hint)}</li>`
+        : '';
+
       list.innerHTML = matches.map((it, i) => `
         <li role="option" id="ac-opt-${i}" data-i="${i}"
-            class="ac-item${i === activeIndex ? ' active' : ''}"
-            aria-selected="${i === activeIndex}">${highlight(it.name, query)}</li>`).join('') + gizlenen;
+            class="ac-item${it.custom ? ' ac-custom' : ''}${i === activeIndex ? ' active' : ''}"
+            aria-selected="${i === activeIndex}">${
+              it.custom ? esc(custom.label(it.name)) : highlight(it.name, query)
+            }</li>`).join('') + ipucu + gizlenen;
     }
     open();
   }
@@ -102,9 +133,12 @@ function createAutocomplete(opts) {
   /* --------------------------- Secim --------------------------- */
   function select(item) {
     selected = item;
-    hidden.value = item ? item.id : '';
+    // Tek seferlik secimin kalici bir kaydi yoktur: gizli alan BOS kalir,
+    // yoksa "null" metni id sanilip forma sizardi.
+    hidden.value = item && !item.custom ? item.id : '';
     input.value = item ? item.name : '';
     input.classList.toggle('ac-ok', !!item);
+    input.classList.toggle('ac-custom-on', !!(item && item.custom));
     input.classList.remove('ac-invalid');
     close();
     if (onSelect) onSelect(item);
@@ -113,7 +147,7 @@ function createAutocomplete(opts) {
   function clearSelection({ silent = false } = {}) {
     selected = null;
     hidden.value = '';
-    input.classList.remove('ac-ok');
+    input.classList.remove('ac-ok', 'ac-custom-on');
     if (!silent && onSelect) onSelect(null);
   }
 
@@ -121,6 +155,11 @@ function createAutocomplete(opts) {
    * Alandan cikilinca: yazilan metin tam olarak bir kayda esitse onu sec,
    * degilse secimi temizle ve alani isaretle. Boylece elle yazilan
    * gecersiz bir isim forma sizamaz.
+   *
+   * `custom` acikken "gecersiz" diye bir sey yoktur: eslesmeyen ad tek
+   * seferlik deger olur. Bu durumda "tek esleme kaldiysa onu sec"
+   * kisayolu UYGULANMAZ — yazilan adi sessizce baska bir garsona
+   * cevirmek, kalici listeye girmeyen bir adi yanlis kisiye yazmak olurdu.
    */
   function commit() {
     const text = input.value.trim();
@@ -134,6 +173,8 @@ function createAutocomplete(opts) {
 
     const tam = items.find((it) => norm(it.name) === norm(text));
     if (tam) return select(tam);
+
+    if (custom) return select({ id: null, name: text, custom: true });
 
     // Tek bir esleme kaldiysa onu sec (yazim kolayligi)
     const kalan = filter(text);
@@ -184,7 +225,9 @@ function createAutocomplete(opts) {
     /** Liste sonradan degistiginde (ornek: yeni garson eklendi) */
     setItems(next) {
       items = next || [];
-      if (selected && !items.some((i) => String(i.id) === String(selected.id))) {
+      // Tek seferlik secim listeye bagli degildir; liste tazelenince silinmez.
+      if (selected && !selected.custom &&
+          !items.some((i) => String(i.id) === String(selected.id))) {
         input.value = '';
         clearSelection();
       }

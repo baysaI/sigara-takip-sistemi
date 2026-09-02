@@ -48,15 +48,31 @@ function showDayInfo() {
 }
 
 /* ---------------------- Referans listeler ---------------------- */
+
+/**
+ * TEK SEFERLIK ("liste disi") GARSON — "Yeni Garson Ekle".
+ *
+ * O gun ekstra calisan, kadroda olmayan biri icin. Yazilan ad garson
+ * listesine EKLENMEZ; yalnizca o kayda islenir. Tek seferlik sigarada
+ * (custom_type) oldugu gibi: kalici tanim listesi bir kerelik girdilerle
+ * sismesin.
+ *
+ * Garson listesi BOSKEN de kullanilabilir olmali — bu yuzden
+ * waitersReady kontrolu tek seferlik secime bagli olarak gevsetilir.
+ */
+const ozelGarsonSecili = () => !!waiterAC?.selected?.custom;
+
 async function loadWaiters() {
   const { waiters } = await API.get('/api/waiters');
   waitersReady = waiters.length > 0;
 
-  if (!waitersReady) return showNoWaiters();
-
   $('waiterSearch').disabled = false;
-  $('waiterSearch').placeholder = 'Garson adı yazın...';
-  $('noWaiters')?.remove();
+  $('waiterSearch').placeholder = waitersReady
+    ? 'Garson adı yazın...'
+    : 'Garson adı yazın (liste boş — tek seferlik girilebilir)';
+
+  if (waitersReady) $('noWaiters')?.remove();
+  else showNoWaiters();
 
   if (waiterAC) return waiterAC.setItems(waiters);
 
@@ -64,36 +80,42 @@ async function loadWaiters() {
     input: $('waiterSearch'),
     hidden: $('waiterId'),
     list: $('waiterList'),
-    items: waiters
+    items: waiters,
+    // Listede olmayan ad yazilinca en altta cikan secenek
+    custom: {
+      label: (ad) => `➕ "${ad}" — tek seferlik garson`,
+      hint: 'Bu ad garson listesine eklenmez.'
+    },
+    onSelect: () => {
+      $('customWaiterNote').classList.toggle('hidden', !ozelGarsonSecili());
+      applySubmit();
+    }
   });
 }
 
-/** Hic garson tanimli degilken kullaniciya ne yapacagini soyle. */
+/**
+ * Hic garson tanimli degilken kullaniciya ne yapacagini soyle.
+ *
+ * Alan ARTIK KILITLENMEZ: liste bos olsa da tek seferlik ad girilerek
+ * kayit acilabilir. Uyari yine gosterilir — kalici ekibin Yonetim'den
+ * tanimlanmasi dogru olandir, tek seferlik giris gecici cozumdur.
+ */
 function showNoWaiters() {
-  const input = $('waiterSearch');
-  input.disabled = true;
-  input.placeholder = 'Önce garson eklenmeli';
-  input.value = '';
-  $('waiterId').value = '';
-
   if ($('noWaiters')) return;
 
   const uyari = document.createElement('div');
   uyari.id = 'noWaiters';
   uyari.className = 'cooldown-box show blocked';
-  uyari.innerHTML = App.user.role === 'admin'
-    ? `<div class="cooldown-head">⚠️ Sistemde kayıtlı garson yok</div>
-       <div class="cooldown-meta" style="margin-top:5px">
-         Kayıt açabilmek için önce garson eklemelisiniz.<br />
-         <a href="/yonetim.html" style="color:var(--accent);font-weight:600">
-           Yönetim sayfasından ekle →</a>
-       </div>`
-    : `<div class="cooldown-head">⚠️ Sistemde kayıtlı garson yok</div>
-       <div class="cooldown-meta" style="margin-top:5px">
-         Kayıt açabilmek için yöneticinizin garson eklemesi gerekiyor.
-       </div>`;
+  uyari.innerHTML = `
+    <div class="cooldown-head">⚠️ Sistemde kayıtlı garson yok</div>
+    <div class="cooldown-meta" style="margin-top:5px">
+      Adı yazıp <b>tek seferlik garson</b> olarak kaydedebilirsiniz.<br />
+      Kalıcı ekip için ${App.user.role === 'admin'
+        ? `<a href="/yonetim.html" style="color:var(--accent);font-weight:600">Yönetim sayfasından ekleyin →</a>`
+        : 'yöneticinizin garson tanımlaması gerekir.'}
+    </div>`;
 
-  input.closest('.field').appendChild(uyari);
+  $('waiterSearch').closest('.field').appendChild(uyari);
 }
 
 /**
@@ -208,7 +230,7 @@ async function loadRecent() {
           ${r.custom_type ? '<span class="pill custom" title="Tek seferlik sigara — ana listede yok, stoktan düşülmedi">LİSTE DIŞI</span>' : ''}
         </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
-        <td data-label="Garson">${esc(r.waiter_name)}</td>
+        <td data-label="Garson">${waiterCellHTML(r)}</td>
         <td data-label="Sigaracı">${esc(r.username)}</td>
         <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
         <td data-label="İşlem">
@@ -413,15 +435,16 @@ function setSubmit(enabled, hint) {
 }
 
 function applySubmit() {
-  // Tek seferlik sigarada listenin dolu olmasi gerekmez: girilen tur
-  // zaten listede olmayan bir sigaradir.
+  // Tek seferlik sigara/garsonda listenin dolu olmasi gerekmez: girilen ad
+  // zaten listede olmayan bir kayittir.
   const turHazir = typesReady || ozelTurSecili();
-  const hazir = waitersReady && turHazir;
+  const garsonHazir = waitersReady || ozelGarsonSecili();
+  const hazir = garsonHazir && turHazir;
 
   $('submitBtn').disabled = !(cd.submitEnabled && hazir);
 
   const eksik = [
-    !waitersReady ? 'garson' : null,
+    !garsonHazir ? 'garson' : null,
     !turHazir ? 'sigara türü' : null
   ].filter(Boolean).join(' ve ');
 
@@ -465,6 +488,10 @@ async function submitRecord(e) {
   const ozel = ozelTurSecili();
   const turAdi = ozel ? $('customTypeName').value.trim() : $('cigaretteType').value;
 
+  /* Tek seferlik garson: listeden secilmedigi icin id yok, ad gonderilir.
+     Sunucu ayni adda kayitli bir garson bulursa onu kullanir. */
+  const ozelGarson = ozelGarsonSecili();
+
   const payload = {
     player_id: $('playerId').value.trim(),
     cigarette_type: turAdi,
@@ -473,13 +500,17 @@ async function submitRecord(e) {
     info: $('info').value.trim()
   };
   if (ozel) payload.custom_type = true;
+  if (ozelGarson) {
+    payload.custom_waiter = true;
+    payload.waiter_name = waiterAC.selected.name;
+  }
 
   if (ozel && !turAdi) {
     $('customTypeName').focus();
     return toast('Sigara adını yazın.', 'error');
   }
 
-  if (!payload.waiter_id) {
+  if (!ozelGarson && !payload.waiter_id) {
     // Alana isim yazilmis ama listeden secilmemis olabilir
     $('waiterSearch').classList.add('ac-invalid');
     $('waiterSearch').focus();
@@ -558,6 +589,19 @@ async function submitRecord(e) {
         'info', 6500
       );
     }
+    if (res.customWaiter) {
+      toast(
+        `➕ Garson "${res.record.waiter_name}" tek seferlik kaydedildi — garson listesine eklenmedi.`,
+        'info', 6500
+      );
+    }
+    // Yazilan ad zaten kayitli bir garsona denk geldi: tek seferlik sayilmadi
+    if (res.waiterMatched) {
+      toast(
+        `"${res.waiterMatched}" zaten kayıtlı bir garson — tek seferlik değil, listedeki kayda işlendi.`,
+        'info', 6500
+      );
+    }
 
     // Garson secimi vardiya boyunca ayni kaldigi icin korunur
     $('cigaretteType').value = '';
@@ -583,8 +627,9 @@ async function submitRecord(e) {
   } finally {
     btn.textContent = 'Kaydı Oluştur';
     // Sure dolmamis olsa bile dugme acik kalir; basildiginda erken alim
-    // onay ekrani cikar. Yalnizca garson/tur eksikse kilitli birakilir.
-    btn.disabled = !(waitersReady && typesReady);
+    // onay ekrani cikar. Yalnizca garson/tur eksikse kilitli birakilir —
+    // karar applySubmit'te toplandigi icin tek seferlik secimler de sayilir.
+    applySubmit();
   }
 }
 

@@ -507,6 +507,24 @@ input.ac-invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(229, 
   font-size: 12.5px; text-align: center;
 }
 
+/* Tek seferlik ("liste disi") secenek: kalici kayitlardan gorsel olarak
+   ayrilir ki kazayla secilmesin. Ustunde ince bir ayrac var. */
+.ac-item.ac-custom {
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+}
+/* Tek seferlik ad secildiginde alan yesil onay yerine turuncu durur:
+   "kaydedilecek ama listeye eklenmeyecek" ayrimi gorunur olsun. */
+input.ac-custom-on {
+  border-color: var(--accent);
+  background-image: none;
+  padding-right: 12px;
+}
+
 /* Telefonda liste daha kisa: klavye acikken ekrani kaplamasin */
 @media (max-width: 640px) { .ac-list { max-height: 210px; } }
 
@@ -743,6 +761,7 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 .row-tight { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .row-tight input[type="date"] { flex: 1 1 128px; min-width: 128px; }
 .row-tight input[type="time"] { flex: 0 1 100px; min-width: 92px; }
+.row-tight select { flex: 1 1 88px; min-width: 80px; }
 
 /* Filtre izgarasi 150px'lik sutunlar kuruyor; tarih+saat ikilisi tek
    sutuna sigmaz, iki sutun kaplar. */
@@ -782,6 +801,9 @@ td.mono { font-family: ui-monospace, Consolas, monospace; color: var(--text-dim)
 .filters .field { margin-bottom: 0; min-width: 0; }
 .filter-actions { display: flex; gap: 9px; align-items: flex-end; }
 .filter-actions button { flex: 1; }
+/* Iki dugme (Temizle + Excel) tek hucreye sigmaz; genis ekranda iki sutun alir */
+.filters .filter-actions { grid-column: span 2; }
+@media (max-width: 479px) { .filters .filter-actions { grid-column: span 1; } }
 /* Rapor sayfasindaki hizli tarih dugmeleri: dar ekranda 2x2, genis ekranda tek satir */
 .quick-range { flex-wrap: wrap; grid-column: 1 / -1; }
 .quick-range button { flex: 1 1 calc(50% - 5px); }
