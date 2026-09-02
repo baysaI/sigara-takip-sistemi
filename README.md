@@ -477,10 +477,23 @@ değil, **yazarak seçim** alanıdır. İkisi de uzayabilen listeler ve ikisinin
 - Türkçe karakterlere duyarlıdır — `ILK` yazınca `Ilker`, `istanbul` ile
   `İSTANBUL BLUE` eşleşir.
 - Ok tuşları + Enter, ya da dokunma/tıklama ile seçilir.
-- Tam ad yazılıp alandan çıkılırsa otomatik seçilir.
 - Listede olmayan bir ad yazılırsa **en altta ayrı bir çizginin altında**
   `➕ "..." — tek seferlik` seçeneği çıkar. Bu seçenek asla varsayılan değildir:
   gerçek bir eşleşme varsa Enter onu seçer, tek seferliğe bilerek inmek gerekir.
+
+**Açılır listeden tıklamak zorunda değilsiniz.** Adı yazıp doğrudan *Kaydı
+Oluştur*'a basmak yeterlidir — telefonda liste düğmenin önünü kapattığı için
+en doğal davranış budur. Gönderim anında yazılan metin şöyle çözülür:
+
+| Yazılan | Sonuç |
+|---|---|
+| Listedeki bir adın **tamamı** (büyük/küçük harf farkı önemsiz) | Listedeki kayıt seçilir — tek seferlik **sayılmaz** |
+| Listede **hiç eşleşmeyen** bir ad | Tek seferlik olarak kaydedilir |
+| **Yarım** bir ad (`Ah` → `Ahmet Yilmaz`'a benziyor) | Reddedilir, alan kırmızıya döner |
+
+Son satır bilinçlidir: yarım yazımı sessizce `Ahmet Yilmaz`'a çevirmek
+kullanıcı yerine karar vermek, sessizce tek seferlik `Ah` oluşturmak ise bir
+yazım hatasını kalıcı listeye girmeyen bir kayda dönüştürmek olurdu.
 
 İki alanın açılış sırası farklıdır: **garsonlar alfabetik**, **sigaralar
 popülerliğe göre** gelir (bkz. yukarıdaki bölüm).

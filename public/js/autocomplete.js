@@ -172,14 +172,25 @@ function createAutocomplete(opts) {
   }
 
   /**
-   * Alandan cikilinca: yazilan metin tam olarak bir kayda esitse onu sec,
-   * degilse secimi temizle ve alani isaretle. Boylece elle yazilan
-   * gecersiz bir isim forma sizamaz.
+   * Yazilani secime cevirir. Alandan cikinca (blur) ve form gonderilirken
+   * cagrilir: kullanici adi yazip dogrudan Kaydet'e basabilmeli, acilir
+   * listeden tiklamak ZORUNDA kalmamali.
    *
-   * `custom` acikken "gecersiz" diye bir sey yoktur: eslesmeyen ad tek
-   * seferlik deger olur. Bu durumda "tek esleme kaldiysa onu sec"
-   * kisayolu UYGULANMAZ — yazilan adi sessizce baska bir garsona
-   * cevirmek, kalici listeye girmeyen bir adi yanlis kisiye yazmak olurdu.
+   * `custom` KAPALIYKEN: tam esleme varsa secilir, tek esleme kaldiysa o
+   * secilir (yazim kolayligi), yoksa alan gecersiz isaretlenir. Boylece
+   * elle yazilan gecersiz bir ad forma sizamaz.
+   *
+   * `custom` ACIKKEN:
+   *   · tam esleme varsa kalici kayit secilir (tek seferlik sayilmaz),
+   *   · listede HIC eslesme yoksa yazilan ad tek seferlik deger olur —
+   *     "Ekstra Mehmet" yazip kaydete basmak yeterlidir,
+   *   · KISMI esleme varsa karar kullaniciya birakilir ve alan gecersiz
+   *     isaretlenir. "Ahm" yazilmisken sessizce tek seferlik "Ahm"
+   *     olusturmak, bir yazim hatasini kalici listeye girmeyen bir kayda
+   *     donusturur; "Ahmet Yilmaz"i secmek de kullanicinin yerine karar
+   *     vermek olurdu.
+   *
+   * @returns {object|null} secim (yoksa null)
    */
   function commit() {
     const text = input.value.trim();
@@ -187,21 +198,28 @@ function createAutocomplete(opts) {
     if (!text) {
       input.classList.remove('ac-invalid');
       clearSelection();
-      return;
+      return null;
     }
-    if (selected && selected.name === text) return;
+    if (selected && selected.name === text) return selected;
 
     const tam = items.find((it) => norm(it.name) === norm(text));
-    if (tam) return select(tam);
+    if (tam) { select(tam); return selected; }
 
-    if (custom) return select({ id: null, name: text, custom: true });
+    const kalan = filter(text);
+
+    if (custom) {
+      if (!kalan.length) { select({ id: null, name: text, custom: true }); return selected; }
+      clearSelection();
+      input.classList.add('ac-invalid');
+      return null;
+    }
 
     // Tek bir esleme kaldiysa onu sec (yazim kolayligi)
-    const kalan = filter(text);
-    if (kalan.length === 1) return select(kalan[0]);
+    if (kalan.length === 1) { select(kalan[0]); return selected; }
 
     clearSelection();
     input.classList.add('ac-invalid');
+    return null;
   }
 
   /* -------------------------- Olaylar -------------------------- */
@@ -254,6 +272,13 @@ function createAutocomplete(opts) {
     },
     get value() { return hidden.value; },
     get selected() { return selected; },
+    /**
+     * Yazilani secime cevirir ve secimi dondurur.
+     * Form GONDERILIRKEN cagrilmalidir: blur'daki otomatik commit 120 ms
+     * gecikmeli oldugu icin gonderim ona yetisir ve "listeden secin"
+     * hatasi, kullanici adi dogru yazmisken bile cikardi.
+     */
+    commit,
     selectById(id) {
       const it = items.find((i) => String(i.id) === String(id));
       if (it) select(it);

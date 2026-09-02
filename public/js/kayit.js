@@ -471,6 +471,18 @@ function renderFlagBanner() {
 async function submitRecord(e) {
   e.preventDefault();
 
+  /*
+   * Once yazilanlari secime cevir.
+   *
+   * Kullanici adi yazip acilir listeden tiklamadan dogrudan Kaydet'e
+   * basabiliyor — telefonda liste dugmenin onunu kapattigi icin en dogal
+   * davranis bu. Bilesenin blur'daki otomatik commit'i 120 ms gecikmeli
+   * oldugundan gonderim ona yetisiyor ve ad dogru yazilmisken bile
+   * "listeden secin" hatasi cikiyordu.
+   */
+  typeAC?.commit();
+  waiterAC?.commit();
+
   /* Sunucuya her iki durumda da tur ADI gonderilir; custom_type bayragi
      "bu ad listede yok, stoktan dusme" der. Sunucu ayni adda AKTIF bir tur
      bulursa bayragi yok sayip normal yola duser (stok takibi atlanmasin). */
@@ -494,18 +506,27 @@ async function submitRecord(e) {
     payload.waiter_name = waiterAC.selected.name;
   }
 
+  /* Buraya dusmek icin alanda KISMEN eslesen bir metin olmali: commit()
+     tam eslemeyi de, hic eslesmeyen adi da (tek seferlik) coktan secmis
+     olurdu. Yani kullanici "MARL" gibi yarim bir sey yazmis — hangisini
+     kastettigine kendisi karar vermeli. */
   if (!turAdi) {
-    // Alana yazilmis ama listeden/tek seferlikten secilmemis olabilir
     $('typeSearch').classList.add('ac-invalid');
     $('typeSearch').focus();
-    return toast('Sigara türünü seçin.', 'error');
+    return toast(
+      'Sigara türünü listeden seçin — listede yoksa "tek seferlik sigara" seçeneğini kullanın.',
+      'error', 5500
+    );
   }
 
+  // Tur alanindaki ile ayni durum: yarim yazilmis, kismen eslesen bir ad.
   if (!ozelGarson && !payload.waiter_id) {
-    // Alana isim yazilmis ama listeden secilmemis olabilir
     $('waiterSearch').classList.add('ac-invalid');
     $('waiterSearch').focus();
-    return toast('Alan garson listeden seçilmelidir.', 'error');
+    return toast(
+      'Garsonu listeden seçin — listede yoksa "tek seferlik garson" seçeneğini kullanın.',
+      'error', 5500
+    );
   }
   if (!payload.player_id || !payload.cigarette_type || !payload.quantity) {
     return toast('Oyuncu ID, sigara türü ve adet zorunludur.', 'error');
