@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.2.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.3.0" />
 </head>
 <body>
 
@@ -49,23 +49,24 @@
             </div>
 
             <div class="field">
-              <label for="cigaretteType">Sigara Türü <span class="req">*</span></label>
-              <select id="cigaretteType" name="cigarette_type" required>
-                <option value="">— Seçiniz —</option>
-              </select>
+              <label for="typeSearch">Sigara Türü <span class="req">*</span></label>
+              <!-- Alan Garson ile aynı bileşen: adı yazılır, eşleşenler açılır,
+                   biri seçilir. Alana tıklayınca liste POPÜLERLİK sırasıyla gelir.
 
-              <!-- "➕ Yeni Sigara Ekle" seçilince açılır. Buraya yazılan tür
-                   ana listeye EKLENMEZ; tek seferlik alınan sigaralar içindir. -->
-              <div class="field mt hidden" id="customTypeBox">
-                <label for="customTypeName">Sigara adı <span class="req">*</span></label>
-                <input type="text" id="customTypeName" maxlength="60" autocomplete="off"
-                       placeholder="ör. MARLBORO TOUCH" />
-                <p class="muted mt">
-                  Tek seferlik kayıt: bu sigara <b>ana listeye eklenmez</b> ve
-                  <b>stoktan düşülmez</b> (stok kartı yok). Arşivde ve gün sonu
-                  raporunda normal şekilde görünür.
-                </p>
+                   Listede olmayan bir ad yazılırsa altta "➕ ... tek seferlik
+                   sigara" seçeneği çıkar. Bu tür ana listeye EKLENMEZ ve
+                   stoktan düşülmez (stok kartı yok). -->
+              <div class="ac">
+                <input type="text" id="typeSearch" maxlength="60"
+                       placeholder="Sigara adı yazın..." enterkeyhint="done" />
+                <input type="hidden" id="cigaretteTypeId" />
+                <ul class="ac-list" id="typeList"></ul>
               </div>
+              <p class="muted mt hidden" id="customTypeNote">
+                Tek seferlik kayıt: bu sigara <b>ana listeye eklenmez</b> ve
+                <b>stoktan düşülmez</b> (stok kartı yok). Arşivde ve gün sonu
+                raporunda normal şekilde görünür.
+              </p>
             </div>
 
             <div class="row">
@@ -134,11 +135,11 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.2.0"></script>
-  <script src="/js/layout.js?v=1.2.0"></script>
-  <script src="/js/autocomplete.js?v=1.2.0"></script>
-  <script src="/js/approval.js?v=1.2.0"></script>
-  <script src="/js/degisim.js?v=1.2.0"></script>
-  <script src="/js/kayit.js?v=1.2.0"></script>
+  <script src="/js/api.js?v=1.3.0"></script>
+  <script src="/js/layout.js?v=1.3.0"></script>
+  <script src="/js/autocomplete.js?v=1.3.0"></script>
+  <script src="/js/approval.js?v=1.3.0"></script>
+  <script src="/js/degisim.js?v=1.3.0"></script>
+  <script src="/js/kayit.js?v=1.3.0"></script>
 </body>
 </html>

@@ -1,10 +1,13 @@
 /* ============================================================
-   Otomatik tamamlama — uzun listeler icin (ornek: garson secimi)
+   Otomatik tamamlama — uzun listeler icin.
    Kullanici adi yazar, eslesenler altta listelenir, biri secilir.
+
+   Hizli Kayit'ta HEM garson HEM sigara turu bu bilesenle secilir: ikisi de
+   uzayabilen listeler ve ikisinin de "tek seferlik" kacis yolu var.
 
    Serbest metin VARSAYILAN OLARAK kabul edilmez: secim listeden yapilir.
    `custom` secenegi verilirse listede olmayan bir ad da "tek seferlik"
-   deger olarak secilebilir (bkz. Hizli Kayit > Yeni Garson Ekle).
+   deger olarak secilebilir (bkz. Yeni Garson Ekle / Yeni Sigara Ekle).
    ============================================================ */
 'use strict';
 
@@ -14,16 +17,26 @@
  * @param {HTMLInputElement} opts.hidden   Secilen kaydin id'sini tutan gizli alan
  * @param {HTMLElement}      opts.list     Sonuclarin basilacagi <ul>
  * @param {Array<{id:number|string,name:string}>} opts.items
+ *        SIRA KORUNUR: bos aramada items hangi sirada verildiyse o sirada
+ *        listelenir. Sigara turleri populerlige gore gelir, bu yuzden
+ *        alani acar acmaz en cok verilenler ustte durur.
  * @param {(item|null)=>void} [opts.onSelect]
  * @param {number} [opts.maxResults=50]
  * @param {boolean} [opts.allowEmpty=false]  Bos birakilabilir mi (filtre alanlari icin)
+ * @param {string} [opts.emptyText='Eşleşen kayıt yok']  Hic eslesme yokken yazilacak
+ * @param {(item)=>string} [opts.meta]
+ *        Satirin sagina eklenecek kisa bilgi (ornek: '🔥 POPÜLER').
+ *        DUZ METIN dondurur; kacislama bilesende yapilir.
  * @param {{label:(text:string)=>string, hint?:string}} [opts.custom]
  *        Verilirse listede eslesmeyen ad "tek seferlik" secilebilir.
  *        Secildiginde item {id:null, name, custom:true} seklinde doner ve
  *        gizli alan BOS birakilir — kalici bir kaydin id'si yoktur.
  */
 function createAutocomplete(opts) {
-  const { input, hidden, list, onSelect, maxResults = 50, allowEmpty = false, custom = null } = opts;
+  const {
+    input, hidden, list, onSelect, maxResults = 50, allowEmpty = false,
+    custom = null, meta = null, emptyText = 'Eşleşen kayıt yok'
+  } = opts;
   let items = opts.items || [];
   let matches = [];
   let activeIndex = -1;
@@ -82,7 +95,7 @@ function createAutocomplete(opts) {
     activeIndex = matches.length ? 0 : -1;
 
     if (!matches.length) {
-      list.innerHTML = `<li class="ac-empty" role="presentation">Eşleşen garson yok</li>`;
+      list.innerHTML = `<li class="ac-empty" role="presentation">${esc(emptyText)}</li>`;
     } else {
       const gizlenen = items.length > maxResults && !norm(query)
         ? `<li class="ac-empty" role="presentation">${items.length} kayıttan ilk ${maxResults} tanesi — yazarak daraltın</li>`
@@ -91,12 +104,19 @@ function createAutocomplete(opts) {
         ? `<li class="ac-empty" role="presentation">${esc(custom.hint)}</li>`
         : '';
 
-      list.innerHTML = matches.map((it, i) => `
+      list.innerHTML = matches.map((it, i) => {
+        // Ek bilgi yalnizca kalici kayitlarda anlamli: tek seferlik
+        // girisin populerligi olmaz.
+        const ek = (!it.custom && meta) ? String(meta(it) || '') : '';
+        return `
         <li role="option" id="ac-opt-${i}" data-i="${i}"
             class="ac-item${it.custom ? ' ac-custom' : ''}${i === activeIndex ? ' active' : ''}"
-            aria-selected="${i === activeIndex}">${
-              it.custom ? esc(custom.label(it.name)) : highlight(it.name, query)
-            }</li>`).join('') + ipucu + gizlenen;
+            aria-selected="${i === activeIndex}">
+          <span class="ac-name">${
+            it.custom ? esc(custom.label(it.name)) : highlight(it.name, query)
+          }</span>${ek ? `<span class="ac-meta">${esc(ek)}</span>` : ''}
+        </li>`;
+      }).join('') + ipucu + gizlenen;
     }
     open();
   }

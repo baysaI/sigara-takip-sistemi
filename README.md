@@ -286,19 +286,17 @@ MARLBORO RED BOX;30
 ## Sigara listesi sıralaması
 
 Hızlı Kayıt'taki sigara listesi **alfabetik değil, popülerliğe göre** sıralanır:
-son **30 günde** en çok dağıtılan sigaralar en üstte olur. İlk 10 tanesi
-`🔥 POPÜLER` ibaresiyle işaretlenir, kalanlar altta **Diğer sigaralar** grubunda
-alfabetik durur.
+alana tıkladığınızda son **30 günde** en çok dağıtılan sigaralar en üstte gelir.
+İlk 10 tanesi `🔥 POPÜLER` rozetiyle işaretlenir. Yazmaya başlayınca liste
+eşleşme sırasına geçer.
 
 ```
-— Seçiniz —
-BENSON GOLD          🔥 POPÜLER
-MARLBORO RED         🔥 POPÜLER
-...
-── Diğer sigaralar ──
+MARLBORO RED                    🔥 POPÜLER
+BENSON GOLD                     🔥 POPÜLER
+CAMEL YELLOW
 Cafe Creme Blue
-Craven-A
-➕ Yeni Sigara Ekle
+──────────────────────────────────────────
+➕ "MARLBORO TOUCH" — tek seferlik sigara
 ```
 
 - Ölçüt sabit "tüm zamanlar" değil **kayan 30 günlük pencere**: bırakılan bir
@@ -307,21 +305,20 @@ Craven-A
   satış yoksa rozet boşuna dağıtılmaz.
 - İptal edilmiş ve sigara değişimiyle geçersizleşmiş kayıtlar sayılmaz.
 - Sıralama yalnızca **seçim** listesinde uygulanır. Arşiv ve İptaller
-  sayfalarındaki **filtreler alfabetik kalır** — orada bilinen bir adı ararsınız,
-  popülerlik işe yaramaz. API'de ayrım `?sort=popular` ile yapılır.
+  sayfalarındaki **filtreler alfabetik açılır menü kalır** — orada bilinen bir
+  adı ararsınız, popülerlik işe yaramaz. API'de ayrım `?sort=popular` ile yapılır.
 
 Pencere ve rozet sayısı `routes/lookups.js` içindeki `POPULER_GUN` ve
 `POPULER_ADET` sabitleridir.
 
 ## Yeni Sigara Ekle (tek seferlik)
 
-Sigara türü listesinin en altında **➕ Yeni Sigara Ekle** seçeneği vardır.
-Markette alınan, listede olmayan bir sigarayı kaydetmek içindir — sürekli
-kullanılacak ürünler için değil (onlar Yönetim → Sigara Türleri'nden eklenir).
+Sigara adını yazın; listede yoksa açılır listenin altında **➕ "MARLBORO TOUCH"
+— tek seferlik sigara** seçeneği çıkar. Markette alınan, listede olmayan bir
+sigarayı kaydetmek içindir — sürekli kullanılacak ürünler için değil
+(onlar Yönetim → Sigara Türleri'nden eklenir).
 
-Seçilince ad alanı açılır, ad elle yazılır ve kayıt normal şekilde oluşur.
-
-- Tür **ana listeye eklenmez**; bir dahaki sefere açılır menüde çıkmaz.
+- Tür **ana listeye eklenmez**; bir dahaki sefere listede çıkmaz.
 - **Stoktan düşülmez** ve stok hareketi yazılmaz — o sigaranın stok kartı yok,
   hiç stoklanmamıştır.
 - Kayıt arşivde, geçmişte ve gün sonu raporunun marka dökümünde **normal
@@ -467,23 +464,33 @@ sigara/
 Oturumsuz erişim `/login.html` adresine yönlendirilir; `/yonetim.html` sigaracı
 hesaplarında hem gezinme çubuğunda gizlenir hem de doğrudan açılamaz.
 
-## Garson seçimi
+## Yazarak seçim — Sigara Türü ve Alan Garson
 
-Kadro kalabalık olabileceği için "Alan Garson" alanı açılır liste değil,
-**yazarak seçim** alanıdır:
+Hızlı Kayıt'taki **her iki liste de** (sigara türü ve alan garson) açılır menü
+değil, **yazarak seçim** alanıdır. İkisi de uzayabilen listeler ve ikisinin de
+"tek seferlik" kaçış yolu var; aynı bileşeni paylaşırlar
+([public/js/autocomplete.js](public/js/autocomplete.js)).
 
-- Alana tıklayınca tüm garsonlar listelenir; yazdıkça daralır.
-- Önce **adı o harflerle başlayanlar**, sonra içinde geçenler sıralanır;
+- Alana tıklayınca liste açılır; yazdıkça daralır.
+- Önce **o harflerle başlayanlar**, sonra içinde geçenler sıralanır;
   eşleşen harfler vurgulanır.
-- Türkçe karakterlere duyarlıdır — `ILK` yazınca `Ilker`, `ıspanak` ile `Ispanak` eşleşir.
+- Türkçe karakterlere duyarlıdır — `ILK` yazınca `Ilker`, `istanbul` ile
+  `İSTANBUL BLUE` eşleşir.
 - Ok tuşları + Enter, ya da dokunma/tıklama ile seçilir.
-- Tam ad yazılıp alandan çıkılırsa otomatik seçilir — `zeynep` yazıp geçmek `Zeynep`'i seçer.
-- Seçilen garson kayıttan sonra korunur; aynı vardiyada arka arkaya kayıt hızlanır.
-- Listede olmayan bir ad yazılırsa altta **➕ Yeni Garson Ekle** seçeneği çıkar
-  (aşağıya bakın).
+- Tam ad yazılıp alandan çıkılırsa otomatik seçilir.
+- Listede olmayan bir ad yazılırsa **en altta ayrı bir çizginin altında**
+  `➕ "..." — tek seferlik` seçeneği çıkar. Bu seçenek asla varsayılan değildir:
+  gerçek bir eşleşme varsa Enter onu seçer, tek seferliğe bilerek inmek gerekir.
 
-Aynı alan Arşiv sayfasındaki garson filtresinde de kullanılır — orada serbest
-metin kabul edilmez, seçim listeden yapılır.
+İki alanın açılış sırası farklıdır: **garsonlar alfabetik**, **sigaralar
+popülerliğe göre** gelir (bkz. yukarıdaki bölüm).
+
+Kayıttan sonra **garson seçimi korunur** — aynı vardiyada arka arkaya kayıt
+hızlansın diye. **Sigara türü temizlenir**, çünkü her misafirde değişir.
+
+Garson alanı Arşiv sayfasındaki garson filtresinde de kullanılır — orada
+serbest metin kabul edilmez, seçim listeden yapılır. Arşivdeki sigara türü
+filtresi ise açılır menü olarak kalır.
 
 ### Yeni Garson Ekle (tek seferlik)
 

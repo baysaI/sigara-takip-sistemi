@@ -119,72 +119,60 @@ function showNoWaiters() {
 }
 
 /**
- * "Yeni Sigara Ekle" secenegi icin ayrac deger.
- * Bir sigara adiyla cakismasin diye alt cizgili: tur adlari serbest metin.
+ * SIGARA TURU — Alan Garson ile AYNI bilesen.
+ *
+ * Eskiden acilir liste (<select>) idi ve tek seferlik tur icin ayri bir
+ * metin kutusu aciliyordu. Liste uzadikca acilir menude aranan marka
+ * bulunmaz oldu; garson alaninda coktan cozulmus olan sey burada da
+ * gerekiyordu. Artik ikisi de yazarak secim alani:
+ *   · adi yazdikca liste daralir, Turkce karakterlere duyarli
+ *   · listede olmayan ad, en altta "tek seferlik" secenegi olarak cikar
+ *
+ * Secilen turun id'si gizli alanda tutulur ama sunucuya AD gonderilir
+ * (POST /api/records `cigarette_type` bekler); id yalnizca secimin
+ * listeden mi geldigini bilmek icin.
  */
-const YENI_TUR = '__yeni_sigara__';
+let typeAC = null;
 
 /** Su an tek seferlik (liste disi) sigara mi giriliyor? */
-const ozelTurSecili = () => $('cigaretteType').value === YENI_TUR;
+const ozelTurSecili = () => !!typeAC?.selected?.custom;
 
 /**
- * Sigara listesi POPULERLIGE gore siralanir (alfabetik degil): vardiyada
- * en cok verilen sigaralar ustte, elin oraya gitsin. Sunucu son 30 gunun
- * satisina bakar ve ilk 10'a popular bayragi dusurur.
+ * Sigara listesi POPULERLIGE gore gelir (alfabetik degil): vardiyada en cok
+ * verilenler ustte, elin oraya gitsin. Sunucu son 30 gunun satisina bakar ve
+ * ilk 10'a popular bayragi dusurur.
  *
- * Kalanlar "Diğer sigaralar" grubunda alfabetik durur — bilinen bir adi
- * ararken listenin geri kalani duzenli kalsin.
+ * Bilesen items sirasini KORUDUGU icin alani acar acmaz bu sira gorunur;
+ * yazmaya baslayinca eslesme sirasina gecer.
  */
 async function loadTypes() {
   const { types } = await API.get('/api/cigarette-types', { sort: 'popular' });
   typesReady = types.length > 0;
 
-  const sel = $('cigaretteType');
-  const onceki = sel.value;
+  $('typeSearch').placeholder = typesReady
+    ? 'Sigara adı yazın...'
+    : 'Sigara adı yazın (liste boş — tek seferlik girilebilir)';
 
-  const secenek = (t) =>
-    `<option value="${esc(t.name)}">${esc(t.name)}${t.popular ? ' 🔥 POPÜLER' : ''}</option>`;
+  if (typeAC) return typeAC.setItems(types);
 
-  const populer = types.filter((t) => t.popular);
-  const digerleri = types.filter((t) => !t.popular);
-
-  let govde;
-  if (!typesReady) {
-    govde = '<option value="">— Listede sigara yok —</option>';
-  } else if (!populer.length) {
-    // Henuz satis yoksa rozet dagitmanin anlami yok; duz liste
-    govde = '<option value="">— Seçiniz —</option>' + types.map(secenek).join('');
-  } else {
-    govde = '<option value="">— Seçiniz —</option>' +
-      populer.map(secenek).join('') +
-      (digerleri.length
-        ? `<optgroup label="Diğer sigaralar">${digerleri.map(secenek).join('')}</optgroup>`
-        : '');
-  }
-
-  // "Yeni Sigara Ekle" listeden BAGIMSIZDIR: liste bos olsa da secilebilir,
-  // cunku tek seferlik sigaranin listede karsiligi zaten yoktur.
-  sel.disabled = false;
-  sel.innerHTML = govde + `<option value="${YENI_TUR}">➕ Yeni Sigara Ekle</option>`;
-
-  // Liste tazelendiginde secim korunur (kayit sonrasi loadTypes cagriliyor)
-  if (onceki && [...sel.options].some((o) => o.value === onceki)) sel.value = onceki;
-  toggleCustomType();
-}
-
-/** Ad alanini yalnizca "Yeni Sigara Ekle" secildiginde goster. */
-function toggleCustomType() {
-  const kutu = $('customTypeBox');
-  if (!kutu) return;
-
-  const acik = ozelTurSecili();
-  kutu.classList.toggle('hidden', !acik);
-  if (acik) $('customTypeName').focus();
-  else $('customTypeName').value = '';
-
-  // On kosullar degisti (liste bosken bile tek seferlik kayit acilabilir):
-  // dugmeyi son duruma gore yeniden degerlendir.
-  applySubmit();
+  typeAC = createAutocomplete({
+    input: $('typeSearch'),
+    hidden: $('cigaretteTypeId'),
+    list: $('typeList'),
+    items: types,
+    emptyText: 'Eşleşen sigara yok',
+    // Rozet yalnizca gercekten satisi olanlarda; sunucu bunu zaten hesaplar
+    meta: (t) => (t.popular ? '🔥 POPÜLER' : ''),
+    // Listede olmayan ad yazilinca en altta cikan secenek
+    custom: {
+      label: (ad) => `➕ "${ad}" — tek seferlik sigara`,
+      hint: 'Bu sigara listeye eklenmez, stoktan düşülmez.'
+    },
+    onSelect: () => {
+      $('customTypeNote').classList.toggle('hidden', !ozelTurSecili());
+      applySubmit();
+    }
+  });
 }
 
 async function loadStats() {
@@ -483,10 +471,11 @@ function renderFlagBanner() {
 async function submitRecord(e) {
   e.preventDefault();
 
-  /* Tek seferlik sigara: tur adi listeden degil, elle yazilan alandan gelir
-     ve custom_type bayragiyla gonderilir. Sunucu bu kaydi stoktan dusmez. */
+  /* Sunucuya her iki durumda da tur ADI gonderilir; custom_type bayragi
+     "bu ad listede yok, stoktan dusme" der. Sunucu ayni adda AKTIF bir tur
+     bulursa bayragi yok sayip normal yola duser (stok takibi atlanmasin). */
   const ozel = ozelTurSecili();
-  const turAdi = ozel ? $('customTypeName').value.trim() : $('cigaretteType').value;
+  const turAdi = typeAC?.selected?.name?.trim() || '';
 
   /* Tek seferlik garson: listeden secilmedigi icin id yok, ad gonderilir.
      Sunucu ayni adda kayitli bir garson bulursa onu kullanir. */
@@ -505,9 +494,11 @@ async function submitRecord(e) {
     payload.waiter_name = waiterAC.selected.name;
   }
 
-  if (ozel && !turAdi) {
-    $('customTypeName').focus();
-    return toast('Sigara adını yazın.', 'error');
+  if (!turAdi) {
+    // Alana yazilmis ama listeden/tek seferlikten secilmemis olabilir
+    $('typeSearch').classList.add('ac-invalid');
+    $('typeSearch').focus();
+    return toast('Sigara türünü seçin.', 'error');
   }
 
   if (!ozelGarson && !payload.waiter_id) {
@@ -603,9 +594,10 @@ async function submitRecord(e) {
       );
     }
 
-    // Garson secimi vardiya boyunca ayni kaldigi icin korunur
-    $('cigaretteType').value = '';
-    toggleCustomType();          // ad alanini kapat ve temizle
+    // Garson secimi vardiya boyunca ayni kaldigi icin korunur; sigara turu
+    // her misafirde degistigi icin temizlenir.
+    typeAC.reset();
+    $('customTypeNote').classList.add('hidden');
     $('quantity').value = 1;
     $('info').value = '';
 
@@ -642,9 +634,7 @@ function bindEvents() {
     checkPlayer(v);
   });
 
-  // "Yeni Sigara Ekle" secilince ad alani acilir/kapanir
-  $('cigaretteType').addEventListener('change', toggleCustomType);
-
+  // Sigara turu ve garson secimi kendi onSelect'leriyle tetiklenir
   $('recordForm').addEventListener('submit', submitRecord);
 
   // Son Kayitlar tablosu her yenilendiginde yeniden baglanmasin diye
