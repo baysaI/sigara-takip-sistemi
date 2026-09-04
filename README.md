@@ -854,15 +854,11 @@ sayfasının en üstünde yer alır:
 **KALAN**, önceki dönemden devreden stoğa GİRİŞ eklenip TÜKETİM düşülerek
 hesaplanır.
 
-> **Not — DEVİR sütunu:** Ekrandaki tabloda gösterilmez ama **Excel dökümünde
-> vardır** ve hesabın ilk terimidir (`services/reconciliation.js`). Hesaptan
-> çıkarılırsa KALAN önceki dönemden devreden stoğu yok sayar ve stok kartıyla
-> tutmaz. API yanıtı `devir` alanını döndürmeyi sürdürür.
->
-> Dökümde durmasının sebebi: hareketsiz bir dönemde satır
-> `GİRİŞ 0, TÜKETİM 0, KALAN 25` diye okunur ve rakam havadan gelmiş gibi
-> görünür. Ekranda devir, yanındaki anlık stoktan ve sürekli görüntüden
-> anlaşılır; dosyayı tek başına açan kişide o bağlam yoktur.
+> **Not — DEVİR sütunu:** Ne tabloda ne Excel dökümünde gösterilir, ancak
+> hesabın ilk terimi olarak kullanılmaya devam eder
+> (`services/reconciliation.js`). Hesaptan çıkarılırsa KALAN önceki dönemden
+> devreden stoğu yok sayar ve stok kartıyla tutmaz. API yanıtı `devir` alanını
+> döndürmeyi sürdürür.
 
 | Sütun | Nereden gelir |
 |---|---|

@@ -355,29 +355,20 @@ router.get('/reconciliation.csv', asyncHandler((req, res) => {
     ? `GUN SONU STOK MUTABAKATI - ${rapor.day} (kapandi: ${rapor.period.closedAt})`
     : `GUN SONU STOK MUTABAKATI - ${rapor.day} (ACIK DONEM - henuz kapatilmadi)`;
 
-  /*
-   * DEVIR sutunu EKRANDA gosterilmiyor ama DOKUMDE var.
-   *
-   * Denklem DEVIR + GIRIS - TUKETIM +/- DUZELTME = KALAN. Devir olmadan
-   * hareketsiz bir donemin dokumu "GIRIS 0, TUKETIM 0, KALAN 37" gibi
-   * okunuyor ve rakam havadan gelmis gibi duruyor — dosyayi Excel'de
-   * tek basina inceleyen kisi bunu hata sanabiliyor. Ekranda devir,
-   * yanindaki anlik stok ve surekli goruntuden anlasiliyor; dosyada
-   * boyle bir baglam yok, o yuzden ilk terim yaziliyor.
-   */
   const satirlar = [
     [baslik],
     [],
-    ['NO', 'SIGARA ADI', 'DEVIR', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
+    // DEVIR sutunu dokumde GOSTERILMEZ (ekranda da yok). KALAN hesabinin
+    // ilk terimi olarak kullanilmaya devam ediyor
+    // (bkz. services/reconciliation.js), yalnizca yazilmiyor.
+    ['NO', 'SIGARA ADI', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
     ...rapor.rows.map((r) => [
-      r.no, r.name, r.devir, r.giris, r.tuketim, r.duzeltme, r.kalan,
+      r.no, r.name, r.giris, r.tuketim, r.duzeltme, r.kalan,
       r.sayim ?? '', r.fark ?? '', sayi(r.unitPrice), sayi(r.tutar.toFixed(2))
     ]),
     [],
-    ['', 'TOPLAM', rapor.totals.devir, rapor.totals.giris, rapor.totals.tuketim,
-     rapor.totals.duzeltme, rapor.totals.kalan, '', '', '', sayi(rapor.totals.tutar.toFixed(2))],
-    [],
-    ['DEVIR = donem baslarken elde olan. KALAN = DEVIR + GIRIS - TUKETIM +/- DUZELTME']
+    ['', 'TOPLAM', rapor.totals.giris, rapor.totals.tuketim,
+     rapor.totals.duzeltme, rapor.totals.kalan, '', '', '', sayi(rapor.totals.tutar.toFixed(2))]
   ];
 
   const csv = satirlar.map((r) => r.map(alan).join(';')).join('\r\n');
