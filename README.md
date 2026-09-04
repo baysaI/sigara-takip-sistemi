@@ -854,10 +854,15 @@ sayfasının en üstünde yer alır:
 **KALAN**, önceki dönemden devreden stoğa GİRİŞ eklenip TÜKETİM düşülerek
 hesaplanır.
 
-> **Not — DEVİR sütunu:** Tabloda gösterilmez, ancak hesabın ilk terimi olarak
-> kullanılmaya devam eder (`services/reconciliation.js`). Hesaptan çıkarılırsa
-> KALAN önceki dönemden devreden stoğu yok sayar ve stok kartıyla tutmaz.
-> API yanıtı `devir` alanını döndürmeyi sürdürür.
+> **Not — DEVİR sütunu:** Ekrandaki tabloda gösterilmez ama **Excel dökümünde
+> vardır** ve hesabın ilk terimidir (`services/reconciliation.js`). Hesaptan
+> çıkarılırsa KALAN önceki dönemden devreden stoğu yok sayar ve stok kartıyla
+> tutmaz. API yanıtı `devir` alanını döndürmeyi sürdürür.
+>
+> Dökümde durmasının sebebi: hareketsiz bir dönemde satır
+> `GİRİŞ 0, TÜKETİM 0, KALAN 25` diye okunur ve rakam havadan gelmiş gibi
+> görünür. Ekranda devir, yanındaki anlık stoktan ve sürekli görüntüden
+> anlaşılır; dosyayı tek başına açan kişide o bağlam yoktur.
 
 | Sütun | Nereden gelir |
 |---|---|
@@ -870,7 +875,13 @@ hesaplanır.
 
 Sayım kutusuna yazdıkça fark anlık hesaplanır. **Sayımı Kaydet** ile o iş gününe
 kaydedilir (aynı gün tekrar girilirse güncellenir), rapor sonra açıldığında girilen
-değerler yerinde durur.
+değerler yerinde durur. Vardiya sırasında girilen sayım, gün kapandıktan sonra da
+kapanmış raporda durmaya devam eder.
+
+> **Dönem adresi:** Sayım kaydetmek ve Excel'e aktarmak, ekranda görüntülenen
+> dönemi **kesin kimliğiyle** (kapanış id'si; açık dönemde boş) adresler. Dönem
+> etiketi tek başına benzersiz değildir — bir dönem aynı takvim gününde açılıp
+> kapanırsa sonrakinin etiketi `#2`, `#3` soneki alır.
 
 **Excel'e Aktar** düğmesi tabloyu CSV olarak indirir — noktalı virgül ayraçlı ve BOM'lu
 olduğu için Türkçe Excel'de çift tıklamayla doğru açılır, sütunlar ayrışır.

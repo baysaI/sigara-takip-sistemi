@@ -126,9 +126,25 @@ function openPeriod() {
    */
   const bakir = !son && !ilkVeri;
 
+  /*
+   * Etiket, donem KAPANDIGINDA alacagi anahtarin AYNISIDIR: closeDay da
+   * benzersizAnahtar(acik.from) cagirir ve arada yeni kapanis olusmadigi
+   * icin ikisi ayni degeri uretir.
+   *
+   * Duz tarih kullanmak iki sorun cikariyordu — bir donem ayni takvim
+   * gununde acilip kapaninca (vardiya kapatilip ayni gun yenisi
+   * baslayinca) acik donemin etiketi kapanmis olaninkiyle AYNI oluyordu:
+   *
+   *   · daily_counts UNIQUE(business_day, type_id) yuzunden iki donemin
+   *     fiziksel sayimi ayni satiri paylasiyor, biri digerini eziyordu,
+   *   · vardiya sirasinda girilen sayim, gun '#2' anahtariyla kapaninca
+   *     oksuz kaliyor ve kapanmis raporda gorunmuyordu.
+   *
+   * Anahtari simdiden benzersizlestirmek ikisini de kokten cozer.
+   */
   return {
     closureId: null,
-    dayKey: bakir ? tarihAnahtari(simdi) : (tarihAnahtari(from) || tarihAnahtari(simdi)),
+    dayKey: bakir ? tarihAnahtari(simdi) : benzersizAnahtar(from),
     from,
     to: OPEN_END,
     open: true,
@@ -160,15 +176,31 @@ function periodById(id) {
 }
 
 /**
- * Etikete gore donem. Acik donemin muhtemel etiketi de eslesir.
+ * Etikete gore donem.
+ *
+ * DIKKAT — etiket TEK BASINA benzersiz DEGILDIR. Bir donem ayni takvim
+ * gununde acilip kapanirsa (vardiya kapatilip ayni gun yenisi baslarsa)
+ * kapanis satirinin day_key'i ile ACIK donemin etiketi ayni olur:
+ *
+ *   [ 02:00 — 06:00 kapandi ]  day_key = 2026-09-04
+ *   [ 06:00 — ... ACIK      ]  dayKey  = 2026-09-04   <-- ayni
+ *
+ * Bu durumda ACIK DONEM dondurulur. Kapanmis olani vermek, "bugunu
+ * goster" diyen cagriya muhurlu bir defteri vermek olurdu; gun sonu
+ * Excel'inin ekrandan farkli cikmasinin sebebi tam olarak buydu.
+ * Kapanmis donemler kesin olarak closure id'siyle adreslenir
+ * (?closure=<id> / periodById) — belirsizlik orada yoktur.
+ *
  * @param {string} dayKey YYYY-MM-DD veya YYYY-MM-DD#n
  */
 function periodByKey(dayKey) {
-  const row = kapanisByKeyStmt.get(String(dayKey));
-  if (row) return kapanisiDoneme(row);
+  const anahtar = String(dayKey);
 
   const acik = openPeriod();
-  return acik.dayKey === String(dayKey) ? acik : null;
+  if (acik.dayKey === anahtar) return acik;
+
+  const row = kapanisByKeyStmt.get(anahtar);
+  return row ? kapanisiDoneme(row) : null;
 }
 
 /**
@@ -214,8 +246,10 @@ function periodsBetween(fromKey, toKey) {
   const donemler = rows.map(kapanisiDoneme);
 
   // Acik donem de secilen araliga denk geliyorsa dahil edilir.
+  // Ust sinir yine '￿' ile genisletilir: acik donemin etiketi de artik
+  // '2026-09-04#2' gibi sonek alabiliyor (bkz. openPeriod).
   const acik = openPeriod();
-  if (acik.dayKey >= bas && acik.dayKey <= son) donemler.push(acik);
+  if (acik.dayKey >= bas && acik.dayKey <= `${son}￿`) donemler.push(acik);
 
   if (!donemler.length) return null;
 

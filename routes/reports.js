@@ -295,11 +295,21 @@ router.get('/reconciliation', asyncHandler((req, res) => {
 
 /* ------------------------------------------------------------------ */
 /* POST /api/reports/counts - fiziksel sayimi kaydet                   */
-/* Govde: { dayKey?: string, counts: [{type_id, counted}, ...] }        */
-/* dayKey verilmezse acik doneme yazilir.                              */
+/* Govde: { closureId?: number, dayKey?: string,                        */
+/*          counts: [{type_id, counted}, ...] }                        */
+/*                                                                     */
+/* DONEM ADRESI: closureId KESINDIR, dayKey belirsiz olabilir — ayni    */
+/* takvim gununde acilip kapanmis bir donemle acik donemin etiketi ayni */
+/* olabilir (bkz. services/businessDay.js periodByKey). Sayim bir VERI  */
+/* YAZMA islemi oldugu icin arayuz her zaman closureId gonderir;        */
+/* null/eksikse acik doneme yazilir. dayKey elle cagri icin fallback.   */
 /* ------------------------------------------------------------------ */
 router.post('/counts', asyncHandler((req, res) => {
-  const donem = req.body.dayKey ? periodByKey(String(req.body.dayKey)) : openPeriod();
+  let donem;
+  if (req.body.closureId != null) donem = periodById(req.body.closureId);
+  else if (req.body.dayKey) donem = periodByKey(String(req.body.dayKey));
+  else donem = openPeriod();
+
   if (!donem) {
     return res.status(404).json({ ok: false, error: 'Sayımın yazılacağı dönem bulunamadı.' });
   }
@@ -345,19 +355,29 @@ router.get('/reconciliation.csv', asyncHandler((req, res) => {
     ? `GUN SONU STOK MUTABAKATI - ${rapor.day} (kapandi: ${rapor.period.closedAt})`
     : `GUN SONU STOK MUTABAKATI - ${rapor.day} (ACIK DONEM - henuz kapatilmadi)`;
 
+  /*
+   * DEVIR sutunu EKRANDA gosterilmiyor ama DOKUMDE var.
+   *
+   * Denklem DEVIR + GIRIS - TUKETIM +/- DUZELTME = KALAN. Devir olmadan
+   * hareketsiz bir donemin dokumu "GIRIS 0, TUKETIM 0, KALAN 37" gibi
+   * okunuyor ve rakam havadan gelmis gibi duruyor — dosyayi Excel'de
+   * tek basina inceleyen kisi bunu hata sanabiliyor. Ekranda devir,
+   * yanindaki anlik stok ve surekli goruntuden anlasiliyor; dosyada
+   * boyle bir baglam yok, o yuzden ilk terim yaziliyor.
+   */
   const satirlar = [
     [baslik],
     [],
-    // DEVIR sutunu rapordan kaldirildi; KALAN hesabinda kullanilmaya devam
-    // ediyor (bkz. services/reconciliation.js), yalnizca gosterilmiyor.
-    ['NO', 'SIGARA ADI', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
+    ['NO', 'SIGARA ADI', 'DEVIR', 'GIRIS', 'TUKETIM', 'DUZELTME', 'KALAN', 'SAYIM', 'FARK', 'B.FIYAT', 'TUTAR'],
     ...rapor.rows.map((r) => [
-      r.no, r.name, r.giris, r.tuketim, r.duzeltme, r.kalan,
+      r.no, r.name, r.devir, r.giris, r.tuketim, r.duzeltme, r.kalan,
       r.sayim ?? '', r.fark ?? '', sayi(r.unitPrice), sayi(r.tutar.toFixed(2))
     ]),
     [],
-    ['', 'TOPLAM', rapor.totals.giris, rapor.totals.tuketim,
-     rapor.totals.duzeltme, rapor.totals.kalan, '', '', '', sayi(rapor.totals.tutar.toFixed(2))]
+    ['', 'TOPLAM', rapor.totals.devir, rapor.totals.giris, rapor.totals.tuketim,
+     rapor.totals.duzeltme, rapor.totals.kalan, '', '', '', sayi(rapor.totals.tutar.toFixed(2))],
+    [],
+    ['DEVIR = donem baslarken elde olan. KALAN = DEVIR + GIRIS - TUKETIM +/- DUZELTME']
   ];
 
   const csv = satirlar.map((r) => r.map(alan).join(';')).join('\r\n');

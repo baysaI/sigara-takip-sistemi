@@ -315,7 +315,13 @@ async function saveCounts() {
   const btn = $('saveCountBtn');
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
-    recon = await API.post('/api/reports/counts', { dayKey: recon.day, counts });
+    /* Donem KESIN adresiyle gonderilir: closureId (acik donemde null).
+       Etiketle gondermek, ayni takvim gununde kapanmis bir donem varken
+       sayimi YANLIS doneme yazabilirdi — bu bir veri yazma islemi. */
+    recon = await API.post('/api/reports/counts', {
+      closureId: recon.period?.closureId ?? null,
+      counts
+    });
     renderReconciliation();
     const farkli = recon.totals.farkli;
     toast(
@@ -553,8 +559,21 @@ function bindEvents() {
   $('saveCountBtn').addEventListener('click', saveCounts);
   $('closeDayBtn').addEventListener('click', closeDay);
 
+  /*
+   * Excel'e aktar — EKRANIN kullandigi kapsamin AYNISI gonderilir.
+   *
+   * Eskiden ?dayKey=recon.day gidiyordu. Etiket tek basina benzersiz
+   * degil: bir donem ayni takvim gununde acilip kapanirsa kapanis
+   * satirinin day_key'i ile acik donemin etiketi ayni olur ve sunucu
+   * kapanmis olani donerdi. Sonuc: ekranda bugunun rakamlari, indirilen
+   * dosyada baska bir donemin rakamlari (GIRIS/TUKETIM bos, KALAN dolu).
+   * Kapsami tek yerden uretmek bu ayrismayi kokten kaldirir.
+   */
   $('csvBtn').addEventListener('click', () => {
     if (!recon) return toast('Önce mutabakat tablosu yüklenmeli.', 'error');
-    window.location.href = `/api/reports/reconciliation.csv?dayKey=${encodeURIComponent(recon.day)}`;
+    const qs = new URLSearchParams(
+      Object.entries(currentScope()).filter(([, v]) => v !== '' && v != null)
+    );
+    window.location.href = `/api/reports/reconciliation.csv?${qs}`;
   });
 }
