@@ -331,6 +331,31 @@ normal yola düşer ve stoktan düşer. Böylece stok takibi bu kapıdan atlanam
 Ad pasif bir türle aynıysa kayıt reddedilir ve türü Yönetim'den aktifleştirmeniz
 istenir — aksi halde arşivde iki farklı şey aynı ada bağlanırdı.
 
+### Arşivdeki listesi
+
+Arşiv sayfasında, kayıt tablosunun üstünde **Tek Seferlik Sigaralar** kartı
+vardır. Bu türlerin stok kartı olmadığı için Stok panelinde ve mutabakat
+tablosunda satırları yoktur; hangi markaların bu şekilde alındığı yalnızca
+arşivi satır satır tarayarak görülebiliyordu.
+
+| Sigara | İşlem | Paket | İlk Alım | Son Alım | |
+|---|---|---|---|---|---|
+| MARLBORO TOUCH `LİSTE DIŞI` | 2 | 5 | 05.09.2026 10:00 | 05.09.2026 14:00 | *Kayıtları göster* |
+
+- **Yürürlükteki filtrelere göre** hesaplanır: tarih aralığı, saat aralığı,
+  oyuncu, garson, sigaracı — hepsi geçerlidir.
+- **Sayfalamadan bağımsızdır:** ekranda 25 kayıt görüyor olsanız da kart,
+  filtreye uyan kayıtların tamamını sayar.
+- `İşlem` tüm satırları, `Paket` yalnızca **geçerli** olanları sayar —
+  değiştirilmiş ve aynı dönemde iptal edilmiş kayıtlar pakete girmez
+  (kayıt tablosundaki özet sayılarla aynı dil).
+- **Kayıtları göster** düğmesi arşivi o markaya filtreler.
+- Hiç tek seferlik sigara yoksa kart görünmez.
+
+Tür süzgecinin açılır menüsünde de bu adlar **Tek seferlik (liste dışı)**
+başlığı altında ayrı bir grupta listelenir; kayıtlı türlerle karışmazlar.
+Excel dökümünde ise satır bazında `LİSTE DIŞI` sütunuyla işaretlidirler.
+
 ### Rapordaki etkisi
 
 Liste dışı sigaraların **stok mutabakatı tablosunda satırı olmaz** (stok kartı
@@ -453,7 +478,7 @@ sigara/
 |---|---|---|
 | `/login.html` | Giriş | herkes |
 | `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
-| `/arsiv.html` | Filtreler + tam arşiv + sayfalama + Excel dökümü | oturum |
+| `/arsiv.html` | Filtreler + tam arşiv + tek seferlik listesi + Excel dökümü | oturum |
 | `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
@@ -1009,6 +1034,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `POST` | `/api/records` | Yeni kayıt (süre dolmadıysa `409`; `early_approved` + `early_approved_by` ile erken alım) |
 | `GET` | `/api/records` | Filtreli arşiv + sayfalama |
 | `GET` | `/api/records/export.csv` | Arşiv dökümü — aynı filtreler, sayfalama yok |
+| `GET` | `/api/records/custom-types` | Tek seferlik tür adları (arşiv süzgeci için) |
 | `GET` | `/api/records/stats` | Panel özet kartları |
 
 ### Arşiv filtre parametreleri

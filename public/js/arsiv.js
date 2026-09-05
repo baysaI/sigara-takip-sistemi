@@ -36,10 +36,12 @@ App.ready(async () => {
 
 /** Filtre acilir menulerini doldur. */
 async function loadFilterOptions() {
-  const [{ waiters }, { types }, users] = await Promise.all([
+  const [{ waiters }, { types }, users, ozel] = await Promise.all([
     API.get('/api/waiters'),
     API.get('/api/cigarette-types'),
-    API.get('/api/users').catch(() => ({ users: [] }))
+    API.get('/api/users').catch(() => ({ users: [] })),
+    // Tek seferlik tur adlari cigarette_types'ta YOK; ayri uctan gelir
+    API.get('/api/records/custom-types').catch(() => ({ names: [] }))
   ]);
 
   // Arsiv garson adina gore filtrelenir (kayitlarda ad snapshot olarak tutulur),
@@ -52,8 +54,16 @@ async function loadFilterOptions() {
     onSelect: refilter
   });
 
+  /* Tur suzgeci: once kayitli turler, sonra ayri bir grupta tek seferlik
+     olanlar. Ayni acilir menude durmalari, "liste disi" bir markanin
+     kayitlarini gormek icin ayri bir arayuz gerektirmemesini sagliyor. */
   $('fType').innerHTML = '<option value="">Tümü</option>' +
-    types.map((t) => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('');
+    types.map((t) => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('') +
+    (ozel.names?.length
+      ? `<optgroup label="Tek seferlik (liste dışı)">${
+          ozel.names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+        }</optgroup>`
+      : '');
 
   $('fUser').innerHTML = '<option value="">Tümü</option>' +
     (users.users || []).map((u) => `<option value="${esc(u.username)}">${esc(u.username)}</option>`).join('');
@@ -134,9 +144,52 @@ async function loadArchive() {
   try {
     const data = await API.get('/api/records', currentFilters());
     renderArchive(data);
+    renderCustomTypes(data.customTypes);
   } catch (err) {
     body.innerHTML = `<tr><td colspan="8" class="empty">Arşiv yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
+}
+
+/**
+ * TEK SEFERLİK ("liste dışı") SİGARALAR kartı.
+ *
+ * Bu türlerin stok kartı yoktur; Stok panelinde ve mutabakat tablosunda
+ * satırları olmaz. Hangi markaların bu şekilde alındığı yalnızca arşivi
+ * satır satır tarayarak görülebiliyordu — kart bunu özetler.
+ *
+ * Sayılar sayfalamadan bağımsızdır: yürürlükteki filtreye uyan TÜM
+ * kayıtları kapsar. Hiç yoksa kart gizlenir; bu özelliği kullanmayan
+ * kurulumda sayfa boş bir kartla dolmasın.
+ */
+function renderCustomTypes(liste) {
+  const kart = $('customCard');
+  if (!kart) return;
+
+  if (!liste?.length) {
+    kart.classList.add('hidden');
+    $('customBody').innerHTML = '';
+    return;
+  }
+
+  const toplamPaket = liste.reduce((t, c) => t + c.paket, 0);
+  $('customCount').textContent = `${liste.length} marka · ${toplamPaket} paket`;
+
+  $('customBody').innerHTML = liste.map((c) => `
+    <tr>
+      <td data-label="Sigara">
+        <b>${esc(c.name)}</b>
+        <span class="pill custom" title="Ana listede yok, stoktan düşülmedi">LİSTE DIŞI</span>
+      </td>
+      <td data-label="İşlem">${c.islem}</td>
+      <td data-label="Paket"><span class="pill qty">${c.paket}</span></td>
+      <td data-label="İlk Alım" class="mono">${formatDateTime(c.ilk)}</td>
+      <td data-label="Son Alım" class="mono">${formatDateTime(c.son)}</td>
+      <td data-label="İşlem">
+        <button class="btn-ghost btn-sm" data-ctype="${esc(c.name)}">Kayıtları göster</button>
+      </td>
+    </tr>`).join('');
+
+  kart.classList.remove('hidden');
 }
 
 function renderArchive({ records, pagination, summary }) {
@@ -320,6 +373,26 @@ function bindEvents() {
     );
     window.location.href = `/api/records/export.csv?${qs}`;
     toast('Excel dosyası hazırlanıyor — indirilenler klasörüne düşecek.', 'info');
+  });
+
+  /* Kart satirindaki "Kayitlari goster": tur suzgecini o markaya ceker.
+     Ad, acilir menude "Tek seferlik" grubunda zaten var; olmadigi tek
+     durum kaydin bu oturum acikken girilmis olmasidir — o zaman secenek
+     ekleyip devam ederiz, kullanici sayfayi yenilemek zorunda kalmasin. */
+  $('customBody').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ctype]');
+    if (!btn) return;
+
+    const ad = btn.dataset.ctype;
+    const sel = $('fType');
+    if (![...sel.options].some((o) => o.value === ad)) {
+      sel.insertAdjacentHTML('beforeend', `<option value="${esc(ad)}">${esc(ad)}</option>`);
+    }
+    sel.value = ad;
+
+    updateFilterHint();
+    refilter();
+    sel.scrollIntoView({ block: 'center', behavior: 'smooth' });
   });
 
   updateFilterHint();   // acilistaki metin

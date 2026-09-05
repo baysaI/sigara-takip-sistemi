@@ -415,6 +415,31 @@ router.get('/', asyncHandler((req, res) => {
     FROM records ${whereSql}
   `).get(params);
 
+  /*
+   * TEK SEFERLIK ("liste disi") SIGARALAR — ozet liste.
+   *
+   * Bu turlerin stok karti yoktur: Stok panelinde gorunmezler, mutabakat
+   * tablosunda satirlari olmaz ve tur suzgecinin kaynagi olan
+   * cigarette_types tablosunda da yoklar. Ad yalnizca kaydin kendisinde
+   * yasar. "Bu araligda liste disi neler alinmis" sorusunun cevabi bu
+   * yuzden sayfalar arasinda kayboluyordu.
+   *
+   * Ozet SAYFALAMADAN BAGIMSIZDIR: suzgece uyan tum kayitlari kapsar.
+   * Sayimlar summary ile ayni dili konusur — islem tum satirlari, paket
+   * yalnizca gecerli olanlari sayar.
+   */
+  const ozelTurler = db.prepare(`
+    SELECT cigarette_type AS name,
+           COUNT(*) AS islem,
+           COALESCE(SUM(CASE WHEN ${AKTIF} THEN quantity ELSE 0 END), 0) AS paket,
+           MIN(created_at) AS ilk,
+           MAX(created_at) AS son
+    FROM records
+    ${whereSql ? `${whereSql} AND` : 'WHERE'} custom_type = 1
+    GROUP BY cigarette_type
+    ORDER BY paket DESC, name COLLATE NOCASE
+  `).all(params);
+
   const rows = db.prepare(`
     SELECT ${ARCHIVE_COLUMNS}
     FROM records
@@ -426,6 +451,7 @@ router.get('/', asyncHandler((req, res) => {
   res.json({
     ok: true,
     records: rows,
+    customTypes: ozelTurler,
     pagination: {
       page,
       pageSize,
@@ -439,6 +465,26 @@ router.get('/', asyncHandler((req, res) => {
     },
     serverTime: new Date().toISOString()
   });
+}));
+
+/* ------------------------------------------------------------------ */
+/* GET /api/records/custom-types                                       */
+/*                                                                     */
+/* Arsivde gecmis TEK SEFERLIK tur adlari (tekrarsiz, alfabetik).       */
+/* Arsiv sayfasinin tur suzgeci bunlari da listeleyebilsin diye ayri    */
+/* uc: bu adlarin cigarette_types tablosunda karsiligi YOKTUR, yalnizca */
+/* kayitlarin icinde yasarlar. Suzgec kaynagi oldugu icin filtreden     */
+/* BAGIMSIZ ve tum zamanlari kapsar.                                    */
+/* ------------------------------------------------------------------ */
+router.get('/custom-types', asyncHandler((req, res) => {
+  const rows = db.prepare(`
+    SELECT DISTINCT cigarette_type AS name
+    FROM records
+    WHERE custom_type = 1
+    ORDER BY name COLLATE NOCASE
+  `).all();
+
+  res.json({ ok: true, names: rows.map((r) => r.name) });
 }));
 
 /* ------------------------------------------------------------------ */
