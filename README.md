@@ -365,6 +365,52 @@ bozuk sanılmasın diye mutabakat tablosunun altında farkın nedeni yazılır:
 > Ayrıca 2 paket liste dışı sigara verildi — stok kartı olmadığı için bu
 > tabloda görünmez: MARLBORO TOUCH (2).
 
+## Oyuncu ID düzeltme
+
+Sigaracı ID'yi yanlış yazabiliyor ya da garson tezgâha yanlış ID getirebiliyor.
+Hızlı Kayıt'taki *Son Kayıtlar* ve Arşiv listelerindeki **ID Düzelt** düğmesi
+kaydın sahibini düzeltir.
+
+Onay ekranı ne olacağını açıkça yazar (`1247 → 1250`) ve geçerli, **farklı**
+bir ID girilene kadar onay düğmesi açılmaz.
+
+**Değişen tek şey kaydın sahibidir:**
+
+| | |
+|---|---|
+| **Değişir** | `player_id` ve dolayısıyla **4 saat sayacı** — eski ID serbest kalır, yeni ID'ninki bu kayıttan itibaren işler |
+| **Değişmez** | Adet, sigara türü, garson, sigaracı, saat ve **stok** |
+
+Hiçbir stok hareketi yazılmaz; dönemin tüketimi, marka dökümü ve mutabakat
+tablosu aynen kalır. Kayıt **silinmez** — silip yeniden açmak stoğu ve sayacı
+iki kez kurcalamak, stok geçmişini de iki gereksiz satırla kirletmek olurdu.
+
+- Her düzeltme `record_player_edits` tablosuna yazılır: eski ID, yeni ID,
+  neden, **kim** ve **ne zaman**. Art arda düzeltmelerde zincir korunur.
+- Kayıt arşivde `🆔 ID düzeltildi` satırıyla işaretlenir; onay ekranı önceki
+  düzeltmeleri de gösterir.
+- Sigara değişimiyle bağlantılı bir kaydın ID'si düzeltilirse **zincirin
+  tamamı** birlikte düzeltilir. Aksi halde aynı sigara iki farklı oyuncuda
+  görünürdü.
+
+### Kapanmış günde düzeltme
+
+Sigara değişimi kapanmış dönemde **yasaktır** (stoğu cari döneme, kaydı eski
+döneme düşürürdü). ID düzeltmesinde böyle bir şey yoktur: hiçbir sayı dönem
+değiştirmez. Bu yüzden engellenmez — ama onay ekranı uyarır ve düzeltme
+`late` olarak işaretlenir.
+
+Kapanmış günün raporunda değişebilecek tek şey **oyuncu sayısıdır**
+(`COUNT DISTINCT player_id`) — o da zaten yanlış ID yüzünden yanlıştı. Yanlış
+bir ID'yi "mühürlü defter" adına sonsuza kadar yanlış bırakmak kimseye hizmet
+etmezdi.
+
+> Düzeltme **oturum açmış herkese açıktır** — iptal ve geri alma gibi. Sayacı
+> bir oyuncudan diğerine taşıdığı için kötüye kullanılabilir; koruma, işlemin
+> silinmemesi ve her adımın kim/ne zaman diye kayda geçmesidir. Yalnızca
+> yöneticide olmasını isterseniz [routes/records.js](routes/records.js)
+> içindeki uca `requireAdmin` eklemek yeterli.
+
 ## İptal Edilenler / Arşiv
 
 Müşteri sigarayı aldıktan sonra iade ederse satış **iptal edilir**: aktif
@@ -968,6 +1014,7 @@ Ayrıntılar:
 | `records` | Dağıtım arşivi (onay bilgisi snapshot'ı dahil) |
 | `daily_counts` | Gün sonu fiziksel sayım kayıtları |
 | `player_flags` | Oyuncu bazlı özel uyarı / onay / bloke tanımları |
+| `record_player_edits` | Oyuncu ID düzeltmeleri — eski/yeni ID, neden, kim, ne zaman |
 | `stock_movements` | Her stok hareketi (ikmal, çıkış, düzeltme) |
 
 `records` tablosunda garson adı ve sigaracı kullanıcı adı **snapshot** olarak da
@@ -1035,6 +1082,8 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/records` | Filtreli arşiv + sayfalama |
 | `GET` | `/api/records/export.csv` | Arşiv dökümü — aynı filtreler, sayfalama yok |
 | `GET` | `/api/records/custom-types` | Tek seferlik tür adları (arşiv süzgeci için) |
+| `GET` | `/api/records/:id/player-edits` | Kaydın oyuncu ID düzeltme geçmişi |
+| `POST` | `/api/records/:id/player-id` | Oyuncu ID düzeltme (stok ve adet değişmez) |
 | `GET` | `/api/records/stats` | Panel özet kartları |
 
 ### Arşiv filtre parametreleri

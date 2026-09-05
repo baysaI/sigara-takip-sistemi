@@ -239,6 +239,7 @@ function renderArchive({ records, pagination, summary }) {
                   ? '<span class="muted" title="Bu kaydın günü kapandı — değişim yapılamaz">gün kapalı</span>'
                   : '')}
             ${iptalEdilebilir ? `<button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>` : ''}
+            <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
             ${!degisebilir && !iptalEdilebilir && r.superseded_by ? '<span class="muted">—</span>' : ''}
           </div>
         </td>
@@ -257,6 +258,19 @@ function renderArchive({ records, pagination, summary }) {
       btn.addEventListener('click', () => {
         const kayit = bul(btn.dataset.cancel);
         if (kayit) iptalEt(kayit);
+      }));
+
+    /* ID duzeltme kapanmis donemde de yapilabilir: stok ve adet degismez,
+       yalnizca kaydin sahibi degisir (bkz. services/playerEdit.js). */
+    body.querySelectorAll('[data-pid]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const kayit = bul(btn.dataset.pid);
+        if (!kayit) return;
+        btn.disabled = true;
+        const gec = !!App.period && kayit.created_at < App.period.from;
+        const degisti = await handlePlayerIdEdit(kayit, gec);
+        btn.disabled = false;
+        if (degisti) await loadArchive();
       }));
   }
 

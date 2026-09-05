@@ -248,6 +248,14 @@ function recordDetailHTML(r) {
     satirlar.push('<span class="detail-line swap">🔄 Bu kayıt değiştirildi, yerine yenisi geçti</span>');
   }
 
+  // Oyuncu ID düzeltmesi — kaydın sahibi sonradan düzeltildi
+  if (r.player_edited_at) {
+    satirlar.push(
+      `<span class="detail-line swap">🆔 ID düzeltildi — ${esc(r.player_edited_by || '')}` +
+      ` · ${formatDateTime(r.player_edited_at)}</span>`
+    );
+  }
+
   // İptal
   if (r.cancelled_at) {
     satirlar.push(

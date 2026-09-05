@@ -375,6 +375,47 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_records_custom ON records (custom_type)'
  */
 addColumn('records', 'custom_waiter', 'INTEGER NOT NULL DEFAULT 0');
 
+/*
+ * OYUNCU ID DUZELTME.
+ *
+ * Sigaraci ID'yi yanlis yazabiliyor ya da garson yanlis ID getirebiliyor.
+ * Kayit SILINIP yeniden acilmaz — silmek stogu ve 4 saat sayacini
+ * kurcalamak, sonra da geri koymak demekti. Bunun yerine kaydin uzerinde
+ * yalnizca player_id degisir; olayin kendisi record_player_edits'te
+ * saklanir (degisim ve iptalde oldugu gibi).
+ *
+ * Bu iki sutun ROZET VE IPUCU icindir: arsiv satirinda "ID DUZELTILDI"
+ * gostermek icin her satirda ayri sorgu yapmak gerekmesin.
+ * Tam gecmis edits tablosundadir.
+ */
+addColumn('records', 'player_edited_at', 'TEXT');
+addColumn('records', 'player_edited_by', 'TEXT');
+
+/*
+ * DUZELTME IZI. Her satir bir duzeltmedir; zincir olusabilir
+ * (1247 -> 1250 -> 1252). Kayit silinirse iz de gider (CASCADE):
+ * olmayan bir kaydin duzeltme gecmisinin anlami yok.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS record_player_edits (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id     INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    old_player_id TEXT    NOT NULL,
+    new_player_id TEXT    NOT NULL,
+    reason        TEXT,
+    -- Duzeltme, satisin donemi KAPANDIKTAN sonra mi yapildi?
+    -- Stok ve tuketim degismedigi icin engellenmez, ama isaretlenir.
+    late          INTEGER NOT NULL DEFAULT 0 CHECK (late IN (0,1)),
+    sale_day_key  TEXT,
+    user_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    username      TEXT    NOT NULL,
+    created_at    TEXT    NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_pedits_record  ON record_player_edits (record_id);
+  CREATE INDEX IF NOT EXISTS idx_pedits_created ON record_player_edits (created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_pedits_old     ON record_player_edits (old_player_id);
+`);
+
 // Indeksler sutunlar eklendikten SONRA kurulur (SCHEMA icinde olamaz).
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_records_superseded ON records (superseded_by);

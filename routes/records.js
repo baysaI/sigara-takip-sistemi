@@ -11,6 +11,7 @@ const { exchangeRecord, exchangeableRecords, assertExchangeable } = require('../
 const {
   cancelRecord, uncancelRecord, assertCancellable, assertUncancellable, listCancellations
 } = require('../services/cancellation');
+const { editPlayerId, assertEditable, editsForRecord } = require('../services/playerEdit');
 const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } = require('../config');
 const { cooldownHours } = require('../services/settings');
 
@@ -379,7 +380,8 @@ const ARCHIVE_COLUMNS = `
   flag_level, flag_note, approved_by, approval_note,
   early_release, early_remaining_ms, early_approved_by, early_note,
   superseded_by, exchanged_from, exchanged_at, exchanged_by,
-  cancelled_at, cancelled_by, cancel_reason, cancel_late
+  cancelled_at, cancelled_by, cancel_reason, cancel_late,
+  player_edited_at, player_edited_by
 `;
 
 /* ------------------------------------------------------------------ */
@@ -827,6 +829,55 @@ router.post('/:id/uncancel', asyncHandler((req, res) => {
     ok: true,
     ...sonuc,
     status: getCooldownStatus(sonuc.record.player_id)   // sayac yeniden isler
+  });
+}));
+
+/* ------------------------------------------------------------------ */
+/* OYUNCU ID DUZELTME                                                  */
+/*                                                                     */
+/* GET  /api/records/:id/player-edits  duzeltme gecmisi                */
+/* POST /api/records/:id/player-id     ID'yi duzelt                    */
+/*                                                                     */
+/* Yanlis yazilmis ID icin. Kayit SILINMEZ, stok DEGISMEZ; yalnizca    */
+/* player_id degisir ve olay record_player_edits'e yazilir.            */
+/* 4 saat sayaci dogal olarak yeni ID'ye gecer — dogru olan da budur.  */
+/* Ayrinti: services/playerEdit.js                                     */
+/* ------------------------------------------------------------------ */
+router.get('/:id/player-edits', asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+  res.json({ ok: true, edits: editsForRecord(id) });
+}));
+
+router.post('/:id/player-id', asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+
+  const reason = String(req.body.reason || '').trim() || null;
+  if (reason && reason.length > 255) {
+    return res.status(400).json({ ok: false, error: 'Duzeltme nedeni en fazla 255 karakter olabilir.' });
+  }
+
+  // Uygunluk kontrolu islemden ONCE: hata mesaji net olsun
+  assertEditable(id, req.body.player_id);
+
+  const sonuc = editPlayerId({
+    recordId: id,
+    newPlayerId: req.body.player_id,
+    reason,
+    user: req.session.user
+  });
+
+  res.status(201).json({
+    ok: true,
+    ...sonuc,
+    // Iki sayacin da yeni durumu: eskisi serbest kalmis, yenisi islemis olmali
+    oldStatus: getCooldownStatus(sonuc.oldPlayerId),
+    status: getCooldownStatus(sonuc.newPlayerId)
   });
 }));
 

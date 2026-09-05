@@ -222,11 +222,14 @@ async function loadRecent() {
         <td data-label="Sigaracı">${esc(r.username)}</td>
         <td data-label="Info" class="info-cell">${recordDetailHTML(r)}</td>
         <td data-label="İşlem">
-          ${r.superseded_by
-            ? '<span class="pill locked" title="Bu kayıt değiştirildi, arşivde kalır">DEĞİŞTİRİLDİ</span>'
-            : degistirilebilir
-              ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
-              : '<span class="muted">—</span>'}
+          <div class="row-actions">
+            ${r.superseded_by
+              ? '<span class="pill locked" title="Bu kayıt değiştirildi, arşivde kalır">DEĞİŞTİRİLDİ</span>'
+              : degistirilebilir
+                ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
+                : ''}
+            <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
@@ -660,11 +663,39 @@ function bindEvents() {
 
   // Son Kayitlar tablosu her yenilendiginde yeniden baglanmasin diye
   // dinleyici govdeye bir kez kurulur (olay delegasyonu).
-  $('recentBody').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-swap]');
-    if (!btn) return;
-    btn.disabled = true;
-    handleExchange(Number(btn.dataset.swap)).finally(() => { btn.disabled = false; });
+  $('recentBody').addEventListener('click', async (e) => {
+    const swapBtn = e.target.closest('[data-swap]');
+    if (swapBtn) {
+      swapBtn.disabled = true;
+      handleExchange(Number(swapBtn.dataset.swap)).finally(() => { swapBtn.disabled = false; });
+      return;
+    }
+
+    /* ID duzeltme: yanlis yazilan ID'yi hemen tezgahta duzeltebilmek icin
+       Son Kayitlar'da da duruyor — hata cogunlukla burada fark ediliyor. */
+    const pidBtn = e.target.closest('[data-pid]');
+    if (!pidBtn) return;
+
+    const id = Number(pidBtn.dataset.pid);
+    let kayit;
+    try {
+      kayit = (await API.get('/api/records', { pageSize: 50, page: 1 }))
+        .records.find((r) => r.id === id);
+    } catch (err) {
+      return toast(`Kayıt alınamadı: ${err.message}`, 'error');
+    }
+    if (!kayit) return toast('Kayıt bulunamadı, listeyi yenileyin.', 'error');
+
+    pidBtn.disabled = true;
+    const gec = !!App.period && kayit.created_at < App.period.from;
+    const degisti = await handlePlayerIdEdit(kayit, gec);
+    pidBtn.disabled = false;
+
+    if (degisti) {
+      await Promise.all([loadStats(), loadRecent()]);
+      // Ekranda o oyuncu aciksa sayaci tazele: hak durumu degismis olabilir
+      if (cd.playerId) checkPlayer(cd.playerId);
+    }
   });
 
   setInterval(loadStats, 60000);
