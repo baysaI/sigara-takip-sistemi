@@ -333,7 +333,7 @@ istenir — aksi halde arşivde iki farklı şey aynı ada bağlanırdı.
 
 ### Arşivdeki listesi
 
-Arşiv sayfasında, kayıt tablosunun üstünde **Tek Seferlik Sigaralar** kartı
+Arşiv sayfasında, kayıt tablosunun altında **Tek Seferlik Sigaralar** kartı
 vardır. Bu türlerin stok kartı olmadığı için Stok panelinde ve mutabakat
 tablosunda satırları yoktur; hangi markaların bu şekilde alındığı yalnızca
 arşivi satır satır tarayarak görülebiliyordu.
