@@ -227,14 +227,69 @@ async function loadStats() {
   } catch { /* istatistik kritik degil */ }
 }
 
+/** "Son 24 saat" penceresinin baslangici — duvar saatinden, donemden bagimsiz. */
+const SON_24_SAAT = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+/**
+ * Listedeki bir kaydin GUNCEL halini sunucudan alir.
+ *
+ * Ekrandaki satir bayat olabilir (baska bir sigaraci ayni kaydi
+ * duzeltmis olabilir); islem ekranlari taze veriyle acilmali.
+ * Hata durumunda kullaniciya soyler ve null doner.
+ */
+async function kaydiBul(id) {
+  try {
+    const { records } = await API.get('/api/records', {
+      playerExact: cd.playerId,
+      from: SON_24_SAAT(),
+      pageSize: 50,
+      page: 1
+    });
+    const kayit = records.find((r) => r.id === id);
+    if (!kayit) toast('Kayıt bulunamadı, listeyi yenileyin.', 'error');
+    return kayit || null;
+  } catch (err) {
+    toast(`Kayıt alınamadı: ${err.message}`, 'error');
+    return null;
+  }
+}
+
+/**
+ * SON KAYITLAR — yalnizca EKRANDAKI OYUNCUNUN son 24 saati.
+ *
+ * Eskiden sayfa acilir acilmaz tum kullanicilarin son 10 kaydi geliyordu:
+ * tezgahta duran ekranda baskalarinin oyuncu ID'leri, aldigi sigaralar ve
+ * info notlari surekli acikta duruyordu. Artik ID girilene kadar liste
+ * BOSTUR; ID girilince yalnizca o oyuncunun gecmisi listelenir.
+ *
+ * Eslesme TAM: playerExact kullanilir. Kismi arama olsaydi 1247 ararken
+ * 112478'in kayitlari da gorunurdu.
+ */
 async function loadRecent() {
   const body = $('recentBody');
+
+  // ID yoksa hic sorgu yapilmaz: liste bos, sebebi yazili.
+  if (!cd.playerId) {
+    $('recentCount').textContent = '';
+    body.innerHTML = `<tr><td colspan="8" class="empty">
+      Oyuncu ID girin — bu oyuncunun <b>son 24 saatteki</b> kayıtları burada listelenir.
+    </td></tr>`;
+    return;
+  }
+
   try {
-    const { records, summary } = await API.get('/api/records', { pageSize: 10, page: 1 });
-    $('recentCount').textContent = `${summary.total} kayıt`;
+    const { records, summary } = await API.get('/api/records', {
+      playerExact: cd.playerId,
+      from: SON_24_SAAT(),
+      pageSize: 50,
+      page: 1
+    });
+    $('recentCount').textContent = `${cd.playerId} · ${summary.total} kayıt`;
 
     if (!records.length) {
-      body.innerHTML = '<tr><td colspan="8" class="empty">Henüz kayıt yok.</td></tr>';
+      body.innerHTML = `<tr><td colspan="8" class="empty">
+        ${esc(cd.playerId)} için son 24 saatte kayıt yok.
+      </td></tr>`;
       return;
     }
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
@@ -269,6 +324,7 @@ async function loadRecent() {
                 ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
                 : ''}
             <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
+            <button class="btn-ghost btn-sm" data-info="${r.id}">${r.info_by || r.info ? 'İnfo Düzenle' : 'İnfo Ekle'}</button>
           </div>
         </td>
       </tr>`;
@@ -356,6 +412,8 @@ const checkPlayer = debounce(async (raw) => {
     cd.flag = flag || null;
     applyStatus(status);
     renderFlagBanner();
+    // Liste artik bu oyuncuya ait; ID degistiginde yenilenmeli
+    loadRecent();
   } catch (err) {
     stopTimer();
     box().className = 'cooldown-box show blocked';
@@ -447,6 +505,7 @@ function resetCooldown() {
   stopTimer();
   cd.playerId = ''; cd.allowed = false; cd.deadline = 0; cd.flag = null;
   $('flagBanner')?.remove();
+  loadRecent();          // ID silindi: liste bosalir
   box().className = 'cooldown-box';
   box().innerHTML = '';
   setSubmit(false, 'Başlamak için Oyuncu ID girin.');
@@ -579,6 +638,20 @@ async function submitRecord(e) {
   }
   if (cd.playerId !== payload.player_id.toUpperCase()) {
     return toast('Oyuncu ID doğrulanmadı, lütfen tekrar girin.', 'error');
+  }
+
+  /* --- STOK DISI SIGARA ONAYI ---
+     Listede olmayan bir tur elle girildiyse kayit dogrudan acilmaz. Bu
+     kayit stoktan DUSMEZ ve mutabakat tablosunda satiri olmaz; yanlislikla
+     secilirse stok defteri sessizce eksik kalirdi.
+     Adet onayindan ONCE gelir: once NE veriliyor, sonra NE KADAR. */
+  if (ozel) {
+    const devam = await showCustomTypeGate(turAdi);
+    if (!devam) {
+      $('typeSearch').focus();
+      $('typeSearch').select();
+      return toast('Kayit olusturulmadi.', 'error');
+    }
   }
 
   /* --- ADET ONAYI ---
@@ -738,20 +811,25 @@ function bindEvents() {
       return;
     }
 
+    /* Sonradan info ekleme: sigara verildi, info veren sonra belli oldu. */
+    const infoBtn = e.target.closest('[data-info]');
+    if (infoBtn) {
+      const kayit = await kaydiBul(Number(infoBtn.dataset.info));
+      if (!kayit) return;
+      infoBtn.disabled = true;
+      const degisti = await handleInfoEdit(kayit);
+      infoBtn.disabled = false;
+      if (degisti) await loadRecent();
+      return;
+    }
+
     /* ID duzeltme: yanlis yazilan ID'yi hemen tezgahta duzeltebilmek icin
        Son Kayitlar'da da duruyor — hata cogunlukla burada fark ediliyor. */
     const pidBtn = e.target.closest('[data-pid]');
     if (!pidBtn) return;
 
-    const id = Number(pidBtn.dataset.pid);
-    let kayit;
-    try {
-      kayit = (await API.get('/api/records', { pageSize: 50, page: 1 }))
-        .records.find((r) => r.id === id);
-    } catch (err) {
-      return toast(`Kayıt alınamadı: ${err.message}`, 'error');
-    }
-    if (!kayit) return toast('Kayıt bulunamadı, listeyi yenileyin.', 'error');
+    const kayit = await kaydiBul(Number(pidBtn.dataset.pid));
+    if (!kayit) return;
 
     pidBtn.disabled = true;
     const gec = !!App.period && kayit.created_at < App.period.from;

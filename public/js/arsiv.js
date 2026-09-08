@@ -240,6 +240,7 @@ function renderArchive({ records, pagination, summary }) {
                   : '')}
             ${iptalEdilebilir ? `<button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>` : ''}
             <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
+            <button class="btn-ghost btn-sm" data-info="${r.id}">${r.info_by || r.info ? 'İnfo Düzenle' : 'İnfo Ekle'}</button>
             ${!degisebilir && !iptalEdilebilir && r.superseded_by ? '<span class="muted">—</span>' : ''}
           </div>
         </td>
@@ -262,6 +263,17 @@ function renderArchive({ records, pagination, summary }) {
 
     /* ID duzeltme kapanmis donemde de yapilabilir: stok ve adet degismez,
        yalnizca kaydin sahibi degisir (bkz. services/playerEdit.js). */
+    /* Sonradan info ekleme: sigara verildi, info veren sonra belli oldu. */
+    body.querySelectorAll('[data-info]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const kayit = bul(btn.dataset.info);
+        if (!kayit) return;
+        btn.disabled = true;
+        const degisti = await handleInfoEdit(kayit);
+        btn.disabled = false;
+        if (degisti) await loadArchive();
+      }));
+
     body.querySelectorAll('[data-pid]').forEach((btn) =>
       btn.addEventListener('click', async () => {
         const kayit = bul(btn.dataset.pid);

@@ -231,6 +231,77 @@ function showEarlyGate(status) {
 }
 
 /**
+ * MANUEL (STOK DISI) SIGARA ONAYI.
+ *
+ * Sigara turu alanina listede olmayan bir ad yazilip "tek seferlik"
+ * secildiginde cikar. Bu kayit stoktan DUSMEZ ve mutabakat tablosunda
+ * satiri olmaz; yanlislikla secilirse stok defteri sessizce eksik kalir.
+ * Bu yuzden kaydetmeden once ne oldugu acikca sorulur.
+ *
+ * @param {string} typeName  Elle girilen sigara adi
+ * @returns {Promise<boolean>} onaylandi mi
+ */
+function showCustomTypeGate(typeName) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay gate-warning';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'customTitle');
+
+    overlay.innerHTML = `
+      <div class="gate-box" style="max-width:460px">
+        <div class="gate-head">
+          <span class="gate-icon" aria-hidden="true">📦</span>
+          <h2 id="customTitle">STOK DIŞI SİGARA</h2>
+        </div>
+
+        <div class="early-count" style="text-align:center;margin-bottom:14px">
+          <div style="font-size:22px;font-weight:800;color:var(--accent);line-height:1.3">
+            ${esc(typeName)}
+          </div>
+        </div>
+
+        <div class="gate-note">
+          Bu sigara sistem stoklarında bulunmuyor. Bu işlem yalnızca dışarıdan
+          gelen ve stokta olmayan sigaralar için kullanılmalıdır. Bu sigarayı
+          vermek istediğinize emin misiniz?
+        </div>
+
+        <p class="gate-hint">
+          Kayıt açılır ama <b>stoktan düşülmez</b> ve mutabakat tablosunda
+          satırı olmaz.
+        </p>
+
+        <div class="gate-actions">
+          <button class="btn-ghost" id="customCancel">Vazgeç</button>
+          <button class="btn-primary" id="customConfirm">Evet, Devam Et</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const kapat = (sonuc) => {
+      document.body.style.overflow = '';
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+      resolve(sonuc);
+    };
+    const escHandler = (e) => { if (e.key === 'Escape') kapat(false); };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#customCancel').addEventListener('click', () => kapat(false));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) kapat(false); });
+    overlay.querySelector('#customConfirm').addEventListener('click', () => kapat(true));
+
+    /* Odak VAZGEC'te: bu istisnai bir islem, varsayilan cikis "hayir" olsun.
+       Adet onayindan farki bu — orada dogru adet yazan Enter'la gecebilir. */
+    overlay.querySelector('#customCancel').focus();
+  });
+}
+
+/**
  * ADET ONAYI — tek seferde 1'den fazla paket kaydedilirken cikar.
  *
  * Adet kutusu 1 ile baslar ve tezgahta hizli calisilir; yanlislikla 11

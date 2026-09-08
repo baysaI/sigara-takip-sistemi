@@ -302,7 +302,15 @@ function buildArchiveFilter(query) {
   if (query.includeCancelled !== '1') where.push('cancelled_at IS NULL');
   else applied.includeCancelled = true;
 
-  if (query.playerId) {
+  /* playerId  KISMI arama (arsivde "1247 gecen her kayit")
+     playerExact  TAM eslesme — Hizli Kayit'taki "bu oyuncunun son 24 saati"
+                  listesi icin. Kismi arama orada 1247 ararken 112478'i de
+                  getirir ve baskasinin gecmisini gosterirdi. */
+  if (query.playerExact) {
+    where.push('player_id = @playerExact');
+    params.playerExact = normalizePlayerId(query.playerExact);
+    applied.playerId = params.playerExact;
+  } else if (query.playerId) {
     where.push('player_id LIKE @playerId');
     params.playerId = `%${normalizePlayerId(query.playerId)}%`;
     applied.playerId = normalizePlayerId(query.playerId);
@@ -406,7 +414,8 @@ const ARCHIVE_COLUMNS = `
   early_release, early_remaining_ms, early_approved_by, early_note,
   superseded_by, exchanged_from, exchanged_at, exchanged_by,
   cancelled_at, cancelled_by, cancel_reason, cancel_late,
-  player_edited_at, player_edited_by
+  player_edited_at, player_edited_by,
+  info_edited_at, info_edited_by
 `;
 
 /* ------------------------------------------------------------------ */
@@ -511,6 +520,7 @@ router.get('/', asyncHandler((req, res) => {
 const INFO_COLUMNS = `
   id, player_id, cigarette_type, custom_type, quantity,
   waiter_name, custom_waiter, username, info, info_by, info_by_id, created_at,
+  info_edited_at, info_edited_by,
   superseded_by, cancelled_at, cancel_late
 `;
 
@@ -1097,6 +1107,74 @@ router.post('/:id/player-id', asyncHandler((req, res) => {
     // Iki sayacin da yeni durumu: eskisi serbest kalmis, yenisi islemis olmali
     oldStatus: getCooldownStatus(sonuc.oldPlayerId),
     status: getCooldownStatus(sonuc.newPlayerId)
+  });
+}));
+
+/* ------------------------------------------------------------------ */
+/* POST /api/records/:id/info - SONRADAN INFO EKLE / DUZENLE           */
+/*                                                                     */
+/* Tezgahta sira sigarayi vermektir; info veren kisi ve gerekce cogu    */
+/* zaman DAHA SONRA belli olur. Kaydi eksik acip sonradan tamamlamak    */
+/* mumkun olmasaydi ya kayit bekletilir ya da iptal edilip yeniden      */
+/* acilirdi — stok ve 4 saat sayaci bosuna iki kez kurcalanirdi.        */
+/*                                                                     */
+/* Govde: { info_by_id?: number|null, info?: string }                   */
+/*   info_by_id  tanim listesinden secilir; null/eksik = kisiyi kaldir  */
+/*   info        serbest metin; bos = nedeni kaldir                     */
+/*                                                                     */
+/* Adet, tur, garson, stok ve sayac DEGISMEZ. Kim degistirdi ve ne      */
+/* zaman kayda islenir (info_edited_at/by).                            */
+/* ------------------------------------------------------------------ */
+router.post('/:id/info', asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+
+  const kayit = recordByIdStmt.get(id);
+  if (!kayit) return res.status(404).json({ ok: false, error: 'Kayit bulunamadi.' });
+
+  const info = String(req.body.info ?? '').trim() || null;
+  if (info && info.length > 255) {
+    return res.status(400).json({ ok: false, error: 'Info nedeni en fazla 255 karakter olabilir.' });
+  }
+
+  /* null/eksik gonderilmesi "kisiyi kaldir" demektir; bu yuzden gecersiz
+     id ile bos deger ayrilir. */
+  const ham = req.body.info_by_id;
+  const bosaltiliyor = ham === null || ham === undefined || ham === '';
+  const infoById = bosaltiliyor ? null : Number.parseInt(ham, 10);
+
+  if (!bosaltiliyor && !Number.isInteger(infoById)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz info veren kimligi.' });
+  }
+
+  const infoVeren = infoById === null ? null : infoProviderByIdStmt.get(infoById);
+  if (infoById !== null && !infoVeren) {
+    return res.status(400).json({ ok: false, error: 'Secilen info veren kisi bulunamadi.' });
+  }
+
+  const simdi = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE records
+    SET info = ?, info_by = ?, info_by_id = ?, info_edited_at = ?, info_edited_by = ?
+    WHERE id = ?
+  `).run(
+    info,
+    // Ad SNAPSHOT olarak yazilir (garsonlardaki waiter_name gibi):
+    // kisi sonradan silinse de kayit bozulmaz.
+    infoVeren ? infoVeren.name : null,
+    infoVeren ? infoVeren.id : null,
+    simdi,
+    req.session.user.username,
+    id
+  );
+
+  res.json({
+    ok: true,
+    record: recordByIdStmt.get(id),
+    previous: { info: kayit.info, info_by: kayit.info_by }
   });
 }));
 

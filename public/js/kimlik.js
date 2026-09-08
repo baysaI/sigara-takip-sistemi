@@ -204,3 +204,153 @@ async function handlePlayerIdEdit(record, late) {
     return false;
   }
 }
+
+/* ============================================================
+   SONRADAN INFO EKLE / DUZENLE — onay ekrani.
+
+   Tezgahta sira sigarayi vermektir; info veren kisi ve gerekce cogu
+   zaman DAHA SONRA belli olur. Kaydi eksik acip sonradan tamamlamak
+   mumkun olmasaydi ya kayit bekletilir ya da iptal edilip yeniden
+   acilirdi — stok ve 4 saat sayaci bosuna iki kez kurcalanirdi.
+
+   Info veren TANIM LISTESINDEN secilir (kayit formundaki gibi);
+   neden serbest metindir. Ikisi de bosaltilabilir.
+
+   Cagiran: kayit.js, arsiv.js, info.js
+   ============================================================ */
+
+/**
+ * @param {object} o
+ * @param {object} o.record     Kayit (id, player_id, cigarette_type, quantity,
+ *                              created_at, info, info_by, info_by_id)
+ * @param {Array}  o.providers  Tanim listesi: {id, name}
+ * @returns {Promise<null | {info_by_id:number|null, info:string}>}
+ */
+function showInfoDialog({ record, providers }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay gate-swap';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    const vardi = !!(record.info_by || record.info);
+
+    overlay.innerHTML = `
+      <div class="gate-box" style="max-width:480px">
+        <div class="gate-head">
+          <span class="gate-icon" aria-hidden="true">💬</span>
+          <h2>${vardi ? 'İnfo Düzenle' : 'İnfo Ekle'}</h2>
+        </div>
+
+        <div class="gate-player">
+          Oyuncu <b>${esc(record.player_id)}</b>
+        </div>
+
+        <div class="cooldown-meta" style="font-size:14px;line-height:1.7;margin-bottom:14px">
+          Kayıt: <b>${esc(record.cigarette_type)} ×${record.quantity}</b><br />
+          Kayıt saati: <b>${formatDateTime(record.created_at)}</b>
+          ${record.info_edited_at
+            ? `<br /><span class="muted">Son düzenleme: ${esc(record.info_edited_by || '')}
+               · ${formatDateTime(record.info_edited_at)}</span>` : ''}
+        </div>
+
+        <div class="field">
+          <label for="dlgInfoBy">İnfo Veren Kişi <span class="muted">(opsiyonel)</span></label>
+          <div class="ac">
+            <input type="text" id="dlgInfoBy" placeholder="İsim yazın..." />
+            <input type="hidden" id="dlgInfoById" />
+            <ul class="ac-list" id="dlgInfoByList"></ul>
+          </div>
+          ${providers.length ? '' :
+            '<p class="muted mt">Tanımlı info veren yok — Yönetim → İnfo Verenler\'den eklenir.</p>'}
+        </div>
+
+        <div class="field">
+          <label for="dlgInfo">İnfo Nedeni <span class="muted">(opsiyonel)</span></label>
+          <textarea id="dlgInfo" maxlength="255" placeholder="ör. doğum günü ikramı"></textarea>
+        </div>
+
+        <p class="muted" style="font-size:13px;line-height:1.6;margin-bottom:14px">
+          Adet, sigara türü, garson ve <b>stok değişmez</b>. İkisini de boş
+          bırakırsanız kayıttaki info silinir.
+        </p>
+
+        <div class="gate-actions">
+          <button class="btn-ghost" data-no>Vazgeç</button>
+          <button class="btn-primary" data-yes>Kaydet</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const kapat = (sonuc) => {
+      document.body.style.overflow = '';
+      overlay.remove();
+      document.removeEventListener('keydown', escTus);
+      resolve(sonuc);
+    };
+    const escTus = (e) => { if (e.key === 'Escape') kapat(null); };
+    document.addEventListener('keydown', escTus);
+
+    overlay.querySelector('[data-no]').addEventListener('click', () => kapat(null));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) kapat(null); });
+
+    /* Kayit formundaki alanla AYNI bilesen: listeden secim, serbest metin yok. */
+    const ac = createAutocomplete({
+      input: overlay.querySelector('#dlgInfoBy'),
+      hidden: overlay.querySelector('#dlgInfoById'),
+      list: overlay.querySelector('#dlgInfoByList'),
+      items: providers,
+      emptyText: 'Eşleşen kişi yok'
+    });
+
+    // Mevcut degerler yuklenir; kisi silinmisse ad kutuda kalmaz ama
+    // neden korunur — kullanici yeniden secebilsin.
+    if (record.info_by_id) ac.selectById(record.info_by_id);
+    overlay.querySelector('#dlgInfo').value = record.info || '';
+
+    overlay.querySelector('[data-yes]').addEventListener('click', () => {
+      ac.commit();
+      kapat({
+        info_by_id: ac.selected ? ac.selected.id : null,
+        info: overlay.querySelector('#dlgInfo').value.trim()
+      });
+    });
+
+    overlay.querySelector('#dlgInfoBy').focus();
+  });
+}
+
+/**
+ * Diyalogu acar, onaylanirsa sunucuya gonderir.
+ * Uc sayfa da ayni akisi kullansin diye burada.
+ *
+ * @param {object} record
+ * @returns {Promise<boolean>} degisiklik yapildiysa true (liste tazelensin)
+ */
+async function handleInfoEdit(record) {
+  let providers = [];
+  try {
+    providers = (await API.get('/api/info-providers')).providers || [];
+  } catch { /* liste alinamadi; neden yine girilebilir */ }
+
+  const secim = await showInfoDialog({ record, providers });
+  if (!secim) return false;
+
+  try {
+    const r = await API.post(`/api/records/${record.id}/info`, secim);
+    const y = r.record;
+
+    toast(
+      y.info_by || y.info
+        ? `İnfo kaydedildi${y.info_by ? `: ${y.info_by}` : ''}.`
+        : 'Kayıttaki info temizlendi.',
+      'success', 4500
+    );
+    return true;
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    return false;
+  }
+}

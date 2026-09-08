@@ -752,6 +752,24 @@ taranarak cevaplanabiliyordu.
 > `(ad girilmemiş)` altında toplanır. O veri **taşınmaz** — hangi kelimenin ad,
 > hangisinin neden olduğunu tahmin etmek arşivi bozma riski taşırdı.
 
+### Sonradan info ekleme / düzenleme
+
+Tezgâhta sıra sigarayı vermektir; **info veren kişi ve gerekçe çoğu zaman daha
+sonra belli olur**. Bu yüzden mevcut kayıtlara sonradan info eklenebilir ve
+düzenlenebilir.
+
+*Son Kayıtlar*, *Arşiv* ve *İnfo Verenler* listelerindeki **İnfo Ekle** /
+**İnfo Düzenle** düğmesi. Kişi tanım listesinden seçilir, neden elle yazılır;
+ikisi de boş bırakılabilir (boş kaydedilirse kayıttaki info temizlenir).
+
+- **Adet, sigara türü, garson ve stok değişmez.** Kayıt silinip yeniden
+  açılmaz — o yol stoğu ve 4 saat sayacını boşuna iki kez kurcalardı.
+- Kim düzenledi ve ne zaman kayda işlenir (`info_edited_at` / `info_edited_by`);
+  diyalog son düzenlemeyi gösterir. İnfo artık "kim info verdi" dökümünü
+  beslediği için sessizce değiştirilebilmesi atıf kaydırmanın yolu olurdu.
+- Kişi seçimi burada da **listeden** yapılır, kayda **adın kendisi** yazılır
+  (snapshot) — kişi sonradan silinse de kayıt bozulmaz.
+
 ### `/info.html` sayfası
 
 Gezinme çubuğundaki **💬 İnfo** sekmesi. Yalnızca info girilmiş kayıtları
@@ -781,6 +799,45 @@ NO;TARİH;SAAT;İNFO VEREN;NEDEN;OYUNCU ID;SİGARA TÜRÜ;ADET;GARSON;SİGARACI;
 Dosyanın başında dökümün alındığı an, hangi filtrelerin açık olduğu ve toplam
 yazar; sonunda **KİŞİ BAZLI ÖZET** bölümü gelir. Dosya adı
 `sigara-info-verenler-YYYYAAGG-SSDD.csv`.
+
+## Son Kayıtlar — yalnızca aranan oyuncu
+
+Hızlı Kayıt sayfasındaki *Son Kayıtlar* listesi **sayfa açılırken boştur**.
+Oyuncu ID girilince yalnızca **o oyuncunun son 24 saatteki** kayıtları
+listelenir.
+
+Eskiden sayfa açılır açılmaz tüm kullanıcıların son 10 kaydı geliyordu:
+tezgâhta duran ekranda başkalarının oyuncu ID'leri, aldıkları sigaralar ve
+info notları sürekli açıkta duruyordu.
+
+- Eşleşme **tam**dır (`playerExact`). Kısmi arama olsaydı `1247` ararken
+  `112478`in kayıtları da görünürdü.
+- 24 saat **duvar saatinden** sayılır — iş gününden ve gün kapanışından
+  bağımsız kayan pencere.
+- ID silinince liste yeniden boşalır.
+
+Sütunlar aynı kalır: tarih/saat, oyuncu ID, sigara türü, adet, garson,
+sigaracı, info ve işlem.
+
+## Stok dışı (manuel) sigara onayı
+
+Sigara türü alanına listede olmayan bir ad yazılıp **tek seferlik** seçildiğinde,
+*Kaydı Oluştur*'a basıldıktan sonra onay ekranı çıkar:
+
+> Bu sigara sistem stoklarında bulunmuyor. Bu işlem yalnızca dışarıdan gelen ve
+> stokta olmayan sigaralar için kullanılmalıdır. Bu sigarayı vermek
+> istediğinize emin misiniz?
+
+**Vazgeç** seçilirse kayıt oluşturulmaz ve odak sigara alanına döner;
+**Evet, Devam Et** seçilirse kayıt açılır.
+
+Bu kayıt stoktan **düşmez** ve mutabakat tablosunda satırı olmaz; yanlışlıkla
+seçilirse stok defteri sessizce eksik kalırdı. Onay ekranının sebebi bu.
+
+- **Adet onayından önce** gelir: önce *ne* veriliyor, sonra *ne kadar*.
+- Odak varsayılan olarak **Vazgeç**'tedir — istisnai bir işlem olduğu için
+  varsayılan çıkış "hayır". (Adet onayında odak onaydadır; orada doğru adet
+  yazan kullanıcı Enter'la geçebilsin diye.)
 
 ## Adet onayı
 
@@ -1214,6 +1271,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `DELETE` | `/api/info-providers/:id` | İnfo vereni sil *(admin)* |
 | `GET` | `/api/reports/daily.csv` | Gün sonu raporunun tamamı — Excel |
 | `GET` | `/api/records/:id/player-edits` | Kaydın oyuncu ID düzeltme geçmişi |
+| `POST` | `/api/records/:id/info` | Sonradan info ekle / düzenle (stok değişmez) |
 | `POST` | `/api/records/:id/player-id` | Oyuncu ID düzeltme (stok ve adet değişmez) |
 | `GET` | `/api/records/stats` | Panel özet kartları |
 
@@ -1221,6 +1279,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 
 `playerId` (kısmi arama), `waiter`, `type`, `user`, `from`, `to` (ISO tarih-saat),
 `hourFrom`, `hourTo` (0–23), `by` (info veren), `infoOnly=1`,
+`playerExact` (kısmi değil **tam** eşleşme),
 `page`, `pageSize` (varsayılan 50, en fazla 500).
 
 `from`/`to` **tek bir sürekli aralık** kurar; `hourFrom`/`hourTo` ise kaydın

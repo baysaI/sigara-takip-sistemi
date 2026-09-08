@@ -15,6 +15,9 @@ const $ = (id) => document.getElementById(id);
 
 const state = { page: 1, pageSize: 25 };
 
+/** Ekranda duran kayitlar — duzenleme diyalogu icin. */
+let sonKayitlar = [];
+
 /** Filtre degisince ilk sayfaya don ve yeniden yukle. */
 const refilter = () => { state.page = 1; loadInfo(); };
 
@@ -112,6 +115,7 @@ async function loadInfo() {
 
 function render({ records, providers, pagination, summary }) {
   const body = $('infoBody');
+  sonKayitlar = records;
 
   if (!records.length) {
     body.innerHTML = '<tr><td colspan="8" class="empty">Bu filtrelerle info kaydı bulunamadı.</td></tr>';
@@ -135,6 +139,9 @@ function render({ records, providers, pagination, summary }) {
         </td>
         <td data-label="Adet"><span class="pill qty">${r.quantity}</span></td>
         <td data-label="Garson">${waiterCellHTML(r)}</td>
+        <td data-label="İşlem">
+          <button class="btn-ghost btn-sm" data-info="${r.id}">İnfo Düzenle</button>
+        </td>
         <td data-label="Sigaracı">
           ${esc(r.username)}
           ${r.cancelled_at ? '<span class="pill locked" title="Bu satış iptal edildi">İPTAL</span>' : ''}
@@ -216,6 +223,19 @@ function bindEvents() {
 
   /* Ozet satirindaki "Kayitlari goster": kisi suzgecini o ada ceker.
      "(ad girilmemis)" gercek bir ad degil, suzgece cevrilemez. */
+  /* Sonradan info duzenleme — bu sayfa zaten info kayitlarini gosterir,
+     yanlis girilen adi/nedeni duzeltmenin en dogal yeri burasi. */
+  $('infoBody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-info]');
+    if (!btn) return;
+    const kayit = sonKayitlar.find((r) => String(r.id) === btn.dataset.info);
+    if (!kayit) return toast('Kayit bulunamadi, listeyi yenileyin.', 'error');
+    btn.disabled = true;
+    const degisti = await handleInfoEdit(kayit);
+    btn.disabled = false;
+    if (degisti) await loadInfo();
+  });
+
   $('providerBody').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-by]');
     if (!btn) return;

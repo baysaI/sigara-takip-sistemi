@@ -438,6 +438,25 @@ db.exec(`
 addColumn('records', 'info_by_id', 'INTEGER REFERENCES info_providers(id) ON DELETE SET NULL');
 
 /*
+ * SONRADAN INFO EKLEME.
+ *
+ * Tezgahta sira sigarayi vermektir; info veren kisi ve gerekce cogu zaman
+ * DAHA SONRA belli olur. Kaydi o an eksik acip sonradan tamamlayabilmek
+ * gerekiyor — aksi halde ya kayit bekletilir ya da iptal edilip yeniden
+ * acilirdi (stok ve 4 saat sayaci bosuna iki kez kurcalanirdi).
+ *
+ * Bu iki sutun IZ icindir: info sonradan eklendi/degistirildi mi, kim ve
+ * ne zaman. Info artik "kim info verdi" dokumunu besliyor; sessizce
+ * degistirilebilmesi atif kaydirmanin yolu olurdu.
+ *
+ * Oyuncu ID duzeltmesinden farkli olarak ayri bir gecmis tablosu YOK:
+ * orada eski->yeni zincirini izlemek gerekiyordu, burada gecerli deger
+ * ile "kim degistirdi" yeterli.
+ */
+addColumn('records', 'info_edited_at', 'TEXT');
+addColumn('records', 'info_edited_by', 'TEXT');
+
+/*
  * Gecis: liste kurulmadan once serbest metinle girilmis adlar tanim
  * listesine BIR KEZ tasinir. Boylece mevcut kayitlar yetim kalmaz ve
  * yonetici listeyi sifirdan yazmak zorunda kalmaz. Tablo bosken calisir.
