@@ -1,6 +1,6 @@
 {
   "name": "sigara-takip-sistemi",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Rol yapma sunucusu icin sigara dagitim takip sistemi (4 saat kurali)",
   "main": "server.js",
   "type": "commonjs",

@@ -230,6 +230,95 @@ function showEarlyGate(status) {
   });
 }
 
+/**
+ * ADET ONAYI — tek seferde 1'den fazla paket kaydedilirken cikar.
+ *
+ * Adet kutusu 1 ile baslar ve tezgahta hizli calisilir; yanlislikla 11
+ * yazmak ya da eski bir degerin ekranda kalmasi 10 paketlik hatali kayit
+ * demek. Kayit acildiktan sonra duzeltmenin tek yolu iptal etmek —
+ * stok ve sayac iki kez kurcalanir. Ucuz olan, once sormaktir.
+ *
+ * Bu bir YETKI ekrani DEGILDIR: onaylayan adi istenmez, hicbir sey
+ * kayda islenmez. Yalnizca "bunu mu demek istediniz" sorusudur, o yuzden
+ * tek tikla gecilir.
+ *
+ * @param {object} o
+ * @param {string} o.playerId
+ * @param {string} o.typeName
+ * @param {number} o.quantity
+ * @param {string} o.waiterName
+ * @param {boolean} [o.customType]    Tek seferlik ("liste disi") sigara mi
+ * @param {boolean} [o.customWaiter]  Tek seferlik garson mu
+ * @returns {Promise<boolean>} onaylandi mi
+ */
+function showQuantityGate({ playerId, typeName, quantity, waiterName,
+                            customType = false, customWaiter = false }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gate-overlay gate-swap';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'qtyTitle');
+
+    const rozet = (kosul, baslik) => kosul
+      ? ` <span class="pill custom" title="${baslik}">LİSTE DIŞI</span>` : '';
+
+    overlay.innerHTML = `
+      <div class="gate-box" style="max-width:440px">
+        <div class="gate-head">
+          <span class="gate-icon" aria-hidden="true">📦</span>
+          <h2 id="qtyTitle">ADET ONAYI</h2>
+        </div>
+
+        <p class="gate-player">OYUNCU: <b>${esc(playerId)}</b></p>
+
+        <div class="early-count" style="text-align:center;margin-bottom:14px">
+          <div style="font-size:15px;line-height:1.5">
+            ${esc(typeName)}${rozet(customType, 'Ana listede yok, stoktan düşülmez')}
+          </div>
+          <div style="font-size:34px;font-weight:800;color:var(--accent);line-height:1.2">
+            ${quantity} paket
+          </div>
+        </div>
+
+        <div class="cooldown-meta" style="font-size:14px;line-height:1.7;margin-bottom:14px">
+          Alan garson: <b>${esc(waiterName)}</b>${rozet(customWaiter, 'Garson listesinde yok')}
+        </div>
+
+        <p class="gate-hint">
+          Tek seferde <b>1'den fazla</b> paket kaydediliyor.
+          Adet doğruysa onaylayın.
+        </p>
+
+        <div class="gate-actions">
+          <button class="btn-ghost" id="qtyCancel">Vazgeç</button>
+          <button class="btn-primary" id="qtyConfirm">${quantity} Paket Kaydet</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden';
+
+    const kapat = (sonuc) => {
+      document.body.style.overflow = '';
+      overlay.remove();
+      document.removeEventListener('keydown', escHandler);
+      resolve(sonuc);
+    };
+
+    const escHandler = (e) => { if (e.key === 'Escape') kapat(false); };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#qtyCancel').addEventListener('click', () => kapat(false));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) kapat(false); });
+    overlay.querySelector('#qtyConfirm').addEventListener('click', () => kapat(true));
+
+    /* Odak ONAY dugmesinde: dogru adet yazan kullanici Enter'la gecebilsin.
+       Yanlis yazan zaten buyuk puntolu adeti gormus olur. */
+    overlay.querySelector('#qtyConfirm').focus();
+  });
+}
+
 /** Kayit formunun ustunde duran kalici uyari serifi (ID yazilir yazilmaz gorunur). */
 function flagBannerHTML(flag) {
   if (!flag) return '';

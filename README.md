@@ -706,6 +706,30 @@ paket toplamı değiştirilmiş ve aynı dönemde iptal edilmiş kayıtları say
 > Çok büyük arşivlerde döküm 50.000 satırda kesilir ve dosyanın sonuna bunu
 > söyleyen bir satır düşülür. Böyle bir durumda tarih aralığını daraltın.
 
+## Adet onayı
+
+**Adet 1'den fazla girildiğinde kayıt doğrudan açılmaz**; önce onay ekranı
+çıkar ve kayıt ancak onaylandıktan sonra oluşur.
+
+Adet kutusu 1 ile başlar ve tezgâhta hızlı çalışılır: yanlışlıkla `11` yazmak
+ya da önceki kayıttan kalan bir değerin ekranda durması 10 paketlik hatalı
+kayıt demek. Kayıt açıldıktan sonra düzeltmenin tek yolu iptal etmek — stok ve
+sayaç iki kez kurcalanır. Ucuz olan, önce sormaktır.
+
+Ekran ne kaydedileceğini büyük puntoyla yazar (`MARLBORO RED` / **5 paket**),
+alan garsonu gösterir ve onay düğmesi adedi tekrarlar: *5 Paket Kaydet*.
+Vazgeçilirse odak Adet kutusuna döner ve değer seçili gelir — düzeltmek tek
+tuş.
+
+- Bu bir **yetki ekranı değildir**: onaylayan adı istenmez, kayda hiçbir şey
+  işlenmez. Yalnızca "bunu mu demek istediniz" sorusudur, tek tıkla geçilir.
+- Erken alım ve özel uyarı ekranlarından **önce** gelir. O ikisi yetki sorar,
+  bu ise girdiyi doğrular; yanlış adet yazan kişiyi önce yetkili onayından
+  geçirip sonra adedi sormak boşuna emek olurdu.
+- Eşik [public/js/kayit.js](public/js/kayit.js) içindeki `ADET_ONAY_ESIGI`
+  sabitidir. Varsayılan `1` (birden fazla paket her zaman sorulur); işletmenizde
+  2 paket olağansa `2` yapmanız yeterli.
+
 ## Erken alım — süresi dolmadan verme
 
 4 saat kuralı **sert engel değildir**. Yüksek oynama miktarı gibi gerekçelerle hak

@@ -21,6 +21,13 @@ let waiterAC = null;
 let waitersReady = false;
 let typesReady = false;
 
+/**
+ * Bu adetin UZERINDE kayit dogrudan acilmaz, once onay ekrani cikar.
+ * 1 = "birden fazla paket her zaman sorulsun". Buyutmek isterseniz
+ * (ornegin 2 paket normalse) tek yer burasi.
+ */
+const ADET_ONAY_ESIGI = 1;
+
 App.ready(async () => {
   showDayInfo();
   await Promise.all([loadTypes(), loadWaiters()]);
@@ -536,6 +543,29 @@ async function submitRecord(e) {
   }
   if (cd.playerId !== payload.player_id.toUpperCase()) {
     return toast('Oyuncu ID doğrulanmadı, lütfen tekrar girin.', 'error');
+  }
+
+  /* --- ADET ONAYI ---
+     Tek seferde birden fazla paket kaydediliyorsa once sorulur. Diger
+     onay ekranlarindan ONCE gelir: erken alim ve uyari ekranlari YETKI
+     sorar, bu ise "bunu mu demek istediniz" diye sorar. Yanlis adet
+     yazan kisiyi once yetkili onayindan gecirip sonra adeti sormak
+     bosuna emek olurdu; en ucuz duzeltme once. */
+  if (payload.quantity > ADET_ONAY_ESIGI) {
+    const onaylandi = await showQuantityGate({
+      playerId: cd.playerId,
+      typeName: turAdi,
+      quantity: payload.quantity,
+      waiterName: ozelGarson ? waiterAC.selected.name : $('waiterSearch').value.trim(),
+      customType: ozel,
+      customWaiter: ozelGarson
+    });
+
+    if (!onaylandi) {
+      $('quantity').focus();
+      $('quantity').select();
+      return toast('Adet onaylanmadı, kayıt oluşturulmadı.', 'error');
+    }
   }
 
   /* --- 4 saat dolmadiysa: erken alim onayi --- */
