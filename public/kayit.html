@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.7.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.8.0" />
 </head>
 <body>
 
@@ -96,17 +96,24 @@
             </div>
 
             <!-- INFO — ikiye ayrıldı: kim verdi + neden.
-                 Eskiden tek serbest metindi ve "kim, kaç kez, neden info
-                 verdi" ancak metinler gözle taranarak cevaplanabiliyordu.
                  İkisi de opsiyonel; biri girilip diğeri boş bırakılabilir.
-                 Ad listesi datalist ile önerilir ki aynı kişi arşivde
-                 farklı yazımlarla birikmesin. -->
+
+                 İnfo veren kişi, Alan Garson ile AYNI bileşenle LİSTEDEN
+                 seçilir. Serbest metin kabul edilmez: isimleri yönetici
+                 tanımlar, böylece aynı kişi farklı yazımlarla bölünmez.
+                 Seçilen kişinin id'si infoById gizli alanında tutulur. -->
             <div class="field">
-              <label for="infoBy">İnfo Veren Kişi <span class="muted">(opsiyonel)</span></label>
-              <input type="text" id="infoBy" name="info_by" maxlength="60"
-                     autocomplete="off" list="infoByList"
-                     placeholder="ör. Ahmet Bey" />
-              <datalist id="infoByList"></datalist>
+              <label for="infoBySearch">İnfo Veren Kişi <span class="muted">(opsiyonel)</span></label>
+              <div class="ac">
+                <input type="text" id="infoBySearch" placeholder="İsim yazın..."
+                       enterkeyhint="done" />
+                <input type="hidden" id="infoById" name="info_by_id" />
+                <ul class="ac-list" id="infoByList"></ul>
+              </div>
+              <p class="muted mt hidden" id="noInfoProviders">
+                Sistemde tanımlı info veren yok. Yönetici
+                <b>Yönetim → İnfo Verenler</b>'den ekleyebilir.
+              </p>
             </div>
 
             <div class="field">
@@ -149,12 +156,12 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.7.0"></script>
-  <script src="/js/layout.js?v=1.7.0"></script>
-  <script src="/js/autocomplete.js?v=1.7.0"></script>
-  <script src="/js/approval.js?v=1.7.0"></script>
-  <script src="/js/degisim.js?v=1.7.0"></script>
-  <script src="/js/kimlik.js?v=1.7.0"></script>
-  <script src="/js/kayit.js?v=1.7.0"></script>
+  <script src="/js/api.js?v=1.8.0"></script>
+  <script src="/js/layout.js?v=1.8.0"></script>
+  <script src="/js/autocomplete.js?v=1.8.0"></script>
+  <script src="/js/approval.js?v=1.8.0"></script>
+  <script src="/js/degisim.js?v=1.8.0"></script>
+  <script src="/js/kimlik.js?v=1.8.0"></script>
+  <script src="/js/kayit.js?v=1.8.0"></script>
 </body>
 </html>

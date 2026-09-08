@@ -239,6 +239,146 @@ router.get('/daily', asyncHandler((req, res) => {
 }));
 
 /* ------------------------------------------------------------------ */
+/* GET /api/reports/daily.csv - GUN SONU RAPORUNUN TAMAMI (Excel)      */
+/*                                                                     */
+/* Mutabakat dokumu (reconciliation.csv) yalnizca stok tablosunu verir. */
+/* Bu uc ise raporun TAMAMINI tek dosyada dokum eder: ozet, marka,      */
+/* garson, sigaraci, tek seferlik sigaralar, ikmaller, erken alimlar,   */
+/* onaylar, degisimler, iptaller — hepsi ayri bolumler halinde.         */
+/*                                                                     */
+/* Kapsami GET /daily ile AYNI yerden cozer (resolveScope), yani ekranda */
+/* gorulen donem neyse dosya da odur.                                   */
+/* ------------------------------------------------------------------ */
+router.get('/daily.csv', asyncHandler((req, res) => {
+  const kapsam = resolveScope(req.query);
+  if (!kapsam) return bosKapsam(res);
+
+  const { from, to } = kapsam;
+  const p = { from, to };
+
+  /* --- Bicimleyiciler: mutabakat dokumuyle ayni kurallar --- */
+  const alan = (v) => {
+    const s = String(v ?? '');
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const iki = (n) => String(n).padStart(2, '0');
+  const tarihSaat = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? ''
+      : `${iki(d.getDate())}.${iki(d.getMonth() + 1)}.${d.getFullYear()} ` +
+        `${iki(d.getHours())}:${iki(d.getMinutes())}`;
+  };
+  const sayi = (n) => String(n ?? '').replace('.', ',');
+
+  const sorgu = (sql) => db.prepare(sql).all(p);
+
+  const ozet = db.prepare(`
+    SELECT COUNT(*) AS islem, COALESCE(SUM(quantity), 0) AS paket,
+           COUNT(DISTINCT player_id) AS oyuncu,
+           COUNT(DISTINCT waiter_name) AS garson,
+           COUNT(DISTINCT username) AS sigaraci
+    FROM records WHERE created_at BETWEEN @from AND @to AND ${AKTIF}
+  `).get(p);
+
+  const markalar = sorgu(`
+    SELECT cigarette_type AS name, COUNT(*) AS islem, COALESCE(SUM(quantity),0) AS paket,
+           SUM(custom_type) AS ozel
+    FROM records WHERE created_at BETWEEN @from AND @to AND ${AKTIF}
+    GROUP BY cigarette_type ORDER BY paket DESC, name COLLATE NOCASE`);
+
+  const garsonlar = sorgu(`
+    SELECT waiter_name AS name, COUNT(*) AS islem, COALESCE(SUM(quantity),0) AS paket,
+           COUNT(DISTINCT player_id) AS oyuncu
+    FROM records WHERE created_at BETWEEN @from AND @to AND ${AKTIF}
+    GROUP BY waiter_name ORDER BY paket DESC, name COLLATE NOCASE`);
+
+  const sigaracilar = sorgu(`
+    SELECT username AS name, COUNT(*) AS islem, COALESCE(SUM(quantity),0) AS paket,
+           MIN(created_at) AS ilk, MAX(created_at) AS son
+    FROM records WHERE created_at BETWEEN @from AND @to AND ${AKTIF}
+    GROUP BY username ORDER BY islem DESC, name COLLATE NOCASE`);
+
+  /* Her satis ayri ayri — dokumun asil govdesi. Ekranda liste halinde
+     yok (rapor ozet gosterir); Excel'de gunun tamamini gormek isteyen
+     icin satir satir verilir. */
+  const kayitlar = sorgu(`
+    SELECT created_at, player_id, cigarette_type, custom_type, quantity,
+           waiter_name, custom_waiter, username, info_by, info,
+           early_release, early_approved_by, flag_level, approved_by
+    FROM records WHERE created_at BETWEEN @from AND @to AND ${AKTIF}
+    ORDER BY created_at ASC`);
+
+  const ikmaller = sorgu(`
+    SELECT type_name, SUM(delta) AS miktar, COUNT(*) AS hareket
+    FROM stock_movements
+    WHERE created_at BETWEEN @from AND @to AND reason = 'ikmal'
+    GROUP BY type_name ORDER BY miktar DESC`);
+
+  const degisimler = exchangesInRange(from, to);
+  const iptaller = cancellationsInRange(from, to);
+
+  const donemAdi = kapsam.period
+    ? `${kapsam.period.dayKey}${kapsam.period.open ? ' (ACIK DONEM)' : ''}`
+    : `${kapsam.periods.length} donem birlestirildi`;
+
+  /* Bolum yardimcisi: baslik + sutunlar + satirlar, arada bos satir. */
+  const bolum = (baslik, basliklar, satirlar) =>
+    satirlar.length ? [[], [baslik], basliklar, ...satirlar] : [[], [baslik], ['(kayit yok)']];
+
+  const s = [
+    ['GUN SONU RAPORU'],
+    [`Donem: ${donemAdi}`],
+    [`Aralik: ${tarihSaat(from)} - ${kapsam.period?.open ? 'su an' : tarihSaat(to)}`],
+    [`Alindigi an: ${tarihSaat(new Date().toISOString())}`],
+    [],
+    ['OZET'],
+    ['Islem', 'Paket', 'Oyuncu', 'Garson', 'Sigaraci'],
+    [ozet.islem, ozet.paket, ozet.oyuncu, ozet.garson, ozet.sigaraci],
+
+    ...bolum('MARKA BAZLI DAGITIM', ['SIGARA', 'ISLEM', 'PAKET', 'LISTE DISI'],
+      markalar.map((m) => [m.name, m.islem, m.paket, m.ozel ? 'evet' : ''])),
+
+    ...bolum('GARSON BAZLI DAGILIM', ['GARSON', 'ISLEM', 'PAKET', 'OYUNCU'],
+      garsonlar.map((g) => [g.name, g.islem, g.paket, g.oyuncu])),
+
+    ...bolum('SIGARACI DOKUMU', ['SIGARACI', 'ISLEM', 'PAKET', 'ILK', 'SON'],
+      sigaracilar.map((x) => [x.name, x.islem, x.paket, tarihSaat(x.ilk), tarihSaat(x.son)])),
+
+    ...bolum('IKMALLER', ['SIGARA', 'MIKTAR', 'HAREKET'],
+      ikmaller.map((i) => [i.type_name, i.miktar, i.hareket])),
+
+    ...bolum('SIGARA DEGISIMLERI', ['TARIH', 'OYUNCU', 'ESKI', 'YENI', 'ADET', 'YAPAN', 'NOT'],
+      degisimler.map((d) => [tarihSaat(d.created_at), d.player_id, d.from_type_name,
+        d.to_type_name, d.quantity, d.username, d.note || ''])),
+
+    ...bolum('IPTALLER', ['TARIH', 'OYUNCU', 'SIGARA', 'ADET', 'NEDEN', 'GEC MI', 'YAPAN', 'GERI ALINDI'],
+      iptaller.map((c) => [tarihSaat(c.created_at), c.player_id, c.cigarette_type, c.quantity,
+        c.reason || '', c.late ? 'evet' : '', c.username,
+        c.reverted_at ? `${tarihSaat(c.reverted_at)} (${c.reverted_by})` : ''])),
+
+    ...bolum('TUM KAYITLAR',
+      ['NO', 'TARIH / SAAT', 'OYUNCU ID', 'SIGARA', 'ADET', 'GARSON', 'SIGARACI',
+       'INFO VEREN', 'INFO NEDENI', 'ERKEN ALIM', 'UYARI ONAYI'],
+      kayitlar.map((r, i) => [
+        i + 1, tarihSaat(r.created_at), r.player_id,
+        r.cigarette_type + (r.custom_type ? ' (liste disi)' : ''),
+        r.quantity,
+        r.waiter_name + (r.custom_waiter ? ' (liste disi)' : ''),
+        r.username, r.info_by || '', r.info || '',
+        r.early_release ? (r.early_approved_by || 'onaylandi') : '',
+        r.flag_level ? `${r.flag_level}${r.approved_by ? ` - ${r.approved_by}` : ''}` : ''
+      ]))
+  ];
+
+  const csv = s.map((r) => r.map(alan).join(';')).join('\r\n');
+  const adGuvenli = String(kapsam.period?.dayKey || 'aralik').replace(/#/g, '-');
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="sigara-gun-sonu-${adGuvenli}.csv"`);
+  res.send('﻿' + csv);   // BOM: Excel Turkce karakterleri dogru acsin
+}));
+
+/* ------------------------------------------------------------------ */
 /* GET /api/reports/closures - kapanmis gunlerin listesi               */
 /* ------------------------------------------------------------------ */
 router.get('/closures', asyncHandler((req, res) => {

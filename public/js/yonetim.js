@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 App.ready(async () => {
   if (App.user.role !== 'admin') return showDenied();
 
-  await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadSettings(), loadBackups(), loadOverview()]);
+  await Promise.all([loadWaiters(), loadProviders(), loadTypes(), loadUsers(), loadSettings(), loadBackups(), loadOverview()]);
   bindEvents();
 });
 
@@ -131,6 +131,109 @@ async function bulkAddWaiters() {
   const sonuc = await bulkPost('/api/waiters', adlar, $('bulkAddBtn'), 'Listeyi Ekle');
   $('bulkWaiters').value = '';
   await loadWaiters();
+  ozetBildir(sonuc);
+}
+
+/* ============================================================
+   INFO VERENLER — garsonlarla ayni desen.
+
+   Kayit formunda BU LISTEDEN secilir; serbest metin kabul edilmez.
+   Boylece ayni kisi "Ahmet / ahmet / Ahmet Bey" diye bolunmez ve
+   Info Verenler sayfasindaki kisi bazli ozet duzgun toplanir.
+   ============================================================ */
+async function loadProviders() {
+  const body = $('providerBody');
+  try {
+    const { providers } = await API.get('/api/info-providers');
+    $('providerCount').textContent = providers.length ? `${providers.length} kişi` : 'boş';
+
+    if (!providers.length) {
+      body.innerHTML = `<tr><td colspan="2" class="empty">
+        Henüz info veren eklenmemiş.<br />
+        <span class="muted">Eklenene kadar kayıt formundaki alan boş kalır — kayıt yine açılabilir.</span>
+      </td></tr>`;
+      return;
+    }
+
+    body.innerHTML = providers.map((p) => `
+      <tr>
+        <td data-label="İsim"><b>${esc(p.name)}</b></td>
+        <td data-label="İşlem">
+          <div class="row-actions">
+            <button class="btn-ghost btn-sm" data-prov-edit="${p.id}" data-name="${esc(p.name)}">Adı Değiştir</button>
+            <button class="btn-danger btn-sm" data-prov-del="${p.id}" data-name="${esc(p.name)}">Sil</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    body.querySelectorAll('[data-prov-del]').forEach((btn) =>
+      btn.addEventListener('click', () => silInfoVeren(btn.dataset.provDel, btn.dataset.name)));
+    body.querySelectorAll('[data-prov-edit]').forEach((btn) =>
+      btn.addEventListener('click', () => adDegistir(btn.dataset.provEdit, btn.dataset.name)));
+  } catch (err) {
+    body.innerHTML = `<tr><td colspan="2" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+/**
+ * Adi degistirir.
+ *
+ * GECMIS KAYITLAR DEGISMEZ: kayittaki ad snapshot'tir, o kayit acilirken
+ * gecerli olan ad neyse arsivde o kalir. Buradaki degisiklik yalnizca
+ * bundan sonraki secimleri etkiler — garson adi mantiginin aynisi.
+ */
+async function adDegistir(id, eski) {
+  const yeni = prompt('Yeni isim:', eski);
+  if (yeni === null) return;
+
+  const ad = yeni.trim();
+  if (!ad) return toast('İsim boş olamaz.', 'error');
+  if (ad === eski) return;
+
+  try {
+    await API.patch(`/api/info-providers/${id}`, { name: ad });
+    await loadProviders();
+    toast(`"${eski}" → "${ad}" olarak değiştirildi. Geçmiş kayıtlar etkilenmedi.`, 'success', 5500);
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+/** Kisiyi tamamen siler. Gecmis kayitlarda adi snapshot olarak kalir. */
+async function silInfoVeren(id, ad) {
+  const onay = await confirmDelete({
+    title: 'İnfo vereni sil',
+    body: `<b>${esc(ad)}</b> listeden tamamen silinecek.<br />
+           Geçmiş kayıtlarda adı görünmeye devam eder, arşiv bozulmaz.`
+  });
+  if (!onay) return;
+
+  try {
+    const r = await API.request(`/api/info-providers/${id}`, { method: 'DELETE' });
+    await loadProviders();
+    toast(
+      `${r.deleted} silindi.` + (r.affectedRecords ? ` ${r.affectedRecords} kayıtta adı korundu.` : ''),
+      'success', 5000
+    );
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function addProvider() {
+  const name = $('newProvider').value.trim();
+  if (!name) return toast('İsim girin.', 'error');
+  try {
+    await API.post('/api/info-providers', { name });
+    $('newProvider').value = '';
+    await loadProviders();
+    toast(`${name} eklendi.`, 'success');
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+async function bulkAddProviders() {
+  const adlar = parseBulk($('bulkProviders'));
+  if (!adlar.length) return toast('Eklenecek ad bulunamadı.', 'error');
+
+  const sonuc = await bulkPost('/api/info-providers', adlar, $('bulkProviderBtn'), 'Listeyi Ekle');
+  $('bulkProviders').value = '';
+  await loadProviders();
   ozetBildir(sonuc);
 }
 
@@ -562,6 +665,8 @@ async function saveCooldown() {
 function bindEvents() {
   $('addWaiterBtn').addEventListener('click', addWaiter);
   $('bulkAddBtn').addEventListener('click', bulkAddWaiters);
+  $('addProviderBtn').addEventListener('click', addProvider);
+  $('bulkProviderBtn').addEventListener('click', bulkAddProviders);
   $('newWaiter').addEventListener('keydown', (e) => { if (e.key === 'Enter') addWaiter(); });
 
   $('addTypeBtn').addEventListener('click', addType);
@@ -636,7 +741,7 @@ async function runReset(preselect) {
       .map((x) => `${x.label}: ${x.deleted}`)
       .join(' · ');
 
-    await Promise.all([loadWaiters(), loadTypes(), loadUsers(), loadSettings(), loadBackups(), loadOverview()]);
+    await Promise.all([loadWaiters(), loadProviders(), loadTypes(), loadUsers(), loadSettings(), loadBackups(), loadOverview()]);
     toast(ozet ? `Silindi — ${ozet}` : 'Silinecek kayıt bulunamadı.', 'success', 7000);
   } catch (err) {
     toast(err.message, 'error', 6000);

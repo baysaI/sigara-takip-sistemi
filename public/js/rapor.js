@@ -569,6 +569,20 @@ function bindEvents() {
    * dosyada baska bir donemin rakamlari (GIRIS/TUKETIM bos, KALAN dolu).
    * Kapsami tek yerden uretmek bu ayrismayi kokten kaldirir.
    */
+  /*
+   * Gun sonu raporunun TAMAMI — ekranin kullandigi kapsamin aynisiyla.
+   * Gunu KAPATMAZ: yalnizca okur ve dosyayi indirir. Mutabakat dokumu
+   * (asagidaki csvBtn) sadece stok tablosunu verir; bu ise ozet, marka,
+   * garson, sigaraci, degisim, iptal ve tum kayitlari tek dosyada toplar.
+   */
+  $('dailyCsvBtn').addEventListener('click', () => {
+    const qs = new URLSearchParams(
+      Object.entries(currentScope()).filter(([, v]) => v !== '' && v != null)
+    );
+    window.location.href = `/api/reports/daily.csv?${qs}`;
+    toast('Gün sonu raporu hazırlanıyor — indirilenler klasörüne düşecek.', 'info');
+  });
+
   $('csvBtn').addEventListener('click', () => {
     if (!recon) return toast('Önce mutabakat tablosu yüklenmeli.', 'error');
     const qs = new URLSearchParams(

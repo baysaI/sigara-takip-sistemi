@@ -68,7 +68,9 @@ function updateFilterHint() {
 /** Filtre acilir menulerini doldur. */
 async function loadFilterOptions() {
   const [kisiler, users] = await Promise.all([
-    API.get('/api/records/info-providers').catch(() => ({ names: [] })),
+    // Suzgec GECMISI kapsamali: silinmis kisiler ve liste kurulmadan
+    // once serbest metinle girilmis adlar da secilebilmeli.
+    API.get('/api/records/info-names').catch(() => ({ names: [] })),
     API.get('/api/users').catch(() => ({ users: [] }))
   ]);
 

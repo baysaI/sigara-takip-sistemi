@@ -713,21 +713,44 @@ Kayıt formundaki **İnfo** alanı ikiye ayrıldı:
 
 | Alan | İçerik |
 |---|---|
-| **İnfo Veren Kişi** (`info_by`) | İnfoyu veren kişinin adı |
-| **İnfo Nedeni** (`info`) | Neden verildiği |
+| **İnfo Veren Kişi** (`info_by_id` → `info_by`) | İnfoyu veren kişi — **listeden seçilir** |
+| **İnfo Nedeni** (`info`) | Neden verildiği — serbest metin |
 
-İkisi de **opsiyoneldir**; biri girilip diğeri boş bırakılabilir. Ad alanı
-serbest metindir ama daha önce kullanılmış adları önerir (`datalist`) — aynı
-kişinin `Ahmet`, `ahmet`, `Ahmet Bey` diye üçe bölünmesini bu önler.
+İkisi de **opsiyoneldir**; biri girilip diğeri boş bırakılabilir.
+
+İsim alanı **Alan Garson ile aynı bileşendir**: yazdıkça liste daralır, seçim
+listeden yapılır, **serbest metin kabul edilmez**. İsimleri yönetici tanımlar
+(aşağıya bakın); böylece aynı kişi `Ahmet`, `ahmet`, `Ahmet Bey` diye üçe
+bölünmez ve kişi bazlı özet düzgün toplanır.
+
+Kayda **adın kendisi de yazılır** (`info_by`, garsonlardaki `waiter_name` gibi
+snapshot). Kişi sonradan silinse veya adı değişse bile arşivdeki kayıt bozulmaz.
+
+### İsimleri yönetme
+
+**Yönetim → 💬 İnfo Verenler** bölümünden:
+
+- **Tek tek** ya da **toplu** ekleme (her satıra bir ad)
+- **Adı Değiştir** — yalnızca bundan sonraki seçimleri etkiler; geçmiş
+  kayıtlardaki ad snapshot olduğu için **değişmez**
+- **Sil** — geçmiş kayıtlarda adı görünmeye devam eder, `info_by_id` boşalır
+
+Aynı ad iki kez eklenemez (büyük/küçük harf farkı da aynı sayılır). Liste boşken
+kayıt formundaki alan uyarı gösterir ama **kayıt açılabilir** — info opsiyonel.
 
 Eskiden tek serbest metin kutusuydu ve hem kimin info verdiğini hem nedenini
 aynı cümlede taşıyordu; *"kim, kaç kez, neden info verdi"* ancak metinler gözle
 taranarak cevaplanabiliyordu.
 
-> **Eski kayıtlar olduğu gibi kalır.** `info_by` boştur, serbest metin `info`
-> içinde durur ve listede **Neden** sütununda görünür. Geçmiş veri taşınmaz —
-> hangi kelimenin ad, hangisinin neden olduğunu tahmin etmek arşivi bozma
-> riski taşırdı.
+> **Geçiş.** Liste kurulmadan önce serbest metinle girilmiş adlar, ilk
+> çalıştırmada **bir kez** tanım listesine taşınır ve kayıtlara bağlanır;
+> yönetici listeyi sıfırdan yazmak zorunda kalmaz. Konsola kaç ad taşındığı
+> yazılır.
+>
+> Daha da eski, hiç ad içermeyen kayıtlarda `info_by` boş kalır: serbest metin
+> `info` içinde durur, listede **Neden** sütununda görünür ve kişi bazlı özette
+> `(ad girilmemiş)` altında toplanır. O veri **taşınmaz** — hangi kelimenin ad,
+> hangisinin neden olduğunu tahmin etmek arşivi bozma riski taşırdı.
 
 ### `/info.html` sayfası
 
@@ -907,6 +930,28 @@ Bölümler:
 4. **Sigaracı bazlı işlemler** — kim kaç işlem girdi, ilk ve son işlem saati
 5. **Özel onay ile verilenler** — hangi oyuncu, hangi uyarı, **kimin onayıyla**, hangi not
 6. **Kalan stok raporu** — anlık paket sayıları, kritik eşikler ve dönem içi ikmaller
+
+### Gün sonu raporunu Excel'e aktarma
+
+*Günü Kapat ve Raporu Al* düğmesinin yanındaki **Excel'e Aktar**, ekranda
+görüntülenen dönemin raporunu **tamamen** indirir. Günü **kapatmaz** — yalnızca
+okur.
+
+Dosya, raporun bütün bölümlerini ayrı başlıklar halinde içerir:
+
+`ÖZET` · `MARKA BAZLI DAĞITIM` · `GARSON BAZLI DAĞILIM` · `SİGARACI DÖKÜMÜ` ·
+`İKMALLER` · `SİGARA DEĞİŞİMLERİ` · `İPTALLER` · `TÜM KAYITLAR`
+
+**TÜM KAYITLAR** bölümü dönemin her satışını satır satır verir — tarih, oyuncu,
+sigara, adet, garson, sigaracı, info veren, info nedeni, erken alım ve uyarı
+onayı. Ekranda rapor özet gösterir; dosyada günün tamamı bulunur.
+
+Boş bölümlerin altına `(kayit yok)` yazılır. Dosya adı
+`sigara-gun-sonu-<dönem>.csv`; biçim mutabakat dökümüyle aynı (noktalı virgül +
+BOM'lu UTF-8).
+
+> Mutabakat kartındaki **Excel'e Aktar** ile karıştırmayın: o yalnızca stok
+> sayım tablosunu verir, bu ise raporun tamamını.
 
 ## Veri silme ve sıfırlama
 
@@ -1092,6 +1137,7 @@ Ayrıntılar:
 | `daily_counts` | Gün sonu fiziksel sayım kayıtları |
 | `player_flags` | Oyuncu bazlı özel uyarı / onay / bloke tanımları |
 | `record_player_edits` | Oyuncu ID düzeltmeleri — eski/yeni ID, neden, kim, ne zaman |
+| `info_providers` | İnfo veren tanım listesi — form dropdown kaynağı |
 | `stock_movements` | Her stok hareketi (ikmal, çıkış, düzeltme) |
 
 `records` tablosunda garson adı ve sigaracı kullanıcı adı **snapshot** olarak da
@@ -1161,7 +1207,12 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/records/custom-types` | Tek seferlik tür adları (arşiv süzgeci için) |
 | `GET` | `/api/records/info` | İnfo girilmiş kayıtlar + kişi bazlı özet |
 | `GET` | `/api/records/info.csv` | İnfo verenler dökümü — aynı filtreler |
-| `GET` | `/api/records/info-providers` | İnfo veren adları (öneri ve süzgeç için) |
+| `GET` | `/api/records/info-names` | Arşivde geçmiş info veren adları (süzgeç için) |
+| `GET` | `/api/info-providers` | İnfo veren tanım listesi |
+| `POST` | `/api/info-providers` | İnfo veren ekle *(admin)* |
+| `PATCH` | `/api/info-providers/:id` | Adı değiştir *(admin)* |
+| `DELETE` | `/api/info-providers/:id` | İnfo vereni sil *(admin)* |
+| `GET` | `/api/reports/daily.csv` | Gün sonu raporunun tamamı — Excel |
 | `GET` | `/api/records/:id/player-edits` | Kaydın oyuncu ID düzeltme geçmişi |
 | `POST` | `/api/records/:id/player-id` | Oyuncu ID düzeltme (stok ve adet değişmez) |
 | `GET` | `/api/records/stats` | Panel özet kartları |

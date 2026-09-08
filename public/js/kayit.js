@@ -36,19 +36,36 @@ App.ready(async () => {
 });
 
 /**
- * Daha once kullanilmis "info veren" adlarini datalist'e doldurur.
+ * INFO VEREN KISI — Alan Garson ile AYNI bilesen, LISTEDEN secim.
  *
- * Alan serbest metindir — kimse bir listeden secmek zorunda degil. Ama
- * ayni kisi "Ahmet", "ahmet", "Ahmet Bey" diye uc kez yazilirsa Info
- * Verenler listesi ayni insani uce boler. Oneri bunu ucuza onler;
- * gorunmezse alan yine duz metin kutusu gibi calisir.
+ * Serbest metin kabul edilmez (custom secenegi YOK): isimleri yonetici
+ * tanimlar, boylece ayni kisi "Ahmet / ahmet / Ahmet Bey" diye uce
+ * bolunmez ve Info Verenler listesi duzgun toplanir.
+ *
+ * Alan OPSIYONELDIR: bos birakilabilir, o zaman kayitta info veren olmaz.
  */
+let infoAC = null;
+
 async function loadInfoProviders() {
+  let providers = [];
   try {
-    const { names } = await API.get('/api/records/info-providers');
-    $('infoByList').innerHTML = (names || [])
-      .map((n) => `<option value="${esc(n)}"></option>`).join('');
-  } catch { /* oneri kritik degil, alan yine yazilabilir */ }
+    providers = (await API.get('/api/info-providers')).providers || [];
+  } catch { /* liste alinamadi; alan bos kalir, kayit yine acilabilir */ }
+
+  $('noInfoProviders').classList.toggle('hidden', providers.length > 0);
+  $('infoBySearch').placeholder = providers.length
+    ? 'İsim yazın...'
+    : 'Tanımlı info veren yok';
+
+  if (infoAC) return infoAC.setItems(providers);
+
+  infoAC = createAutocomplete({
+    input: $('infoBySearch'),
+    hidden: $('infoById'),
+    list: $('infoByList'),
+    items: providers,
+    emptyText: 'Eşleşen kişi yok'
+  });
 }
 
 /**
@@ -508,6 +525,7 @@ async function submitRecord(e) {
    */
   typeAC?.commit();
   waiterAC?.commit();
+  infoAC?.commit();
 
   /* Sunucuya her iki durumda da tur ADI gonderilir; custom_type bayragi
      "bu ad listede yok, stoktan dusme" der. Sunucu ayni adda AKTIF bir tur
@@ -525,7 +543,8 @@ async function submitRecord(e) {
     quantity: Number($('quantity').value),
     waiter_id: Number($('waiterId').value),
     info: $('info').value.trim(),
-    info_by: $('infoBy').value.trim()
+    // Bos birakilabilir; sunucu gecersiz id'yi zaten reddeder
+    info_by_id: $('infoById').value || undefined
   };
   if (ozel) payload.custom_type = true;
   if (ozelGarson) {
@@ -671,7 +690,7 @@ async function submitRecord(e) {
     $('customTypeNote').classList.add('hidden');
     $('quantity').value = 1;
     $('info').value = '';
-    $('infoBy').value = '';
+    infoAC?.reset();
 
     applyStatus(res.status);
     await Promise.all([loadStats(), loadRecent(), loadTypes()]);

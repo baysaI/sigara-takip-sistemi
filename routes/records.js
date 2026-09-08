@@ -35,17 +35,18 @@ const AKTIF = 'superseded_by IS NULL AND (cancelled_at IS NULL OR cancel_late = 
 
 const waiterByIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
 const waiterByNameStmt = db.prepare('SELECT id, name FROM waiters WHERE name = ?');
+const infoProviderByIdStmt = db.prepare('SELECT id, name FROM info_providers WHERE id = ?');
 
 const insertRecordStmt = db.prepare(`
   INSERT INTO records
     (player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
      waiter_id, waiter_name, custom_waiter,
-     user_id, username, info, info_by, created_at, flag_level, flag_note, approved_by, approval_note,
+     user_id, username, info, info_by, info_by_id, created_at, flag_level, flag_note, approved_by, approval_note,
      early_release, early_remaining_ms, early_approved_by, early_note)
   VALUES
     (@player_id, @cigarette_type, @cigarette_type_id, @custom_type, @quantity,
      @waiter_id, @waiter_name, @custom_waiter,
-     @user_id, @username, @info, @info_by, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
+     @user_id, @username, @info, @info_by, @info_by_id, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
      @early_release, @early_remaining_ms, @early_approved_by, @early_note)
 `);
 
@@ -73,10 +74,13 @@ router.post('/', asyncHandler((req, res) => {
   const cigaretteType = String(req.body.cigarette_type || '').trim();
   const quantity = Number.parseInt(req.body.quantity, 10);
   const waiterId = Number.parseInt(req.body.waiter_id, 10);
-  /* Info ikiye ayrildi: infoBy = veren kisinin ADI, info = NEDENI.
-     Ikisi de opsiyoneldir; biri girilip digeri bos birakilabilir. */
+  /* Info iki parcali: info_by_id = LISTEDEN secilen kisi, info = NEDENI.
+     Ikisi de opsiyoneldir; biri girilip digeri bos birakilabilir.
+     Ad, garsonlarda oldugu gibi SNAPSHOT olarak kayda yazilir — kisi
+     sonradan silinse de arsivdeki kayit bozulmaz. */
   const info = String(req.body.info || '').trim() || null;
-  const infoBy = String(req.body.info_by || '').trim() || null;
+  const infoById = Number.parseInt(req.body.info_by_id, 10);
+  const infoVeren = Number.isInteger(infoById) ? infoProviderByIdStmt.get(infoById) : null;
 
   /* --- Garson: listeden mi, TEK SEFERLIK mi? ---
      "Yeni Garson Ekle" ile yazilan ad waiters tablosuna eklenmez; kayda
@@ -103,7 +107,7 @@ router.post('/', asyncHandler((req, res) => {
     errors.push('Alan garson secilmelidir.');
   }
   if (info && info.length > 255) errors.push('Info nedeni en fazla 255 karakter olabilir.');
-  if (infoBy && infoBy.length > 60) errors.push('Info veren kisi adi en fazla 60 karakter olabilir.');
+  if (Number.isInteger(infoById) && !infoVeren) errors.push('Secilen info veren kisi bulunamadi.');
 
   if (errors.length) {
     return res.status(400).json({ ok: false, error: errors.join(' ') });
@@ -226,7 +230,8 @@ router.post('/', asyncHandler((req, res) => {
       user_id: req.session.user.id,
       username: req.session.user.username,   // islemi yapan sigaraci otomatik kaydedilir
       info,
-      info_by: infoBy,
+      info_by: infoVeren ? infoVeren.name : null,
+      info_by_id: infoVeren ? infoVeren.id : null,
       created_at,
       // Modul 7 snapshot'i: uyari sonradan silinse de arsivde kalir
       flag_level: flag ? flag.level : null,
@@ -396,7 +401,7 @@ function buildArchiveFilter(query) {
 const ARCHIVE_COLUMNS = `
   id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
   waiter_name, custom_waiter,
-  username, info, info_by, created_at,
+  username, info, info_by, info_by_id, created_at,
   flag_level, flag_note, approved_by, approval_note,
   early_release, early_remaining_ms, early_approved_by, early_note,
   superseded_by, exchanged_from, exchanged_at, exchanged_by,
@@ -494,7 +499,7 @@ router.get('/', asyncHandler((req, res) => {
 /*                                                                     */
 /* GET /api/records/info            liste + kisi bazli ozet            */
 /* GET /api/records/info.csv        ayni suzgecle Excel dokumu         */
-/* GET /api/records/info-providers  ad onerileri (kayit formu icin)    */
+/* GET /api/records/info-names      arsivde gecmis adlar (suzgec icin) */
 /*                                                                     */
 /* `info` alani eskiden tek serbest metindi ve hem KIMIN info verdigini */
 /* hem NEDENINI ayni cumlede tasiyordu; artik info_by (ad) ve info      */
@@ -505,7 +510,7 @@ router.get('/', asyncHandler((req, res) => {
 /** Info listesinin sutunlari — liste ve dokum ayni alanlari okur. */
 const INFO_COLUMNS = `
   id, player_id, cigarette_type, custom_type, quantity,
-  waiter_name, custom_waiter, username, info, info_by, created_at,
+  waiter_name, custom_waiter, username, info, info_by, info_by_id, created_at,
   superseded_by, cancelled_at, cancel_late
 `;
 
@@ -569,8 +574,15 @@ router.get('/info', asyncHandler((req, res) => {
   });
 }));
 
-/** Ad onerileri: daha once kullanilmis info veren adlari (suzgecten bagimsiz). */
-router.get('/info-providers', asyncHandler((req, res) => {
+/**
+ * Arsivde GECMIS info veren adlari — Info Verenler sayfasinin suzgeci icin.
+ *
+ * Tanim listesi (/api/info-providers) ile ayni SEY DEGILDIR: burada
+ * silinmis kisiler ve liste kurulmadan once serbest metinle girilmis
+ * adlar da vardir. Suzgec gecmisi kapsamali, tanim listesi ise yalnizca
+ * bugun secilebilecekleri.
+ */
+router.get('/info-names', asyncHandler((req, res) => {
   const rows = db.prepare(`
     SELECT DISTINCT TRIM(info_by) AS name
     FROM records

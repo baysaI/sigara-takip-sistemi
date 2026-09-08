@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.7.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.8.0" />
 </head>
 <body>
 
@@ -51,6 +51,39 @@
         </div>
         <div class="pager">
           <span class="info">Ayrılan garsonu silin — geçmiş kayıtlarda adı korunur, arşiv bozulmaz.</span>
+        </div>
+      </section>
+
+      <!-- ==================== İNFO VERENLER ====================
+           Garsonlarla aynı desen. Kayıt formunda bu listeden seçilir;
+           serbest metin kabul edilmez, böylece aynı kişi farklı
+           yazımlarla bölünmez. -->
+      <section class="card">
+        <h2>💬 İnfo Verenler <span class="badge-count" id="providerCount"></span></h2>
+        <div class="card-body">
+          <div class="field">
+            <label for="newProvider">İsim</label>
+            <input type="text" id="newProvider" maxlength="60" placeholder="ör. Ahmet Bey" />
+          </div>
+          <button class="btn-primary" id="addProviderBtn">Ekle</button>
+
+          <div class="field mt">
+            <label for="bulkProviders">Toplu Ekleme <span class="muted">(her satıra bir ad)</span></label>
+            <textarea id="bulkProviders" rows="4" placeholder="Ahmet Bey&#10;Zeynep Hanım"></textarea>
+          </div>
+          <button class="btn-ghost btn-block" id="bulkProviderBtn">Listeyi Ekle</button>
+        </div>
+
+        <div class="table-scroll">
+          <table class="responsive">
+            <thead><tr><th>İsim</th><th>İşlem</th></tr></thead>
+            <tbody id="providerBody">
+              <tr><td colspan="2" class="empty">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span class="info">Silinen kişinin adı geçmiş kayıtlarda korunur, arşiv bozulmaz.</span>
         </div>
       </section>
 
@@ -235,9 +268,9 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.7.0"></script>
-  <script src="/js/layout.js?v=1.7.0"></script>
-  <script src="/js/danger.js?v=1.7.0"></script>
-  <script src="/js/yonetim.js?v=1.7.0"></script>
+  <script src="/js/api.js?v=1.8.0"></script>
+  <script src="/js/layout.js?v=1.8.0"></script>
+  <script src="/js/danger.js?v=1.8.0"></script>
+  <script src="/js/yonetim.js?v=1.8.0"></script>
 </body>
 </html>

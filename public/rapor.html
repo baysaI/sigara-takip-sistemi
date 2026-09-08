@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.7.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.8.0" />
 </head>
 <body>
 
@@ -88,7 +88,11 @@
           <label for="closeNote">Kapanış notu <span class="muted">(opsiyonel)</span></label>
           <input type="text" id="closeNote" maxlength="255" placeholder="ör. gece vardiyası sonu" />
         </div>
-        <button class="btn-primary btn-auto" id="closeDayBtn">Günü Kapat ve Raporu Al</button>
+        <div class="row-actions">
+          <button class="btn-primary btn-auto" id="closeDayBtn">Günü Kapat ve Raporu Al</button>
+          <!-- Raporun TAMAMINI indirir; günü KAPATMAZ, yalnızca okur. -->
+          <button class="btn-ghost btn-auto" id="dailyCsvBtn">Excel'e Aktar</button>
+        </div>
       </div>
     </section>
 
@@ -254,9 +258,9 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.7.0"></script>
-  <script src="/js/layout.js?v=1.7.0"></script>
-  <script src="/js/danger.js?v=1.7.0"></script>
-  <script src="/js/rapor.js?v=1.7.0"></script>
+  <script src="/js/api.js?v=1.8.0"></script>
+  <script src="/js/layout.js?v=1.8.0"></script>
+  <script src="/js/danger.js?v=1.8.0"></script>
+  <script src="/js/rapor.js?v=1.8.0"></script>
 </body>
 </html>

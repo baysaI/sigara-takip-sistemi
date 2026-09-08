@@ -120,6 +120,75 @@ router.delete('/waiters/:id', requireAdmin, asyncHandler((req, res) => {
   res.json({ ok: true, deleted: garson.name, affectedRecords: kayit });
 }));
 
+/* ------------------------------------------------------------------
+   INFO VERENLER — garsonlarla ayni desen.
+
+   Ad once serbest metindi ve ayni kisi farkli yazimlarla boluniyordu.
+   Artik kalici tanim listesi: yonetici ekler/siler, sigaraci kayit
+   acarken LISTEDEN secer. records.info_by ad snapshot'i olarak kalir,
+   bu yuzden kisi silinse de arsiv bozulmaz.
+   ------------------------------------------------------------------ */
+const listInfoProviders = db.prepare(
+  'SELECT id, name, is_active FROM info_providers ORDER BY name COLLATE NOCASE'
+);
+
+/** GET /api/info-providers - kayit formu ve suzgecler icin */
+router.get('/info-providers', asyncHandler((req, res) => {
+  res.json({ ok: true, providers: listInfoProviders.all() });
+}));
+
+/** POST /api/info-providers - yeni kisi (admin) */
+router.post('/info-providers', requireAdmin, asyncHandler((req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ ok: false, error: 'Isim bos olamaz.' });
+  if (name.length > 60) return res.status(400).json({ ok: false, error: 'Isim cok uzun.' });
+
+  try {
+    const info = db.prepare('INSERT INTO info_providers (name) VALUES (?)').run(name);
+    res.status(201).json({ ok: true, provider: { id: info.lastInsertRowid, name, is_active: 1 } });
+  } catch (err) {
+    if (String(err.code).includes('SQLITE_CONSTRAINT')) {
+      return res.status(409).json({ ok: false, error: 'Bu isim zaten kayitli.' });
+    }
+    throw err;
+  }
+}));
+
+/** PATCH /api/info-providers/:id - adi degistir (admin).
+ *  Gecmis kayitlardaki ad snapshot'i DEGISMEZ: o kayit acilirken gecerli
+ *  olan ad neyse arsivde o kalir. */
+router.patch('/info-providers/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const name = String(req.body.name || '').trim();
+  if (!name) return res.status(400).json({ ok: false, error: 'Isim bos olamaz.' });
+  if (name.length > 60) return res.status(400).json({ ok: false, error: 'Isim cok uzun.' });
+
+  try {
+    const info = db.prepare('UPDATE info_providers SET name = ? WHERE id = ?').run(name, id);
+    if (!info.changes) return res.status(404).json({ ok: false, error: 'Kisi bulunamadi.' });
+    res.json({ ok: true, provider: { id, name } });
+  } catch (err) {
+    if (String(err.code).includes('SQLITE_CONSTRAINT')) {
+      return res.status(409).json({ ok: false, error: 'Bu isim zaten kayitli.' });
+    }
+    throw err;
+  }
+}));
+
+/** DELETE /api/info-providers/:id - kisiyi sil (admin).
+ *  Gecmis kayitlar bozulmaz: records.info_by ad snapshot'i tutulur,
+ *  info_by_id ise ON DELETE SET NULL ile bosalir. */
+router.delete('/info-providers/:id', requireAdmin, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  const kisi = db.prepare('SELECT name FROM info_providers WHERE id = ?').get(id);
+  if (!kisi) return res.status(404).json({ ok: false, error: 'Kisi bulunamadi.' });
+
+  const kayit = db.prepare('SELECT COUNT(*) c FROM records WHERE info_by_id = ?').get(id).c;
+  db.prepare('DELETE FROM info_providers WHERE id = ?').run(id);
+
+  res.json({ ok: true, deleted: kisi.name, affectedRecords: kayit });
+}));
+
 /** GET /api/cigarette-types?all=1 - pasifler dahil (yonetim ekrani) */
 const listAllTypes = db.prepare('SELECT id, name, is_active FROM cigarette_types ORDER BY is_active DESC, name COLLATE NOCASE');
 

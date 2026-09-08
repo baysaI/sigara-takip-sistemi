@@ -415,6 +415,61 @@ addColumn('records', 'info_by', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_records_info_by ON records (info_by)');
 
 /*
+ * INFO VERENLER — onceden tanimli liste (garsonlarin aynisi).
+ *
+ * Ad once serbest metindi ve ayni kisi "Ahmet / ahmet / Ahmet Bey" diye
+ * boluniyordu; oneri listesi bunu azaltiyordu ama garanti etmiyordu.
+ * Artik kalici bir tanim listesi var: yonetici ekler/siler, sigaraci
+ * kayit acarken LISTEDEN secer.
+ *
+ * records.info_by ad SNAPSHOT'i olarak KALIR (waiter_name gibi): kisi
+ * sonradan silinse bile arsivdeki kayit bozulmaz. info_by_id yalnizca
+ * hangi tanima baglandigini soyler ve silinince NULL'a duser.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS info_providers (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    is_active  INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  );
+`);
+
+addColumn('records', 'info_by_id', 'INTEGER REFERENCES info_providers(id) ON DELETE SET NULL');
+
+/*
+ * Gecis: liste kurulmadan once serbest metinle girilmis adlar tanim
+ * listesine BIR KEZ tasinir. Boylece mevcut kayitlar yetim kalmaz ve
+ * yonetici listeyi sifirdan yazmak zorunda kalmaz. Tablo bosken calisir.
+ */
+(function infoVerenleriTasi() {
+  const varMi = db.prepare('SELECT COUNT(*) c FROM info_providers').get().c;
+  if (varMi) return;
+
+  const adlar = db.prepare(`
+    SELECT DISTINCT TRIM(info_by) AS name
+    FROM records
+    WHERE COALESCE(TRIM(info_by), '') <> ''
+    ORDER BY name COLLATE NOCASE
+  `).all();
+
+  if (!adlar.length) return;
+
+  const ekle = db.prepare('INSERT OR IGNORE INTO info_providers (name) VALUES (?)');
+  const bagla = db.prepare(`
+    UPDATE records SET info_by_id = (SELECT id FROM info_providers WHERE name = TRIM(records.info_by))
+    WHERE COALESCE(TRIM(info_by), '') <> '' AND info_by_id IS NULL
+  `);
+
+  db.transaction(() => {
+    for (const a of adlar) ekle.run(a.name);
+    bagla.run();
+  })();
+
+  console.log(`[migrasyon] ${adlar.length} info veren adi tanim listesine tasindi.`);
+})();
+
+/*
  * DUZELTME IZI. Her satir bir duzeltmedir; zincir olusabilir
  * (1247 -> 1250 -> 1252). Kayit silinirse iz de gider (CASCADE):
  * olmayan bir kaydin duzeltme gecmisinin anlami yok.
