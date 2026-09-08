@@ -334,6 +334,7 @@ async function loadRecent() {
                 : ''}
             <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
             <button class="btn-ghost btn-sm" data-info="${r.id}">${r.info_by || r.info ? 'İnfo Düzenle' : 'İnfo Ekle'}</button>
+            ${kokHesap() ? `<button class="btn-danger btn-sm" data-del="${r.id}" title="Kaydı kalıcı olarak siler — yalnızca kök hesap">Sil</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -817,6 +818,19 @@ function bindEvents() {
     if (swapBtn) {
       swapBtn.disabled = true;
       handleExchange(Number(swapBtn.dataset.swap)).finally(() => { swapBtn.disabled = false; });
+      return;
+    }
+
+    /* KALICI SILME — yalnizca kok hesap. Dugme zaten gizli, sunucu da
+       requireRoot ile ayrica dogrular. */
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) {
+      const kayit = await kaydiBul(Number(delBtn.dataset.del));
+      if (!kayit) return;
+      delBtn.disabled = true;
+      const silindi = await handleRecordDelete(kayit);
+      delBtn.disabled = false;
+      if (silindi) await Promise.all([loadStats(), loadRecent()]);
       return;
     }
 

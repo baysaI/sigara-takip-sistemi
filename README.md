@@ -125,6 +125,7 @@ geçerli olur (kullanıcının açık sayfası varsa yenilemesi gerekir).
 | **Rapor** — görüntüleme, sayım, **günü kapatma** | ✅ | ✅ |
 | Toplu stok / fiyat, kritik eşik | ✅ | ✅ |
 | Yönetim (garson, tür, hesap, yedekleme) | — | ✅ |
+| **Kaydı kalıcı silme** | — | — *(yalnızca kök hesap)* |
 | **Sigara kuralı ayarı** | — | ✅ |
 
 Vardiyayı sigaracı yönettiği için gün sonu raporunu alma (ve dolayısıyla günü
@@ -410,6 +411,39 @@ etmezdi.
 > silinmemesi ve her adımın kim/ne zaman diye kayda geçmesidir. Yalnızca
 > yöneticide olmasını isterseniz [routes/records.js](routes/records.js)
 > içindeki uca `requireAdmin` eklemek yeterli.
+
+## Kaydı kalıcı olarak silme — yalnızca kök hesap
+
+Sistemin geri kalanı hiçbir şeyi silmez: iptal edilen satış arşivde kalır,
+değişimde orijinal kayıt durur, ID düzeltmesi iz bırakır. **Silme bu prensibin
+tek istisnasıdır ve geri dönüşü yoktur** — bu yüzden veri sıfırlamayla aynı
+yerde, piramidin en üstünde durur: **yalnızca kök hesap** (`is_root = 1`,
+kurulumdaki `admin`). Yönetici olmak yetmez.
+
+*Son Kayıtlar*, *Arşiv* ve *İptaller* listelerindeki kırmızı **Sil** düğmesi.
+Düğme diğer hesaplarda **görünmez**; sunucu ayrıca `requireRoot` ile
+doğrular ve bayrağı oturumdan değil **veritabanından** okur.
+
+> Yanlış girilmiş bir kayıt için önce **İptal Et** denenmelidir: iptal geri
+> alınabilir, silme alınamaz. Silme, iptalin bile yetmediği durum içindir —
+> örneğin adı tamamen yanlış yazılmış **tek seferlik sigara**, çünkü o kaydın
+> stok kartı olmadığı için başka türlü düzeltilemez.
+
+Onay ekranı ne olacağını önceden yazar ve stok davranışı kaydın durumuna göre
+değişir:
+
+| Kayıt | Stok |
+|---|---|
+| Normal satış | Sigara stoğa **geri eklenir** |
+| **Tek seferlik** sigara | Stok kartı yok — hiçbir şey eklenmez |
+| **İptal edilmiş** satış | Eklenmez; stok iptal anında **zaten geri dönmüştü** |
+
+- **Değişim zinciri** varsa zincirin tamamı birlikte silinir. Tek halkayı silmek
+  stoğu bozardı; iade yalnızca fiilen dışarıda olan halka için yapılır.
+- 4 saat sayacı doğal olarak **serbest kalır** — kayıt artık yoktur.
+- İptal, değişim ve ID düzeltme izleri kayıtla birlikte silinir (`CASCADE`);
+  stok hareket geçmişi ise **kalır**, yalnızca kayda olan bağı kopar.
+- `?restock=0` ile iade kapatılabilir (API).
 
 ## İptal Edilenler / Arşiv
 
@@ -1242,7 +1276,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `DELETE` | `/api/waiters/:id` | Garsonu sil *(admin)* |
 | `DELETE` | `/api/cigarette-types/:id` | Türü sil *(admin)* |
 | `DELETE` | `/api/flags/:id` | Uyarıyı sil *(admin)* |
-| `DELETE` | `/api/records/:id` | Kaydı sil, stoğu iade et *(admin)* |
+| `DELETE` | `/api/records/:id` | Kaydı **kalıcı** sil, stoğu iade et *(**kök hesap**)* |
 | `GET` | `/api/admin/overview` | Hangi veriden kaç kayıt var *(admin)* |
 | `POST` | `/api/admin/reset` | Toplu sıfırlama, `confirm: "SIFIRLA"` *(admin)* |
 | `GET` | `/api/flags` | Tanımlı oyuncu uyarıları |

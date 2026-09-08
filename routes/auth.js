@@ -8,8 +8,14 @@ const { loginRateLimit, loginBasarisiz, loginBasarili } = require('../middleware
 
 const router = express.Router();
 
+/* is_root ZORUNLU: oturum nesnesi bu bayragi tasiyor ve arayuz kayit
+   silme gibi kok-hesaba ozel dugmeleri ona bakarak gosteriyor. Sutun
+   secilmezse giristen hemen sonra deger undefined kalir ve kok hesap
+   kendi dugmelerini goremezdi (yalnizca /api/auth/me cagrisindan sonra
+   duzelirdi). Sunucu tarafi zaten requireRoot ile veritabanindan
+   dogruluyor — bu satir arayuzun ilk anda dogru olmasi icin. */
 const findUserStmt = db.prepare(
-  'SELECT id, username, password_hash, full_name, role, is_active FROM users WHERE username = ?'
+  'SELECT id, username, password_hash, full_name, role, is_active, is_root FROM users WHERE username = ?'
 );
 
 /** POST /api/auth/login — kaba kuvvete karsi deneme sinirli */

@@ -98,11 +98,26 @@ async function loadCancellations() {
         <td data-label="İptal Eden"><b>${esc(r.cancelled_by)}</b></td>
         <td data-label="Garson" class="muted">${waiterCellHTML(r)}</td>
         <td data-label="İşlem">
-          ${r.canUndo
-            ? `<button class="btn-ghost btn-sm" data-undo="${r.id}">Geri Al</button>`
-            : `<span class="muted" title="Satışın günü kapandı — geri almak kapanmış raporu değiştirirdi">kilitli</span>`}
+          <div class="row-actions">
+            ${r.canUndo
+              ? `<button class="btn-ghost btn-sm" data-undo="${r.id}">Geri Al</button>`
+              : `<span class="muted" title="Satışın günü kapandı — geri almak kapanmış raporu değiştirirdi">kilitli</span>`}
+            ${kokHesap() ? `<button class="btn-danger btn-sm" data-del="${r.id}" title="Kaydı kalıcı olarak siler — yalnızca kök hesap">Sil</button>` : ''}
+          </div>
         </td>
       </tr>`).join('');
+
+    /* KALICI SILME — yalnizca kok hesap. Iptal edilmis kaydin stogu
+       zaten geri donmustu; sunucu tekrar eklemez. */
+    body.querySelectorAll('[data-del]').forEach((btn) =>
+      btn.addEventListener('click', async () => {
+        const kayit = records.find((x) => String(x.id) === btn.dataset.del);
+        if (!kayit) return;
+        btn.disabled = true;
+        const silindi = await handleRecordDelete(kayit);
+        btn.disabled = false;
+        if (silindi) await loadCancellations();
+      }));
 
     body.querySelectorAll('[data-undo]').forEach((btn) =>
       btn.addEventListener('click', () => {

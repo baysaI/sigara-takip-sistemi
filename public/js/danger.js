@@ -229,3 +229,75 @@ function confirmReset(scopes, confirmWord, preselect = []) {
     }));
   });
 }
+
+/* ============================================================
+   KAYDI KALICI OLARAK SILME — yalnizca KOK HESAP.
+
+   Sistemin geri kalani hicbir seyi silmez: iptal edilen satis arsivde
+   kalir, degisimde orijinal kayit durur, ID duzeltmesi iz birakir.
+   Silme bu prensibin TEK istisnasi ve geri donusu yok.
+
+   Yanlis girilmis bir kayit icin once IPTAL denenmelidir — iptal geri
+   alinabilir, silme alinamaz. Silme, iptalin bile yetmedigi durum
+   icindir: ornegin adi tamamen yanlis yazilmis TEK SEFERLIK sigara,
+   cunku o kayit stok karti olmadigi icin baska turlu duzeltilemez.
+
+   Cagiran: arsiv.js, kayit.js, iptal.js
+   ============================================================ */
+
+/** Kok hesap mi? Silme dugmeleri yalnizca burada gorunur. */
+const kokHesap = () => !!App.user?.is_root;
+
+/**
+ * Onay ekranini acar, onaylanirsa kaydi siler.
+ *
+ * @param {object} r  Silinecek kayit
+ * @returns {Promise<boolean>} silindiyse true (liste tazelensin)
+ */
+async function handleRecordDelete(r) {
+  const zincirli = !!(r.superseded_by || r.exchanged_from);
+  const iptalli = !!r.cancelled_at;
+
+  /* Ne olacagini ONCEDEN yaz: stok iadesi kaydin durumuna gore degisir
+     ve kullanici bunu onaydan sonra ogrenmemeli. */
+  const stokSatiri = r.custom_type
+    ? 'Bu <b>tek seferlik</b> bir sigara — stok kartı yok, stoğa bir şey eklenmez.'
+    : iptalli
+      ? 'Bu satış <b>zaten iptal edilmişti</b>; stok o an geri dönmüştü, tekrar eklenmez.'
+      : `<b>${esc(r.cigarette_type)} ×${r.quantity}</b> stoğa geri eklenir.`;
+
+  const onay = await confirmDelete({
+    title: 'Kaydı kalıcı olarak sil',
+    body:
+      `<b>${esc(r.player_id)}</b> — ${esc(r.cigarette_type)} ×${r.quantity}<br />` +
+      `${formatDateTime(r.created_at)} · garson ${esc(r.waiter_name)}<br /><br />` +
+      stokSatiri +
+      (zincirli
+        ? '<br /><br />🔄 Bu kayıt sigara değişimiyle bağlantılı; <b>zincirin tamamı</b> silinir.'
+        : '') +
+      '<br /><br /><span class="muted">Kaydı geri getirmenin yolu yoktur. ' +
+      'Yalnızca hatayı düzeltmek için kullanın — iade için <b>İptal Et</b> daha doğrudur.</span>',
+    confirmText: 'Kalıcı Olarak Sil'
+  });
+  if (!onay) return false;
+
+  try {
+    const res = await API.request(`/api/records/${r.id}`, { method: 'DELETE' });
+
+    toast(
+      `Kayıt silindi: ${res.deleted.player_id} — ${res.deleted.cigarette_type}` +
+      (res.chain ? ` (${res.chain.length} kayıtlık değişim zinciri)` : ''),
+      'success', 5000
+    );
+    if (res.restocked) {
+      toast(`↩️ ${res.restocked.type}: ${res.restocked.balance} paket (stoğa döndü)`, 'info', 4500);
+    } else if (res.wasCancelled) {
+      toast('Stok eklenmedi — iptal edildiğinde zaten geri dönmüştü.', 'info', 5000);
+    }
+    return true;
+  } catch (err) {
+    // 403: kok hesap degil. Dugme zaten gizli ama sunucu son sozu soyler.
+    toast(err.message, 'error', 6000);
+    return false;
+  }
+}

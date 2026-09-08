@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, requireAdmin, asyncHandler } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireRoot, asyncHandler } = require('../middleware/auth');
 const { getCooldownStatus, normalizePlayerId } = require('../services/cooldown');
 const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
@@ -913,9 +913,25 @@ function exchangeChain(id) {
 }
 
 /* ------------------------------------------------------------------ */
-/* DELETE /api/records/:id - kaydi sil (admin)                         */
-/* Varsayilan olarak stok iade edilir: yanlis girilen kayit silinince  */
-/* sigara da verilmemis sayilir. ?restock=0 ile iade kapatilabilir.    */
+/* DELETE /api/records/:id - kaydi KALICI olarak sil                   */
+/*                                                                     */
+/* YALNIZCA KOK HESAP. Yonetici olmak yetmez.                          */
+/*                                                                     */
+/* Sistemin geri kalani hicbir seyi silmez: iptal edilen satis arsivde */
+/* kalir, degisimde orijinal kayit durur, ID duzeltmesi iz birakir.    */
+/* Silme bu prensibin TEK istisnasi ve geri donusu yok — o yuzden veri */
+/* sifirlamayla ayni yerde durur, piramidin en ustunde                 */
+/* (bkz. middleware/auth.js requireRoot, routes/admin.js).             */
+/*                                                                     */
+/* Yanlis girilmis bir kayit icin once IPTAL denenmelidir: iptal geri  */
+/* alinabilir, silme alinamaz. Silme, iptalin bile yetmedigi durum     */
+/* icindir — ornegin adi tamamen yanlis yazilmis tek seferlik sigara,  */
+/* cunku o kayit stok karti olmadigi icin arsivde duzeltilemez.        */
+/*                                                                     */
+/* STOK IADESI (varsayilan acik, ?restock=0 ile kapatilir):            */
+/*   · tek seferlik sigarada iade YOKTUR — stok karti hic olmadi       */
+/*   · IPTAL EDILMIS kayitta iade YAPILMAZ: stok iptal aninda zaten    */
+/*     geri donmustu, tekrar eklemek stogu sisirirdi                   */
 /*                                                                     */
 /* DEGISIM ZINCIRI: kayit degistirilmisse zincirin TAMAMI birlikte     */
 /* silinir. Tek halkayi silmek stogu bozardi — orijinalin sigarasi     */
@@ -925,7 +941,7 @@ function exchangeChain(id) {
 /* Iade yalnizca zincirin GECERLI halkasi icin yapilir: fiilen         */
 /* disarida olan sigara odur.                                          */
 /* ------------------------------------------------------------------ */
-router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
+router.delete('/:id', requireRoot, asyncHandler((req, res) => {
   const id = Number.parseInt(req.params.id, 10);
   const record = recordByIdStmt.get(id);
   if (!record) return res.status(404).json({ ok: false, error: 'Kayit bulunamadi.' });
@@ -933,7 +949,11 @@ router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
   const zincir = exchangeChain(id);
   const gecerli = zincir.find((r) => !r.superseded_by) || record;
 
-  const iade = req.query.restock !== '0';
+  /* Iptal edilmis kaydin stogu ZATEN iade edilmisti; bir daha eklemek
+     stogu sisirir. Bayrak yanitla birlikte doner ki arayuz "stok iade
+     edilmedi, cunku iptalde zaten donmustu" diyebilsin. */
+  const iptalliydi = !!gecerli.cancelled_at;
+  const iade = req.query.restock !== '0' && !iptalliydi;
   let stokSonuc = null;
 
   const sil = db.transaction(() => {
@@ -970,7 +990,15 @@ router.delete('/:id', requireAdmin, asyncHandler((req, res) => {
 
   res.json({
     ok: true,
-    deleted: { id, player_id: record.player_id, quantity: record.quantity },
+    deleted: {
+      id,
+      player_id: record.player_id,
+      quantity: record.quantity,
+      cigarette_type: record.cigarette_type,
+      custom_type: record.custom_type
+    },
+    // Iade neden yapilmadi? Arayuz bunu kullaniciya soyleyebilsin.
+    wasCancelled: iptalliydi,
     chain: zincir.length > 1 ? zincir.map((r) => ({ id: r.id, type: r.cigarette_type })) : null,
     restocked: stokSonuc ? { type: stokSonuc.type.name, balance: stokSonuc.balanceAfter } : null
   });
