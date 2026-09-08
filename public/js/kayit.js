@@ -31,9 +31,25 @@ const ADET_ONAY_ESIGI = 1;
 App.ready(async () => {
   showDayInfo();
   await Promise.all([loadTypes(), loadWaiters()]);
-  await Promise.all([loadStats(), loadRecent()]);
+  await Promise.all([loadStats(), loadRecent(), loadInfoProviders()]);
   bindEvents();
 });
+
+/**
+ * Daha once kullanilmis "info veren" adlarini datalist'e doldurur.
+ *
+ * Alan serbest metindir — kimse bir listeden secmek zorunda degil. Ama
+ * ayni kisi "Ahmet", "ahmet", "Ahmet Bey" diye uc kez yazilirsa Info
+ * Verenler listesi ayni insani uce boler. Oneri bunu ucuza onler;
+ * gorunmezse alan yine duz metin kutusu gibi calisir.
+ */
+async function loadInfoProviders() {
+  try {
+    const { names } = await API.get('/api/records/info-providers');
+    $('infoByList').innerHTML = (names || [])
+      .map((n) => `<option value="${esc(n)}"></option>`).join('');
+  } catch { /* oneri kritik degil, alan yine yazilabilir */ }
+}
 
 /**
  * Hangi is gunundeyiz — gun degisimi SAATE bagli degil.
@@ -508,7 +524,8 @@ async function submitRecord(e) {
     cigarette_type: turAdi,
     quantity: Number($('quantity').value),
     waiter_id: Number($('waiterId').value),
-    info: $('info').value.trim()
+    info: $('info').value.trim(),
+    info_by: $('infoBy').value.trim()
   };
   if (ozel) payload.custom_type = true;
   if (ozelGarson) {
@@ -654,6 +671,7 @@ async function submitRecord(e) {
     $('customTypeNote').classList.add('hidden');
     $('quantity').value = 1;
     $('info').value = '';
+    $('infoBy').value = '';
 
     applyStatus(res.status);
     await Promise.all([loadStats(), loadRecent(), loadTypes()]);

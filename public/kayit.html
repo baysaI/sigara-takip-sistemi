@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.6.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.7.0" />
 </head>
 <body>
 
@@ -95,10 +95,24 @@
               </div>
             </div>
 
+            <!-- INFO — ikiye ayrıldı: kim verdi + neden.
+                 Eskiden tek serbest metindi ve "kim, kaç kez, neden info
+                 verdi" ancak metinler gözle taranarak cevaplanabiliyordu.
+                 İkisi de opsiyonel; biri girilip diğeri boş bırakılabilir.
+                 Ad listesi datalist ile önerilir ki aynı kişi arşivde
+                 farklı yazımlarla birikmesin. -->
             <div class="field">
-              <label for="info">Info <span class="muted">(opsiyonel)</span></label>
+              <label for="infoBy">İnfo Veren Kişi <span class="muted">(opsiyonel)</span></label>
+              <input type="text" id="infoBy" name="info_by" maxlength="60"
+                     autocomplete="off" list="infoByList"
+                     placeholder="ör. Ahmet Bey" />
+              <datalist id="infoByList"></datalist>
+            </div>
+
+            <div class="field">
+              <label for="info">İnfo Nedeni <span class="muted">(opsiyonel)</span></label>
               <textarea id="info" name="info" maxlength="255"
-                        placeholder="ör. Ahmet Bey'e verildi"></textarea>
+                        placeholder="ör. doğum günü ikramı"></textarea>
             </div>
 
             <button type="submit" class="btn-primary" id="submitBtn" disabled>Kaydı Oluştur</button>
@@ -135,12 +149,12 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.6.0"></script>
-  <script src="/js/layout.js?v=1.6.0"></script>
-  <script src="/js/autocomplete.js?v=1.6.0"></script>
-  <script src="/js/approval.js?v=1.6.0"></script>
-  <script src="/js/degisim.js?v=1.6.0"></script>
-  <script src="/js/kimlik.js?v=1.6.0"></script>
-  <script src="/js/kayit.js?v=1.6.0"></script>
+  <script src="/js/api.js?v=1.7.0"></script>
+  <script src="/js/layout.js?v=1.7.0"></script>
+  <script src="/js/autocomplete.js?v=1.7.0"></script>
+  <script src="/js/approval.js?v=1.7.0"></script>
+  <script src="/js/degisim.js?v=1.7.0"></script>
+  <script src="/js/kimlik.js?v=1.7.0"></script>
+  <script src="/js/kayit.js?v=1.7.0"></script>
 </body>
 </html>

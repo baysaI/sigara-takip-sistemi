@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#161c24" />
+  <title>İnfo Verenler — Sigara Takip Sistemi</title>
+  <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/icons/icon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
+  <link rel="stylesheet" href="/css/style.css?v=1.7.0" />
+</head>
+<body>
+
+  <main class="container">
+
+    <div class="page-head">
+      <h1>💬 İnfo Verenler</h1>
+      <p>İnfo girilmiş kayıtlar: kim verdi, neden verdi.
+         <span class="muted" id="infoNote"></span></p>
+    </div>
+
+    <section class="card card-overflow">
+      <h2>Filtreler</h2>
+      <div class="card-body">
+        <div class="filters">
+          <div class="field">
+            <label for="fBy">İnfo Veren</label>
+            <select id="fBy"><option value="">Tümü</option></select>
+          </div>
+          <div class="field">
+            <label for="fPlayer">Oyuncu ID</label>
+            <input type="text" id="fPlayer" placeholder="Ara..." inputmode="text" />
+          </div>
+          <div class="field">
+            <label for="fUser">Sigaracı</label>
+            <select id="fUser"><option value="">Tümü</option></select>
+          </div>
+          <div class="field field-wide">
+            <label for="fFrom">Başlangıç</label>
+            <div class="row-tight">
+              <input type="date" id="fFrom" />
+              <input type="time" id="fFromTime" aria-label="Başlangıç saati" />
+            </div>
+          </div>
+          <div class="field field-wide">
+            <label for="fTo">Bitiş</label>
+            <div class="row-tight">
+              <input type="date" id="fTo" />
+              <input type="time" id="fToTime" aria-label="Bitiş saati" />
+            </div>
+          </div>
+          <!-- Arşivdekiyle aynı: tarihten BAĞIMSIZ saat süzgeci -->
+          <div class="field field-wide">
+            <label for="fHourFrom">Saat aralığı <span class="muted">(her gün)</span></label>
+            <div class="row-tight">
+              <select id="fHourFrom" aria-label="Başlangıç saati (her gün)"></select>
+              <span class="muted" aria-hidden="true">–</span>
+              <select id="fHourTo" aria-label="Bitiş saati (her gün)"></select>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button class="btn-ghost btn-sm" id="clearFilters">Filtreleri Temizle</button>
+            <!-- Ekrandaki filtrelerin aynısıyla tüm eşleşen kayıtları indirir.
+                 Yalnızca okur; hiçbir kaydı silmez veya değiştirmez. -->
+            <button class="btn-ghost btn-sm" id="csvBtn">Excel'e Aktar</button>
+          </div>
+        </div>
+
+        <p class="muted mt" id="filterHint"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Kayıtlar <span class="badge-count" id="infoCount"></span></h2>
+
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>Tarih / Saat</th><th>İnfo Veren</th><th>Neden</th>
+              <th>Oyuncu ID</th><th>Sigara Türü</th><th>Adet</th>
+              <th>Garson</th><th>Sigaracı</th>
+            </tr>
+          </thead>
+          <tbody id="infoBody">
+            <tr><td colspan="8" class="empty">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="info" id="pagerInfo">—</span>
+        <button class="btn-ghost btn-sm" id="prevPage" disabled>‹ Önceki</button>
+        <button class="btn-ghost btn-sm" id="nextPage" disabled>Sonraki ›</button>
+      </div>
+    </section>
+
+    <!-- KİŞİ BAZLI ÖZET
+         "Kim kaç kez info vermiş" sorusunun cevabı. Kayıt listesi olayları
+         tek tek gösterir; bu kart onları kişiye göre toplar. Asıl liste
+         yukarıdaki olduğu için özet ALTTA durur. -->
+    <section class="card hidden" id="providerCard">
+      <h2>Kişi Bazlı Özet <span class="badge-count" id="providerCount"></span></h2>
+      <div class="table-scroll">
+        <table class="responsive">
+          <thead>
+            <tr>
+              <th>İnfo Veren</th><th>İşlem</th><th>Paket</th>
+              <th>İlk</th><th>Son</th><th>İşlem</th>
+            </tr>
+          </thead>
+          <tbody id="providerBody"></tbody>
+        </table>
+      </div>
+      <p class="muted" style="padding:0 15px 14px">
+        Sayılar seçili filtrelere göredir. <b>Paket</b> yalnızca geçerli
+        kayıtları sayar — değiştirilmiş ve aynı dönemde iptal edilmiş
+        kayıtlar toplama girmez.
+      </p>
+    </section>
+
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="/js/api.js?v=1.7.0"></script>
+  <script src="/js/layout.js?v=1.7.0"></script>
+  <script src="/js/info.js?v=1.7.0"></script>
+</body>
+</html>

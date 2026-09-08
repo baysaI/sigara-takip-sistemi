@@ -55,6 +55,9 @@ const NAV_ITEMS = [
   // Iptal edilen satislar aktif arsivden cikar, burada gecmisiyle durur.
   // Goruntulemek herkese acik; iptal etmek yalnizca yoneticide.
   { href: '/iptal.html',   icon: '🚫', label: 'İptaller' },
+  // Info girilmis kayitlar: kim, neden. Ayri sayfa cunku kendi suzgeci
+  // ve Excel dokumu var.
+  { href: '/info.html',    icon: '💬', label: 'İnfo' },
   { href: '/sorgu.html',   icon: '🔍', label: 'Sorgu' },
   { href: '/stok.html',    icon: '📦', label: 'Stok' },
   // Uyari tanimlamasi gereken kisi tezgahtaki sigaracidir; Yonetim'den

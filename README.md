@@ -526,6 +526,7 @@ sigara/
 | `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
 | `/arsiv.html` | Filtreler + tam arşiv + tek seferlik listesi + Excel dökümü | oturum |
 | `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
+| `/info.html` | İnfo verenler + kişi bazlı özet + Excel dökümü | oturum |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |
 | `/uyari.html` | Oyuncu uyarıları — tanımla, kaldır, sil | oturum |
@@ -705,6 +706,58 @@ paket toplamı değiştirilmiş ve aynı dönemde iptal edilmiş kayıtları say
 
 > Çok büyük arşivlerde döküm 50.000 satırda kesilir ve dosyanın sonuna bunu
 > söyleyen bir satır düşülür. Böyle bir durumda tarih aralığını daraltın.
+
+## İnfo Verenler
+
+Kayıt formundaki **İnfo** alanı ikiye ayrıldı:
+
+| Alan | İçerik |
+|---|---|
+| **İnfo Veren Kişi** (`info_by`) | İnfoyu veren kişinin adı |
+| **İnfo Nedeni** (`info`) | Neden verildiği |
+
+İkisi de **opsiyoneldir**; biri girilip diğeri boş bırakılabilir. Ad alanı
+serbest metindir ama daha önce kullanılmış adları önerir (`datalist`) — aynı
+kişinin `Ahmet`, `ahmet`, `Ahmet Bey` diye üçe bölünmesini bu önler.
+
+Eskiden tek serbest metin kutusuydu ve hem kimin info verdiğini hem nedenini
+aynı cümlede taşıyordu; *"kim, kaç kez, neden info verdi"* ancak metinler gözle
+taranarak cevaplanabiliyordu.
+
+> **Eski kayıtlar olduğu gibi kalır.** `info_by` boştur, serbest metin `info`
+> içinde durur ve listede **Neden** sütununda görünür. Geçmiş veri taşınmaz —
+> hangi kelimenin ad, hangisinin neden olduğunu tahmin etmek arşivi bozma
+> riski taşırdı.
+
+### `/info.html` sayfası
+
+Gezinme çubuğundaki **💬 İnfo** sekmesi. Yalnızca info girilmiş kayıtları
+listeler (iki alandan biri doluysa yeterli):
+
+`Tarih / Saat · İnfo Veren · Neden · Oyuncu ID · Sigara Türü · Adet · Garson · Sigaracı`
+
+Filtreler: **İnfo veren**, oyuncu ID, sigaracı, tarih aralığı ve arşivdekiyle
+aynı **günden bağımsız saat aralığı**.
+
+Listenin altında **Kişi Bazlı Özet** kartı: kim kaç kez info vermiş, kaç paket,
+ilk ve son ne zaman. *Kayıtları göster* düğmesi listeyi o kişiye süzer.
+`Paket` yalnızca geçerli kayıtları sayar — değiştirilmiş ve aynı dönemde iptal
+edilmiş kayıtlar toplama girmez. Adı girilmemiş eski kayıtlar
+`(ad girilmemiş)` altında toplanır.
+
+### Excel dökümü
+
+**Excel'e Aktar** düğmesi, ekrandaki filtrelerin **aynısıyla** eşleşen tüm
+kayıtları indirir (sayfalama yok). Arşiv dökümüyle aynı biçim: noktalı virgül
+ayraç, BOM'lu UTF-8.
+
+```
+NO;TARİH;SAAT;İNFO VEREN;NEDEN;OYUNCU ID;SİGARA TÜRÜ;ADET;GARSON;SİGARACI;DURUM
+```
+
+Dosyanın başında dökümün alındığı an, hangi filtrelerin açık olduğu ve toplam
+yazar; sonunda **KİŞİ BAZLI ÖZET** bölümü gelir. Dosya adı
+`sigara-info-verenler-YYYYAAGG-SSDD.csv`.
 
 ## Adet onayı
 
@@ -1106,6 +1159,9 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `GET` | `/api/records` | Filtreli arşiv + sayfalama |
 | `GET` | `/api/records/export.csv` | Arşiv dökümü — aynı filtreler, sayfalama yok |
 | `GET` | `/api/records/custom-types` | Tek seferlik tür adları (arşiv süzgeci için) |
+| `GET` | `/api/records/info` | İnfo girilmiş kayıtlar + kişi bazlı özet |
+| `GET` | `/api/records/info.csv` | İnfo verenler dökümü — aynı filtreler |
+| `GET` | `/api/records/info-providers` | İnfo veren adları (öneri ve süzgeç için) |
 | `GET` | `/api/records/:id/player-edits` | Kaydın oyuncu ID düzeltme geçmişi |
 | `POST` | `/api/records/:id/player-id` | Oyuncu ID düzeltme (stok ve adet değişmez) |
 | `GET` | `/api/records/stats` | Panel özet kartları |
@@ -1113,7 +1169,8 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 ### Arşiv filtre parametreleri
 
 `playerId` (kısmi arama), `waiter`, `type`, `user`, `from`, `to` (ISO tarih-saat),
-`hourFrom`, `hourTo` (0–23), `page`, `pageSize` (varsayılan 50, en fazla 500).
+`hourFrom`, `hourTo` (0–23), `by` (info veren), `infoOnly=1`,
+`page`, `pageSize` (varsayılan 50, en fazla 500).
 
 `from`/`to` **tek bir sürekli aralık** kurar; `hourFrom`/`hourTo` ise kaydın
 yerel saatini **her güne ayrı ayrı** uygular. İkisi birlikte kullanılabilir.

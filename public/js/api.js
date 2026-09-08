@@ -215,7 +215,13 @@ function periodDuration(fromISO, nowISO) {
 function recordDetailHTML(r) {
   const satirlar = [];
 
-  if (r.info) satirlar.push(esc(r.info));
+  /* İnfo iki parçalı: kim verdi (info_by) + neden (info). Eski kayıtlarda
+     ad yoktur, yalnızca serbest metin bulunur. */
+  if (r.info_by) {
+    satirlar.push(`💬 İnfo: <b>${esc(r.info_by)}</b>${r.info ? ` · ${esc(r.info)}` : ''}`);
+  } else if (r.info) {
+    satirlar.push(esc(r.info));
+  }
 
   // Erken alım: 4 saat dolmadan, yetkili onayıyla verildi
   if (r.early_release) {

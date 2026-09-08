@@ -392,6 +392,29 @@ addColumn('records', 'player_edited_at', 'TEXT');
 addColumn('records', 'player_edited_by', 'TEXT');
 
 /*
+ * INFO VEREN KISI.
+ *
+ * `info` eskiden tek bir serbest metin kutusuydu ("Ahmet Bey'e verildi")
+ * ve hem KIMIN info verdigini hem NEDENINI ayni cumlede tasiyordu. Bu
+ * haliyle "kim, kac kez, neden info verdi" sorusu ancak metinleri gozle
+ * tarayarak cevaplanabiliyordu.
+ *
+ * Artik ikiye ayrilir:
+ *   info_by  info veren kisinin ADI  (yeni sutun)
+ *   info     info verme NEDENI       (mevcut sutun, anlami netlesti)
+ *
+ * Eski kayitlar oldugu gibi kalir: info_by bostur, serbest metin
+ * `info` icinde durur ve listede "neden" sutununda gorunur. Gecmis veri
+ * tasinmaz — hangi kelimenin ad hangisinin neden oldugunu tahmin etmek
+ * arsivi bozma riski tasir.
+ */
+addColumn('records', 'info_by', 'TEXT');
+
+/* "Info verilmis kayitlar" suzgeci sik calisir; iki alan da bos olmayan
+   satirlari bulmak icin. */
+db.exec('CREATE INDEX IF NOT EXISTS idx_records_info_by ON records (info_by)');
+
+/*
  * DUZELTME IZI. Her satir bir duzeltmedir; zincir olusabilir
  * (1247 -> 1250 -> 1252). Kayit silinirse iz de gider (CASCADE):
  * olmayan bir kaydin duzeltme gecmisinin anlami yok.

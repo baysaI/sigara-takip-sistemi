@@ -40,12 +40,12 @@ const insertRecordStmt = db.prepare(`
   INSERT INTO records
     (player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
      waiter_id, waiter_name, custom_waiter,
-     user_id, username, info, created_at, flag_level, flag_note, approved_by, approval_note,
+     user_id, username, info, info_by, created_at, flag_level, flag_note, approved_by, approval_note,
      early_release, early_remaining_ms, early_approved_by, early_note)
   VALUES
     (@player_id, @cigarette_type, @cigarette_type_id, @custom_type, @quantity,
      @waiter_id, @waiter_name, @custom_waiter,
-     @user_id, @username, @info, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
+     @user_id, @username, @info, @info_by, @created_at, @flag_level, @flag_note, @approved_by, @approval_note,
      @early_release, @early_remaining_ms, @early_approved_by, @early_note)
 `);
 
@@ -73,7 +73,10 @@ router.post('/', asyncHandler((req, res) => {
   const cigaretteType = String(req.body.cigarette_type || '').trim();
   const quantity = Number.parseInt(req.body.quantity, 10);
   const waiterId = Number.parseInt(req.body.waiter_id, 10);
+  /* Info ikiye ayrildi: infoBy = veren kisinin ADI, info = NEDENI.
+     Ikisi de opsiyoneldir; biri girilip digeri bos birakilabilir. */
   const info = String(req.body.info || '').trim() || null;
+  const infoBy = String(req.body.info_by || '').trim() || null;
 
   /* --- Garson: listeden mi, TEK SEFERLIK mi? ---
      "Yeni Garson Ekle" ile yazilan ad waiters tablosuna eklenmez; kayda
@@ -99,7 +102,8 @@ router.post('/', asyncHandler((req, res) => {
   } else if (!Number.isInteger(waiterId)) {
     errors.push('Alan garson secilmelidir.');
   }
-  if (info && info.length > 255) errors.push('Info alani en fazla 255 karakter olabilir.');
+  if (info && info.length > 255) errors.push('Info nedeni en fazla 255 karakter olabilir.');
+  if (infoBy && infoBy.length > 60) errors.push('Info veren kisi adi en fazla 60 karakter olabilir.');
 
   if (errors.length) {
     return res.status(400).json({ ok: false, error: errors.join(' ') });
@@ -222,6 +226,7 @@ router.post('/', asyncHandler((req, res) => {
       user_id: req.session.user.id,
       username: req.session.user.username,   // islemi yapan sigaraci otomatik kaydedilir
       info,
+      info_by: infoBy,
       created_at,
       // Modul 7 snapshot'i: uyari sonradan silinse de arsivde kalir
       flag_level: flag ? flag.level : null,
@@ -312,6 +317,21 @@ function buildArchiveFilter(query) {
     params.user = String(query.user).trim();
     applied.user = params.user;
   }
+
+  /* --- INFO SUZGECLERI ---
+     `by`       belirli bir info veren kisi
+     `infoOnly` yalnizca info girilmis kayitlar — Info Verenler sayfasinin
+                temel suzgeci. Iki alandan biri doluysa kayit "info'lu"
+                sayilir: eski kayitlarda ad yoktur, yalnizca serbest metin. */
+  if (query.by) {
+    where.push('info_by = @by COLLATE NOCASE');
+    params.by = String(query.by).trim();
+    applied.by = params.by;
+  }
+  if (query.infoOnly === '1' || query.infoOnly === true) {
+    where.push("(COALESCE(TRIM(info_by),'') <> '' OR COALESCE(TRIM(info),'') <> '')");
+    applied.infoOnly = true;
+  }
   if (query.from) {
     where.push('created_at >= @from');
     params.from = String(query.from);
@@ -376,7 +396,7 @@ function buildArchiveFilter(query) {
 const ARCHIVE_COLUMNS = `
   id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
   waiter_name, custom_waiter,
-  username, info, created_at,
+  username, info, info_by, created_at,
   flag_level, flag_note, approved_by, approval_note,
   early_release, early_remaining_ms, early_approved_by, early_note,
   superseded_by, exchanged_from, exchanged_at, exchanged_by,
@@ -467,6 +487,193 @@ router.get('/', asyncHandler((req, res) => {
     },
     serverTime: new Date().toISOString()
   });
+}));
+
+/* ------------------------------------------------------------------ */
+/* INFO VERENLER                                                       */
+/*                                                                     */
+/* GET /api/records/info            liste + kisi bazli ozet            */
+/* GET /api/records/info.csv        ayni suzgecle Excel dokumu         */
+/* GET /api/records/info-providers  ad onerileri (kayit formu icin)    */
+/*                                                                     */
+/* `info` alani eskiden tek serbest metindi ve hem KIMIN info verdigini */
+/* hem NEDENINI ayni cumlede tasiyordu; artik info_by (ad) ve info      */
+/* (neden) ayri. Eski kayitlarda info_by bostur — serbest metin neden   */
+/* sutununda gorunur ve listede yerini alir.                           */
+/* ------------------------------------------------------------------ */
+
+/** Info listesinin sutunlari — liste ve dokum ayni alanlari okur. */
+const INFO_COLUMNS = `
+  id, player_id, cigarette_type, custom_type, quantity,
+  waiter_name, custom_waiter, username, info, info_by, created_at,
+  superseded_by, cancelled_at, cancel_late
+`;
+
+/** Kisi bazli ozet: kim kac kez info vermis. Suzgece uyar. */
+function infoProviderSummary(whereSql, params) {
+  return db.prepare(`
+    SELECT COALESCE(NULLIF(TRIM(info_by), ''), '(ad girilmemiş)') AS name,
+           COUNT(*) AS islem,
+           COALESCE(SUM(CASE WHEN ${AKTIF} THEN quantity ELSE 0 END), 0) AS paket,
+           MIN(created_at) AS ilk,
+           MAX(created_at) AS son
+    FROM records
+    ${whereSql}
+    GROUP BY name
+    ORDER BY islem DESC, name COLLATE NOCASE
+  `).all(params);
+}
+
+router.get('/info', asyncHandler((req, res) => {
+  // infoOnly bu sayfanin temel suzgeci; istemci gondermese de uygulanir.
+  const { whereSql, params } = buildArchiveFilter({ ...req.query, infoOnly: '1' });
+
+  const pageSize = Math.min(
+    MAX_PAGE_SIZE,
+    Math.max(1, Number.parseInt(req.query.pageSize, 10) || DEFAULT_PAGE_SIZE)
+  );
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const offset = (page - 1) * pageSize;
+
+  const summary = db.prepare(`
+    SELECT COUNT(*) AS total,
+           COUNT(DISTINCT COALESCE(NULLIF(TRIM(info_by), ''), '(ad girilmemiş)')) AS providers,
+           COALESCE(SUM(CASE WHEN ${AKTIF} THEN quantity ELSE 0 END), 0) AS totalQuantity
+    FROM records ${whereSql}
+  `).get(params);
+
+  const rows = db.prepare(`
+    SELECT ${INFO_COLUMNS}
+    FROM records
+    ${whereSql}
+    ORDER BY created_at DESC, id DESC
+    LIMIT @limit OFFSET @offset
+  `).all({ ...params, limit: pageSize, offset });
+
+  res.json({
+    ok: true,
+    records: rows,
+    providers: infoProviderSummary(whereSql, params),
+    pagination: {
+      page,
+      pageSize,
+      total: summary.total,
+      totalPages: Math.max(1, Math.ceil(summary.total / pageSize))
+    },
+    summary: {
+      total: summary.total,
+      providers: summary.providers,
+      totalQuantity: summary.totalQuantity
+    },
+    serverTime: new Date().toISOString()
+  });
+}));
+
+/** Ad onerileri: daha once kullanilmis info veren adlari (suzgecten bagimsiz). */
+router.get('/info-providers', asyncHandler((req, res) => {
+  const rows = db.prepare(`
+    SELECT DISTINCT TRIM(info_by) AS name
+    FROM records
+    WHERE COALESCE(TRIM(info_by), '') <> ''
+    ORDER BY name COLLATE NOCASE
+  `).all();
+
+  res.json({ ok: true, names: rows.map((r) => r.name) });
+}));
+
+/* Excel dokumu — arsiv dokumuyle ayni bicim: noktali virgul + BOM'lu UTF-8. */
+router.get('/info.csv', asyncHandler((req, res) => {
+  const { whereSql, params, applied } = buildArchiveFilter({ ...req.query, infoOnly: '1' });
+
+  const SINIR = 50000;
+  const rows = db.prepare(`
+    SELECT ${INFO_COLUMNS}
+    FROM records
+    ${whereSql}
+    ORDER BY created_at DESC, id DESC
+    LIMIT @limit
+  `).all({ ...params, limit: SINIR + 1 });
+
+  const kirpildi = rows.length > SINIR;
+  if (kirpildi) rows.length = SINIR;
+
+  const kisiler = infoProviderSummary(whereSql, params);
+
+  const alan = (v) => {
+    const s = String(v ?? '');
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const iki = (n) => String(n).padStart(2, '0');
+  const tarih = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : `${iki(d.getDate())}.${iki(d.getMonth() + 1)}.${d.getFullYear()}`;
+  };
+  const saat = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : `${iki(d.getHours())}:${iki(d.getMinutes())}:${iki(d.getSeconds())}`;
+  };
+  const durum = (r) => {
+    if (r.cancelled_at) return r.cancel_late ? 'İptal (geç)' : 'İptal';
+    if (r.superseded_by) return 'Değiştirildi';
+    return 'Normal';
+  };
+
+  const suzgecler = [];
+  if (applied.by) suzgecler.push(`İnfo veren: ${applied.by}`);
+  if (applied.playerId) suzgecler.push(`Oyuncu: ${applied.playerId}`);
+  if (applied.user) suzgecler.push(`Sigaracı: ${applied.user}`);
+  if (applied.from) suzgecler.push(`Başlangıç: ${tarih(applied.from)} ${saat(applied.from)}`);
+  if (applied.to) suzgecler.push(`Bitiş: ${tarih(applied.to)} ${saat(applied.to)}`);
+  if (applied.hourFrom != null) {
+    suzgecler.push(`Saat aralığı (her gün): ${iki(applied.hourFrom)}:00-${iki(applied.hourTo)}:59`);
+  }
+
+  const simdi = new Date();
+  const toplamPaket = rows.reduce(
+    (t, r) => t + ((r.superseded_by || (r.cancelled_at && !r.cancel_late)) ? 0 : r.quantity), 0);
+
+  const satirlar = [
+    ['İNFO VERENLER DÖKÜMÜ'],
+    [`Alındığı an: ${tarih(simdi.toISOString())} ${saat(simdi.toISOString())}`],
+    [`Filtre: ${suzgecler.length ? suzgecler.join(' | ') : 'yok (tüm kayıtlar)'}`],
+    [`Toplam: ${rows.length} kayıt, ${kisiler.length} kişi, ${toplamPaket} paket`],
+    [],
+    ['NO', 'TARİH', 'SAAT', 'İNFO VEREN', 'NEDEN', 'OYUNCU ID',
+     'SİGARA TÜRÜ', 'ADET', 'GARSON', 'SİGARACI', 'DURUM'],
+    ...rows.map((r, i) => [
+      i + 1,
+      tarih(r.created_at),
+      saat(r.created_at),
+      r.info_by || '',
+      r.info || '',
+      r.player_id,
+      r.cigarette_type,
+      r.quantity,
+      r.waiter_name,
+      r.username,
+      durum(r)
+    ]),
+    [],
+    ['KİŞİ BAZLI ÖZET'],
+    ['İNFO VEREN', 'İŞLEM', 'PAKET', 'İLK', 'SON'],
+    ...kisiler.map((k) => [
+      k.name, k.islem, k.paket,
+      `${tarih(k.ilk)} ${saat(k.ilk)}`,
+      `${tarih(k.son)} ${saat(k.son)}`
+    ])
+  ];
+
+  if (kirpildi) {
+    satirlar.push([], [`! Döküm ${SINIR} satırda kesildi. Daha dar bir tarih aralığı seçin.`]);
+  }
+
+  const csv = satirlar.map((s) => s.map(alan).join(';')).join('\r\n');
+  const damga = `${simdi.getFullYear()}${iki(simdi.getMonth() + 1)}${iki(simdi.getDate())}` +
+                `-${iki(simdi.getHours())}${iki(simdi.getMinutes())}`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="sigara-info-verenler-${damga}.csv"`);
+  res.send('﻿' + csv);
 }));
 
 /* ------------------------------------------------------------------ */
