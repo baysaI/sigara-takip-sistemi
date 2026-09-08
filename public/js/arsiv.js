@@ -184,7 +184,7 @@ function renderCustomTypes(liste) {
       <td data-label="Paket"><span class="pill qty">${c.paket}</span></td>
       <td data-label="İlk Alım" class="mono">${formatDateTime(c.ilk)}</td>
       <td data-label="Son Alım" class="mono">${formatDateTime(c.son)}</td>
-      <td data-label="İşlem">
+      <td>
         <button class="btn-ghost btn-sm" data-ctype="${esc(c.name)}">Kayıtları göster</button>
       </td>
     </tr>`).join('');

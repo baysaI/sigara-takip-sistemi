@@ -109,7 +109,7 @@ async function loadInfo() {
     const data = await API.get('/api/records/info', currentFilters());
     render(data);
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="8" class="empty">Liste yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="empty">Liste yüklenemedi: ${esc(err.message)}</td></tr>`;
   }
 }
 
@@ -118,7 +118,7 @@ function render({ records, providers, pagination, summary }) {
   sonKayitlar = records;
 
   if (!records.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty">Bu filtrelerle info kaydı bulunamadı.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="empty">Bu filtrelerle info kaydı bulunamadı.</td></tr>';
   } else {
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
     body.innerHTML = records.map((r) => `
@@ -184,7 +184,7 @@ function renderProviders(liste) {
       <td data-label="Paket"><span class="pill qty">${k.paket}</span></td>
       <td data-label="İlk" class="mono">${formatDateTime(k.ilk)}</td>
       <td data-label="Son" class="mono">${formatDateTime(k.son)}</td>
-      <td data-label="İşlem">
+      <td>
         <button class="btn-ghost btn-sm" data-by="${esc(k.name)}">Kayıtları göster</button>
       </td>
     </tr>`).join('');
