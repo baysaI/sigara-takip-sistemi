@@ -11,7 +11,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Sigara Takip" />
-  <link rel="stylesheet" href="/css/style.css?v=1.9.0" />
+  <link rel="stylesheet" href="/css/style.css?v=1.9.1" />
 </head>
 <body>
 
@@ -145,7 +145,8 @@
           </table>
         </div>
         <div class="pager">
-          <span class="info">Girilen oyuncunun son 24 saati</span>
+          <!-- Kapsam ID girilince degisir: tumu -> o oyuncunun son 24 saati -->
+          <span class="info" id="recentScope">Son 10 kayıt (tümü)</span>
           <a href="/arsiv.html" class="btn-ghost btn-sm"
              style="text-decoration:none;display:inline-flex;align-items:center">Tüm arşiv ›</a>
         </div>
@@ -156,12 +157,12 @@
 
   <div id="toasts"></div>
 
-  <script src="/js/api.js?v=1.9.0"></script>
-  <script src="/js/layout.js?v=1.9.0"></script>
-  <script src="/js/autocomplete.js?v=1.9.0"></script>
-  <script src="/js/approval.js?v=1.9.0"></script>
-  <script src="/js/degisim.js?v=1.9.0"></script>
-  <script src="/js/kimlik.js?v=1.9.0"></script>
-  <script src="/js/kayit.js?v=1.9.0"></script>
+  <script src="/js/api.js?v=1.9.1"></script>
+  <script src="/js/layout.js?v=1.9.1"></script>
+  <script src="/js/autocomplete.js?v=1.9.1"></script>
+  <script src="/js/approval.js?v=1.9.1"></script>
+  <script src="/js/degisim.js?v=1.9.1"></script>
+  <script src="/js/kimlik.js?v=1.9.1"></script>
+  <script src="/js/kayit.js?v=1.9.1"></script>
 </body>
 </html>

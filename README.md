@@ -800,24 +800,27 @@ Dosyanın başında dökümün alındığı an, hangi filtrelerin açık olduğu
 yazar; sonunda **KİŞİ BAZLI ÖZET** bölümü gelir. Dosya adı
 `sigara-info-verenler-YYYYAAGG-SSDD.csv`.
 
-## Son Kayıtlar — yalnızca aranan oyuncu
+## Son Kayıtlar — iki modlu
 
-Hızlı Kayıt sayfasındaki *Son Kayıtlar* listesi **sayfa açılırken boştur**.
-Oyuncu ID girilince yalnızca **o oyuncunun son 24 saatteki** kayıtları
-listelenir.
+Hızlı Kayıt sayfasındaki *Son Kayıtlar* listesinin iki modu vardır:
 
-Eskiden sayfa açılır açılmaz tüm kullanıcıların son 10 kaydı geliyordu:
-tezgâhta duran ekranda başkalarının oyuncu ID'leri, aldıkları sigaralar ve
-info notları sürekli açıkta duruyordu.
+| Durum | Liste |
+|---|---|
+| **Oyuncu ID girilmemiş** | Tüm kayıtların sonu (son 10) |
+| **Oyuncu ID girilmiş** | Yalnızca o oyuncunun **son 24 saati** |
 
-- Eşleşme **tam**dır (`playerExact`). Kısmi arama olsaydı `1247` ararken
-  `112478`in kayıtları da görünürdü.
+ID yazılır yazılmaz liste o oyuncuya daralır; ID silinince genel görünüme
+döner. Böylece sigaracı hem tezgâhın geneline hem de önündeki misafirin
+geçmişine aynı yerden bakar. Liste altındaki etiket hangi moddaysanız onu
+yazar.
+
+- Oyuncu modunda eşleşme **tam**dır (`playerExact`). Kısmi arama olsaydı
+  `1247` ararken `112478`in kayıtları da listeye karışırdı.
 - 24 saat **duvar saatinden** sayılır — iş gününden ve gün kapanışından
   bağımsız kayan pencere.
-- ID silinince liste yeniden boşalır.
 
-Sütunlar aynı kalır: tarih/saat, oyuncu ID, sigara türü, adet, garson,
-sigaracı, info ve işlem.
+Sütunlar iki modda da aynıdır: tarih/saat, oyuncu ID, sigara türü, adet,
+garson, sigaracı, info ve işlem.
 
 ## Stok dışı (manuel) sigara onayı
 

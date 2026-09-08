@@ -231,6 +231,24 @@ async function loadStats() {
 const SON_24_SAAT = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
 /**
+ * Son Kayitlar listesinin sorgusu.
+ *
+ *   ID YOKKEN   tum kayitlarin sonu (genel gorunum)
+ *   ID VARKEN   yalnizca o oyuncunun SON 24 SAATI
+ *
+ * Eslesme ID varken TAM: playerExact kullanilir. Kismi arama olsaydi
+ * 1247 ararken 112478'in kayitlari da listeye karisirdi.
+ *
+ * kaydiBul da AYNI sorguyu kullanir — ekranda gorunen her satir islem
+ * ekranlarinda da bulunabilsin, aksi halde "kayit bulunamadi" derdi.
+ */
+function recentQuery() {
+  return cd.playerId
+    ? { playerExact: cd.playerId, from: SON_24_SAAT(), pageSize: 50, page: 1 }
+    : { pageSize: 10, page: 1 };
+}
+
+/**
  * Listedeki bir kaydin GUNCEL halini sunucudan alir.
  *
  * Ekrandaki satir bayat olabilir (baska bir sigaraci ayni kaydi
@@ -239,12 +257,7 @@ const SON_24_SAAT = () => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString
  */
 async function kaydiBul(id) {
   try {
-    const { records } = await API.get('/api/records', {
-      playerExact: cd.playerId,
-      from: SON_24_SAAT(),
-      pageSize: 50,
-      page: 1
-    });
+    const { records } = await API.get('/api/records', recentQuery());
     const kayit = records.find((r) => r.id === id);
     if (!kayit) toast('Kayıt bulunamadı, listeyi yenileyin.', 'error');
     return kayit || null;
@@ -255,41 +268,37 @@ async function kaydiBul(id) {
 }
 
 /**
- * SON KAYITLAR — yalnizca EKRANDAKI OYUNCUNUN son 24 saati.
+ * SON KAYITLAR — iki modu var.
  *
- * Eskiden sayfa acilir acilmaz tum kullanicilarin son 10 kaydi geliyordu:
- * tezgahta duran ekranda baskalarinin oyuncu ID'leri, aldigi sigaralar ve
- * info notlari surekli acikta duruyordu. Artik ID girilene kadar liste
- * BOSTUR; ID girilince yalnizca o oyuncunun gecmisi listelenir.
+ *   ID YOKKEN   genel gorunum: tum kayitlarin sonu
+ *   ID VARKEN   yalnizca o oyuncunun SON 24 SAATI
  *
- * Eslesme TAM: playerExact kullanilir. Kismi arama olsaydi 1247 ararken
- * 112478'in kayitlari da gorunurdu.
+ * Oyuncu ID'si yazilir yazilmaz liste o oyuncuya daralir; ID silinince
+ * genel gorunume doner. Boylece sigaraci hem tezgahin geneline hem de
+ * onundeki misafirin gecmisine ayni yerden bakar.
  */
 async function loadRecent() {
   const body = $('recentBody');
+  const oyuncuModu = !!cd.playerId;
 
-  // ID yoksa hic sorgu yapilmaz: liste bos, sebebi yazili.
-  if (!cd.playerId) {
-    $('recentCount').textContent = '';
-    body.innerHTML = `<tr><td colspan="8" class="empty">
-      Oyuncu ID girin — bu oyuncunun <b>son 24 saatteki</b> kayıtları burada listelenir.
-    </td></tr>`;
-    return;
+  // Liste altindaki aciklama hangi modda oldugumuzu soyler
+  const etiket = $('recentScope');
+  if (etiket) {
+    etiket.textContent = oyuncuModu
+      ? `${cd.playerId} — son 24 saat`
+      : 'Son 10 kayıt (tümü)';
   }
 
   try {
-    const { records, summary } = await API.get('/api/records', {
-      playerExact: cd.playerId,
-      from: SON_24_SAAT(),
-      pageSize: 50,
-      page: 1
-    });
-    $('recentCount').textContent = `${cd.playerId} · ${summary.total} kayıt`;
+    const { records, summary } = await API.get('/api/records', recentQuery());
+    $('recentCount').textContent = oyuncuModu
+      ? `${cd.playerId} · ${summary.total} kayıt`
+      : `${summary.total} kayıt`;
 
     if (!records.length) {
-      body.innerHTML = `<tr><td colspan="8" class="empty">
-        ${esc(cd.playerId)} için son 24 saatte kayıt yok.
-      </td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="empty">${
+        oyuncuModu ? `${esc(cd.playerId)} için son 24 saatte kayıt yok.` : 'Henüz kayıt yok.'
+      }</td></tr>`;
       return;
     }
     // data-label: telefonda satirlar karta donusunce etiket olarak gorunur
@@ -505,7 +514,7 @@ function resetCooldown() {
   stopTimer();
   cd.playerId = ''; cd.allowed = false; cd.deadline = 0; cd.flag = null;
   $('flagBanner')?.remove();
-  loadRecent();          // ID silindi: liste bosalir
+  loadRecent();          // ID silindi: liste genel gorunume doner
   box().className = 'cooldown-box';
   box().innerHTML = '';
   setSubmit(false, 'Başlamak için Oyuncu ID girin.');
