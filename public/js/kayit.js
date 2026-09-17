@@ -308,6 +308,12 @@ async function loadRecent() {
          dusururdu (sunucu da ayni kurali uygular). */
       const acikDonemde = !App.period || r.created_at >= App.period.from;
       const degistirilebilir = !r.superseded_by && acikDonemde;
+      /* Iptal KAPANMIS gunde de yapilabilir: "gec iptal" olarak cari doneme
+         iade islenir, kapanmis gunun raporu degismez. Bu yuzden degisimden
+         farkli olarak acik donem sarti aranmaz — arsivdeki kuralin aynisi.
+         Degistirilmis kaydin iptali yerine gecen guncel kayit uzerinden
+         yapilir; sunucu da bunu reddeder. */
+      const iptalEdilebilir = !r.superseded_by;
 
       return `
       <tr${r.superseded_by ? ' class="row-superseded"' : ''}>
@@ -332,6 +338,9 @@ async function loadRecent() {
               : degistirilebilir
                 ? `<button class="btn-ghost btn-sm" data-swap="${r.id}">Değiştir</button>`
                 : ''}
+            ${iptalEdilebilir
+              ? `<button class="btn-danger btn-sm" data-cancel="${r.id}">İptal Et</button>`
+              : ''}
             <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
             <button class="btn-ghost btn-sm" data-info="${r.id}">${r.info_by || r.info ? 'İnfo Düzenle' : 'İnfo Ekle'}</button>
             ${kokHesap() ? `<button class="btn-danger btn-sm" data-del="${r.id}" title="Kaydı kalıcı olarak siler — yalnızca kök hesap">Sil</button>` : ''}
@@ -818,6 +827,28 @@ function bindEvents() {
     if (swapBtn) {
       swapBtn.disabled = true;
       handleExchange(Number(swapBtn.dataset.swap)).finally(() => { swapBtn.disabled = false; });
+      return;
+    }
+
+    /* SATIS IPTALI — iadeyi tezgahta alan kisi sigaracidir; bunun icin
+       arsiv sayfasina gitmek gereksiz bir adimdi. Kayit SILINMEZ: aktif
+       listeden cikar, Iptaller bolumune gecmisiyle tasinir, stok geri
+       doner ve oyuncunun sayaci serbest kalir. */
+    const cancelBtn = e.target.closest('[data-cancel]');
+    if (cancelBtn) {
+      const kayit = await kaydiBul(Number(cancelBtn.dataset.cancel));
+      if (!kayit) return;
+
+      cancelBtn.disabled = true;
+      const sonuc = await handleCancel(kayit);
+      cancelBtn.disabled = false;
+
+      if (sonuc) {
+        await Promise.all([loadStats(), loadRecent(), loadTypes()]);
+        // Iptal edilen satis hak kullanimi sayilmaz: ekranda o oyuncu
+        // aciksa serbest kalan sayaci beklemeden goster.
+        if (cd.playerId && cd.playerId === sonuc.record.player_id) applyStatus(sonuc.status);
+      }
       return;
     }
 

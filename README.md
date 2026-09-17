@@ -449,7 +449,9 @@ değişir:
 
 Müşteri sigarayı aldıktan sonra iade ederse satış **iptal edilir**: aktif
 kayıtlardan çıkar ama **silinmez** — tüm geçmişiyle `/iptal.html` sayfasında
-arşivlenir. Arşivdeki *İptal Et* düğmesi (yönetici) bu işlemi yapar.
+arşivlenir. *İptal Et* düğmesi hem **Hızlı Kayıt → Son Kayıtlar** listesinde hem
+de **Arşiv**'de bulunur; ikisi de aynı onay ekranını kullanır. İade çoğu zaman
+kayıt açıldıktan hemen sonra tezgâhta alınır — bunun için arşive gitmek gerekmez.
 
 İptal edildiğinde:
 
@@ -487,7 +489,7 @@ defter geçmişi korur, oyuncu ise olmamış bir satış yüzünden beklemez.
 ### İptali geri alma
 
 Yanlışlıkla iptal edilen satış, İptaller sayfasındaki **Geri Al** düğmesiyle
-(yönetici) yeniden aktif kayda dönüştürülür: sigara tekrar stoktan düşer,
+yeniden aktif kayda dönüştürülür: sigara tekrar stoktan düşer,
 oyuncunun sayacı yeniden işler. İptal kaydı **silinmez** —
 `reverted_at` / `reverted_by` ile "geri alındı" olarak işaretlenir, denetim izi kalır.
 
@@ -559,7 +561,7 @@ sigara/
 | `/login.html` | Giriş | herkes |
 | `/kayit.html` | Hızlı kayıt + özet kartları + son 10 kayıt | oturum |
 | `/arsiv.html` | Filtreler + tam arşiv + tek seferlik listesi + Excel dökümü | oturum |
-| `/iptal.html` | İptal edilen satışlar + filtreler | oturum (iptal etmek: **admin**) |
+| `/iptal.html` | İptal edilen satışlar + filtreler | oturum |
 | `/info.html` | İnfo verenler + kişi bazlı özet + Excel dökümü | oturum |
 | `/sorgu.html` | ID sorgulama, canlı geri sayım, geçmiş | oturum |
 | `/stok.html` | Stok kartları, ikmal, sayım, hareket geçmişi | oturum |

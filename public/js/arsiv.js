@@ -354,32 +354,9 @@ async function degistir(kayit) {
  * sigara stoga doner ve oyuncunun sayaci serbest kalir.
  */
 async function iptalEt(kayit) {
-  // Satisin donemi kapanmis mi? Kapanmissa iade cari doneme duzeltme
-  // olarak duser ve kapanmis raporun sayilari degismez — kullaniciya
-  // bunu ONCEDEN soyleyebilmek icin burada hesaplaniyor.
-  const gec = !!App.period && kayit.created_at < App.period.from;
-
-  const onay = await confirmCancel({ record: kayit, late: gec });
-  if (!onay) return;
-
-  try {
-    const r = await API.post(`/api/records/${kayit.id}/cancel`, { reason: onay.reason });
-    await loadArchive();
-
-    toast(
-      r.restocked
-        ? `Satış iptal edildi. ${r.restocked.name} stoğu ${r.restocked.balance} pakete çıktı.`
-        : 'Satış iptal edildi.',
-      'success', 5000
-    );
-    if (r.late) {
-      toast(
-        `${periodLabel(r.saleDayKey)} tarihli satıştı — o günün raporu değişmedi, ` +
-        'iade bugünün dönemine düzeltme olarak işlendi.',
-        'info', 7000
-      );
-    }
-  } catch (err) { toast(err.message, 'error', 6000); }
+  // Onay ekrani, sunucu cagrisi ve gec iptal uyarisi danger.js'te:
+  // Hizli Kayit sayfasi da ayni akisi kullaniyor.
+  if (await handleCancel(kayit)) await loadArchive();
 }
 
 function bindEvents() {

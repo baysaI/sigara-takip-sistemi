@@ -146,6 +146,51 @@ function confirmCancel({ record, late }) {
 }
 
 /**
+ * IPTAL AKISININ TAMAMI — onay ekrani + sunucu cagrisi + bildirimler.
+ *
+ * Arsiv ve Hizli Kayit ayni isi yapar: iade cogu zaman kayit acildiktan
+ * hemen sonra tezgahta alinir, bunun icin arsive gitmek gereksiz bir
+ * adimdi. Akis tek yerde durmazsa mesajlar ve gec iptal uyarisi zamanla
+ * ayrisirdi — handleRecordDelete / handleInfoEdit ile ayni gerekce.
+ *
+ * @param {object} kayit  records satiri
+ * @returns {Promise<object|null>} sunucu yaniti; vazgecildiyse veya hata
+ *          olduysa null. Yanittaki status alani oyuncunun SERBEST KALMIS
+ *          sayac durumunu, record alani guncel kaydi tasir.
+ */
+async function handleCancel(kayit) {
+  /* Satisin donemi kapanmis mi? Kapanmissa iade cari doneme duzeltme
+     olarak duser ve kapanmis raporun sayilari degismez — kullaniciya
+     bunu ONCEDEN soyleyebilmek icin burada hesaplaniyor. */
+  const gec = !!App.period && kayit.created_at < App.period.from;
+
+  const onay = await confirmCancel({ record: kayit, late: gec });
+  if (!onay) return null;
+
+  try {
+    const r = await API.post(`/api/records/${kayit.id}/cancel`, { reason: onay.reason });
+
+    toast(
+      r.restocked
+        ? `Satış iptal edildi. ${r.restocked.name} stoğu ${r.restocked.balance} pakete çıktı.`
+        : 'Satış iptal edildi.',
+      'success', 5000
+    );
+    if (r.late) {
+      toast(
+        `${periodLabel(r.saleDayKey)} tarihli satıştı — o günün raporu değişmedi, ` +
+        'iade bugünün dönemine düzeltme olarak işlendi.',
+        'info', 7000
+      );
+    }
+    return r;
+  } catch (err) {
+    toast(err.message, 'error', 6000);
+    return null;
+  }
+}
+
+/**
  * Toplu sifirlama onayi — kapsam secimi + kelime yazarak dogrulama.
  * @param {Array<{key:string,label:string,count:number}>} scopes
  * @param {string} confirmWord
