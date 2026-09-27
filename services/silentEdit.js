@@ -48,6 +48,8 @@ const turAdStmt = db.prepare('SELECT id, name, stock, is_active FROM cigarette_t
 const garsonIdStmt = db.prepare('SELECT id, name FROM waiters WHERE id = ?');
 const garsonAdStmt = db.prepare('SELECT id, name FROM waiters WHERE name = ?');
 const kisiStmt = db.prepare('SELECT id, name FROM info_providers WHERE id = ?');
+const sigaraciIdStmt = db.prepare('SELECT id, username FROM users WHERE id = ?');
+const sigaraciAdStmt = db.prepare('SELECT id, username FROM users WHERE username = ?');
 
 /** Kayda bagli stok hareketleri (normal bir satista tek satir olur). */
 const hareketlerStmt = db.prepare(
@@ -132,6 +134,29 @@ function garsonCoz({ waiterId, waiterName, custom }) {
   if (!custom) throw hata('Seçilen garson bulunamadı.');
 
   return { garson: null, ad };   // tek seferlik (liste disi) garson
+}
+
+/**
+ * Kaydi acan sigaraci. Garsondan farki: burada "tek seferlik" yoktur,
+ * ad kayitli bir HESABA karsilik gelmek zorundadir — kayit bir hesabin
+ * actigi islemdir. username kayitta SNAPSHOT olarak durur (hesap
+ * sonradan silinse de arsiv bozulmaz), user_id baglantiyi tutar.
+ */
+function sigaraciCoz({ userId, username }) {
+  if (Number.isInteger(userId)) {
+    const u = sigaraciIdStmt.get(userId);
+    if (!u) throw hata('Seçilen sigaracı hesabı bulunamadı.');
+    return u;
+  }
+
+  const ad = String(username || '').trim();
+  if (!ad) throw hata('Sigaracı boş olamaz.');
+
+  const u = sigaraciAdStmt.get(ad);
+  if (!u) {
+    throw hata(`"${ad}" adında bir hesap yok; sigaracı kayıtlı hesaplar arasından seçilmelidir.`);
+  }
+  return u;
 }
 
 /**
@@ -237,7 +262,7 @@ function turuDegistir(kayit, hedef) {
  *
  * @param {object} p
  * @param {number} p.recordId
- * @param {object} p.degisiklikler  {player_id?, type?, waiter?, info?}
+ * @param {object} p.degisiklikler  {player_id?, type?, waiter?, user?, info?}
  * @returns {{record:object, applied:string[]}}
  */
 const silentEdit = db.transaction(({ recordId, degisiklikler }) => {
@@ -274,6 +299,17 @@ const silentEdit = db.transaction(({ recordId, degisiklikler }) => {
         guncelle.run(garson ? garson.id : null, ad, garson ? 0 : 1, id);
       }
       yapilan.push(`garson: ${kayit.waiter_name} → ${ad}`);
+    }
+  }
+
+  /* --- Sigaraci (kaydi acan hesap) --- */
+  if (degisiklikler.user !== undefined) {
+    const u = sigaraciCoz(degisiklikler.user);
+
+    if (u.username !== kayit.username || u.id !== kayit.user_id) {
+      const guncelle = db.prepare('UPDATE records SET user_id = ?, username = ? WHERE id = ?');
+      for (const id of zincirIdleri) guncelle.run(u.id, u.username, id);
+      yapilan.push(`sigaracı: ${kayit.username} → ${u.username}`);
     }
   }
 
@@ -315,7 +351,77 @@ const silentEdit = db.transaction(({ recordId, degisiklikler }) => {
     }
   }
 
+  /* --- Kayda bagli satis hareketi de YENI haliyle konussun ---
+     Hareketin notu "oyuncu — garson" bicimindedir ve sahibi kaydi acan
+     sigaracidir. Eski adlari tasimaya devam ederse Stok > Son Hareketler
+     listesinde iz kalirdi. Yalnizca TEK ve normal satis hareketi varsa
+     dokunulur; degisim ve iptal notlari kendi olaylarini anlatir. */
+  if (yapilan.length) {
+    const g = kayitStmt.get(kayit.id);
+    const satis = hareketlerStmt.all(kayit.id).filter((x) => x.reason === 'kayit');
+
+    if (satis.length === 1) {
+      db.prepare('UPDATE stock_movements SET note = ?, user_id = ?, username = ? WHERE id = ?')
+        .run(`${g.player_id} — ${g.waiter_name}`, g.user_id, g.username, satis[0].id);
+    }
+  }
+
   return { record: kayitStmt.get(kayit.id), applied: yapilan, stock: stok };
 });
 
-module.exports = { silentEdit };
+/**
+ * BIR STOK HAREKETINI IZ BIRAKMADAN SILER.
+ *
+ * Stok paneli normalde hicbir hareketi silmez: yanlis girilen bir ikmal
+ * "duzeltme" satiriyla dengelenir ve ikisi de gecmiste durur. Kok hesap
+ * icin ayri yol var — satir tamamen kalkar, yerine yeni satir YAZILMAZ.
+ *
+ * Defterin tutmasi icin tur duzeltmesindeki mantigin aynisi uygulanir:
+ * silinen hareketten SONRAKI tum bakiyeler delta kadar geri alinir ve
+ * stok karti da ayni miktarda duzeltilir.
+ *
+ *   +20 ikmal silinir  ->  sonraki bakiyeler -20, kart -20
+ *   -2  satis silinir  ->  sonraki bakiyeler +2,  kart +2
+ *
+ * DIKKAT — sebebi 'kayit' olan hareket bir SATISA baglidir. Silinirse
+ * kayit arsivde ve raporda durmaya devam eder ama stoktan dusmemis olur;
+ * mutabakatta dagitilan paket ile tuketim birbirini tutmaz. Arayuz bunu
+ * onay ekraninda acikca yazar.
+ */
+const deleteMovement = db.transaction(({ movementId }) => {
+  const h = db.prepare('SELECT * FROM stock_movements WHERE id = ?').get(Number(movementId));
+  if (!h) throw hata('Stok hareketi bulunamadı.', 404);
+
+  // Tur silinmisse (type_id NULL) duzeltilecek kart da yoktur.
+  const tur = h.type_id ? turIdStmt.get(h.type_id) : null;
+
+  if (tur) {
+    const yeniStok = tur.stock - h.delta;
+    if (yeniStok < 0) {
+      throw hata(
+        `Bu hareket silinemez: ${tur.name} stoğu ${yeniStok} pakete düşerdi. ` +
+        'Önce sonraki hareketleri düzeltin.',
+        409, { stock: { name: tur.name, current: tur.stock, delta: h.delta } }
+      );
+    }
+
+    kaydirStmt.run({ tur: tur.id, an: h.created_at, hid: h.id + 1, delta: -h.delta });
+    db.prepare('UPDATE cigarette_types SET stock = ? WHERE id = ?').run(yeniStok, tur.id);
+  }
+
+  db.prepare('DELETE FROM stock_movements WHERE id = ?').run(h.id);
+
+  return {
+    deleted: {
+      id: h.id,
+      type_name: h.type_name,
+      delta: h.delta,
+      reason: h.reason,
+      created_at: h.created_at,
+      record_id: h.record_id
+    },
+    stock: tur ? { name: tur.name, balance: tur.stock - h.delta } : null
+  };
+});
+
+module.exports = { silentEdit, deleteMovement };

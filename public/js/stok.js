@@ -14,6 +14,12 @@ const DURUM = {
 /** Son yuklenen stok kartlari — onizleme mevcut degeri buradan okur. */
 let kartlar = [];
 
+/** Son yuklenen hareketler — silme onayi ayrintilari buradan okur. */
+let sonHareketler = [];
+
+/** Hareket tablosunun sutun sayisi: kok hesapta bir de "Islem" var. */
+const SUTUN = () => (kokHesap() ? 8 : 7);
+
 /** Hareket sebebinin okunur karsiligi. */
 const SEBEP = { ikmal: 'ikmal', kayit: 'kayıt', duzeltme: 'düzeltme' };
 
@@ -89,6 +95,13 @@ function tazeleOnizleme() {
 }
 
 App.ready(async () => {
+  /* Kok hesapta hareket satirlarinda "Sil" dugmesi cikar; basligi ona gore
+     ekle. Diger hesaplarda ne sutun ne dugme vardir. */
+  if (kokHesap()) {
+    document.querySelector('#moveBody').closest('table')
+      .querySelector('thead tr').insertAdjacentHTML('beforeend', '<th>İşlem</th>');
+  }
+
   await Promise.all([loadStock(), loadMovements()]);
   bindEvents();
 });
@@ -229,9 +242,10 @@ async function loadMovements() {
   const body = $('moveBody');
   try {
     const { movements } = await API.get('/api/stock/movements', { limit: 30 });
+    sonHareketler = movements;
 
     if (!movements.length) {
-      body.innerHTML = '<tr><td colspan="7" class="empty">Henüz stok hareketi yok.</td></tr>';
+      body.innerHTML = `<tr><td colspan="${SUTUN()}" class="empty">Henüz stok hareketi yok.</td></tr>`;
       return;
     }
 
@@ -248,9 +262,68 @@ async function loadMovements() {
         <td data-label="Sebep"><span class="pill">${esc(m.reason.toUpperCase())}</span></td>
         <td data-label="Kullanıcı">${esc(m.username)}</td>
         <td data-label="Not" class="info-cell">${m.note ? esc(m.note) : '—'}</td>
+        ${kokHesap() ? `<td data-label="İşlem">
+          <button class="btn-danger btn-sm" data-move-del="${m.id}"
+                  title="Hareketi iz bırakmadan siler — yalnızca kök hesap">Sil</button>
+        </td>` : ''}
       </tr>`).join('');
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="7" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${SUTUN()}" class="empty">Yüklenemedi: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+/* ============================================================
+   HAREKETI IZ BIRAKMADAN SILME — yalnizca kok hesap.
+
+   Panel normalde hicbir hareketi silmez: yanlis girilen bir ikmal
+   "duzeltme" satiriyla dengelenir ve ikisi de gecmiste durur. Burada
+   satir tamamen kalkar; yerine yeni satir yazilmaz, sonraki bakiyeler
+   ve stok karti sessizce kaydirilir (bkz. services/silentEdit.js).
+
+   Onay ekrani ne olacagini ONCEDEN yazar — ozellikle satisa bagli bir
+   harekette, kaydin raporda kalmaya devam edecegini.
+   ============================================================ */
+async function handleMovementDelete(m) {
+  const isaret = m.delta > 0 ? `+${m.delta}` : String(m.delta);
+
+  const kartSatiri = m.delta > 0
+    ? `<b>${esc(m.type_name)}</b> stoğu <b>${m.delta}</b> paket <b>azalır</b> — bu giriş hiç olmamış sayılır.`
+    : `<b>${esc(m.type_name)}</b> stoğu <b>${Math.abs(m.delta)}</b> paket <b>artar</b> — bu çıkış hiç olmamış sayılır.`;
+
+  /* Satisa bagli hareket: kayit silinmiyor, yalnizca stok bacagi gidiyor.
+     Kullanici bunu onaydan SONRA ogrenmemeli. */
+  const satisUyarisi = m.reason === 'kayit'
+    ? '<br /><br />⚠️ Bu hareket bir <b>satışa bağlı</b>. Silerseniz kayıt arşivde ve ' +
+      'gün sonu raporunda durmaya devam eder ama stoktan düşmemiş olur; mutabakatta ' +
+      '<b>dağıtılan paket ile tüketim birbirini tutmaz</b>.'
+    : '';
+
+  const onay = await confirmDelete({
+    title: 'Stok hareketini sil',
+    body:
+      `${formatDateTime(m.created_at)} · <b>${esc(m.type_name)}</b> · <b>${isaret}</b> paket · ` +
+      `${esc(m.reason)} · ${esc(m.username)}` +
+      (m.note ? `<br /><span class="muted">${esc(m.note)}</span>` : '') +
+      `<br /><br />${kartSatiri}<br /><br />` +
+      'Sonraki hareketlerin <b>kalan</b> değerleri buna göre kaydırılır ve yerine ' +
+      '<b>düzeltme satırı yazılmaz</b> — hareket hiç olmamış gibi görünür.' +
+      satisUyarisi,
+    confirmText: 'Hareketi Sil'
+  });
+  if (!onay) return false;
+
+  try {
+    const r = await API.request(`/api/stock/movements/${m.id}`, { method: 'DELETE' });
+    toast(
+      r.stock
+        ? `Hareket silindi. ${r.stock.name}: ${r.stock.balance} paket.`
+        : 'Hareket silindi.',
+      'success', 5000
+    );
+    return true;
+  } catch (err) {
+    toast(err.message, 'error', 7000);
+    return false;
   }
 }
 
@@ -446,4 +519,20 @@ function bindEvents() {
   $('bulkStockBtn')?.addEventListener('click', applyBulkStock);
   $('bulkModeAdd')?.addEventListener('click', () => setBulkMode('add'));
   $('bulkModeSet')?.addEventListener('click', () => setBulkMode('set'));
+
+  /* Hareket silme — dinleyici govdeye bir kez kurulur (olay delegasyonu),
+     tablo her yenilendiginde yeniden baglanmasin. */
+  $('moveBody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-move-del]');
+    if (!btn) return;
+
+    const m = sonHareketler.find((x) => String(x.id) === btn.dataset.moveDel);
+    if (!m) return toast('Hareket bulunamadı, listeyi yenileyin.', 'error');
+
+    btn.disabled = true;
+    const silindi = await handleMovementDelete(m);
+    btn.disabled = false;
+
+    if (silindi) await Promise.all([loadStock(), loadMovements()]);
+  });
 }

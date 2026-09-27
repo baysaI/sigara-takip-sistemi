@@ -410,7 +410,7 @@ function buildArchiveFilter(query) {
 const ARCHIVE_COLUMNS = `
   id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
   waiter_id, waiter_name, custom_waiter,
-  username, info, info_by, info_by_id, created_at,
+  user_id, username, info, info_by, info_by_id, created_at,
   flag_level, flag_note, approved_by, approval_note,
   early_release, early_remaining_ms, early_approved_by, early_note,
   superseded_by, exchanged_from, exchanged_at, exchanged_by,
@@ -1292,6 +1292,15 @@ router.post('/:id/silent-edit', requireRoot, asyncHandler((req, res) => {
       waiterId: Number.isInteger(b.waiter_id) ? b.waiter_id : undefined,
       waiterName: b.waiter_name,
       custom: b.custom_waiter === true
+    };
+  }
+
+  /* Sigaraci: garsondan farkli olarak KAYITLI bir hesap olmak zorunda
+     (kayit bir hesabin actigi islemdir), o yuzden custom secenegi yok. */
+  if (gonderildi('user_id') || gonderildi('username')) {
+    degisiklikler.user = {
+      userId: Number.isInteger(b.user_id) ? b.user_id : undefined,
+      username: b.username
     };
   }
 

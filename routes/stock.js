@@ -8,10 +8,11 @@
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, asyncHandler } = require('../middleware/auth');
+const { requireAuth, requireRoot, asyncHandler } = require('../middleware/auth');
 const {
   listStock, stockSummary, addStock, setStock, recentMovements, applyMovement
 } = require('../services/stock');
+const { deleteMovement } = require('../services/silentEdit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -217,6 +218,25 @@ router.post('/bulk', asyncHandler((req, res) => {
     invalid: hatali,
     summary: stockSummary()
   });
+}));
+
+/* ------------------------------------------------------------------ */
+/* DELETE /api/stock/movements/:id — HAREKETI IZ BIRAKMADAN SIL        */
+/*                                                                     */
+/* YALNIZCA KOK HESAP. Stok paneli normalde hicbir hareketi silmez;    */
+/* yanlis girilen ikmal "duzeltme" satiriyla dengelenir ve ikisi de    */
+/* gecmiste durur. Burada satir tamamen kalkar, yerine yeni satir      */
+/* YAZILMAZ: sonraki bakiyeler ve stok karti sessizce kaydirilir       */
+/* (ayrinti: services/silentEdit.js -> deleteMovement).                */
+/* ------------------------------------------------------------------ */
+router.delete('/movements/:id', requireRoot, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz hareket kimligi.' });
+  }
+
+  const sonuc = deleteMovement({ movementId: id });
+  res.json({ ok: true, ...sonuc, summary: stockSummary() });
 }));
 
 module.exports = router;

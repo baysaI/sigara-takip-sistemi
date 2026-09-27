@@ -464,10 +464,15 @@ gönderilir:
 | **Oyuncu ID** | Kaydın sahibi ve dolayısıyla 4 saat sayacı değişir |
 | **Sigara türü** | Kaydın türü **ve o günkü stok hareketi** değişir (aşağıya bakın) |
 | **Alan garson** | Kayıttaki garson adı ve bağlantısı değişir; liste dışı ad da yazılabilir |
+| **Sigaracı** | Kaydı açan hesap değişir — garsondan farklı olarak **kayıtlı bir hesap** olmak zorundadır |
 | **İnfo veren / neden** | İkisi de değiştirilebilir, boş bırakılarak temizlenebilir |
 
-Oyuncu ID ve garson, kayıt bir sigara değişimi zincirindeyse **zincirin tamamına**
-uygulanır: aksi halde aynı sigara iki farklı oyuncuda görünürdü.
+Oyuncu ID, garson ve sigaracı, kayıt bir sigara değişimi zincirindeyse **zincirin
+tamamına** uygulanır: aksi halde aynı sigara iki farklı oyuncuda görünürdü.
+
+Kayda bağlı **stok hareketinin notu da** yeni adlarla güncellenir (`oyuncu — garson`)
+ve sahibi yeni sigaracı olur. Aksi halde Stok → *Son Stok Hareketleri* listesinde eski
+adlar iz olarak kalırdı.
 
 ### Stok defteri geriye dönük düzeltilir
 
@@ -502,6 +507,29 @@ eskisi gibi kayda geçer.
 > Geçmişte oluşmuş izler (mevcut `DEĞİŞTİRİLDİ` rozetleri, ID düzeltme geçmişi,
 > info damgaları) **olduğu gibi kalır**; bu özellik bundan sonraki düzeltmeler
 > için geçerlidir.
+
+### Stok hareketini silme
+
+*Stok Paneli → Son Stok Hareketleri* listesinde kök hesaba özel bir **Sil** düğmesi
+vardır. Panel normalde hiçbir hareketi silmez — yanlış girilen bir ikmal "düzeltme"
+satırıyla dengelenir ve ikisi de geçmişte durur. Bu düğme satırı tamamen kaldırır;
+yerine **yeni satır yazılmaz.**
+
+Defterin tutması için tür düzeltmesindeki mantığın aynısı uygulanır: silinen
+hareketten **sonraki tüm bakiyeler** delta kadar geri alınır, stok kartı da aynı
+miktarda düzeltilir.
+
+```
++20 ikmal silinir  →  sonraki bakiyeler −20, kart −20
+−2  satış silinir  →  sonraki bakiyeler +2,  kart +2
+```
+
+- Silme sonrası stok **eksiye düşecekse işlem reddedilir** (`409`) — önce sonraki
+  hareketleri düzeltmek gerekir.
+- Türü silinmiş bir harekette (stok kartı yok) yalnızca satır kaldırılır.
+- ⚠️ Sebebi **KAYIT** olan hareket bir **satışa bağlıdır.** Silerseniz kayıt arşivde
+  ve gün sonu raporunda durmaya devam eder ama stoktan düşmemiş olur; mutabakatta
+  *dağıtılan paket* ile *tüketim* birbirini tutmaz. Onay ekranı bunu önceden yazar.
 
 ## İptal Edilenler / Arşiv
 
@@ -1340,6 +1368,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `DELETE` | `/api/flags/:id` | Uyarıyı sil *(admin)* |
 | `DELETE` | `/api/records/:id` | Kaydı **kalıcı** sil, stoğu iade et *(**kök hesap**)* |
 | `POST` | `/api/records/:id/silent-edit` | Kaydı **iz bırakmadan** düzelt *(**kök hesap**)* |
+| `DELETE` | `/api/stock/movements/:id` | Stok hareketini **iz bırakmadan** sil *(**kök hesap**)* |
 | `GET` | `/api/admin/overview` | Hangi veriden kaç kayıt var *(admin)* |
 | `POST` | `/api/admin/reset` | Toplu sıfırlama, `confirm: "SIFIRLA"` *(admin)* |
 | `GET` | `/api/flags` | Tanımlı oyuncu uyarıları |
