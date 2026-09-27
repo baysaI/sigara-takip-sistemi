@@ -19,10 +19,11 @@
  * @param {object} o.record     records satiri
  * @param {Array}  o.turler     aktif sigara turleri {id, name}
  * @param {Array}  o.garsonlar  kayitli garsonlar {id, name}
+ * @param {Array}  o.sigaracilar  hesaplar {id, name} — kayitli olmak zorunda
  * @param {Array}  o.kisiler    info veren tanim listesi {id, name}
  * @returns {Promise<object|null>} yalnizca degisen alanlar; vazgecildiyse null
  */
-function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
+function showSilentEditDialog({ record, turler, garsonlar, sigaracilar, kisiler }) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'gate-overlay gate-swap';
@@ -63,6 +64,15 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
             <input type="text" id="seGarson" maxlength="60" placeholder="Garson adı yazın..." />
             <input type="hidden" id="seGarsonId" />
             <ul class="ac-list" id="seGarsonList"></ul>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="seSigaraci">Sigaracı</label>
+          <div class="ac">
+            <input type="text" id="seSigaraci" placeholder="Hesap adı yazın..." />
+            <input type="hidden" id="seSigaraciId" />
+            <ul class="ac-list" id="seSigaraciList"></ul>
           </div>
         </div>
 
@@ -117,6 +127,7 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
       oyuncuAlan.value.trim().toUpperCase() !== record.player_id ||
       overlay.querySelector('#seTur').value.trim() !== (record.cigarette_type || '') ||
       overlay.querySelector('#seGarson').value.trim() !== (record.waiter_name || '') ||
+      overlay.querySelector('#seSigaraci').value.trim() !== (record.username || '') ||
       overlay.querySelector('#seKisi').value.trim() !== (record.info_by || '') ||
       infoAlan.value.trim() !== (record.info || '');
 
@@ -149,6 +160,17 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
       onSelect: tazele
     });
 
+    /* Sigaracida "tek seferlik" YOK: kayit bir hesabin actigi islemdir,
+       ad kayitli bir hesaba karsilik gelmek zorunda. */
+    const sigaraciAC = createAutocomplete({
+      input: overlay.querySelector('#seSigaraci'),
+      hidden: overlay.querySelector('#seSigaraciId'),
+      list: overlay.querySelector('#seSigaraciList'),
+      items: sigaracilar,
+      emptyText: 'Eşleşen hesap yok',
+      onSelect: tazele
+    });
+
     const kisiAC = createAutocomplete({
       input: overlay.querySelector('#seKisi'),
       hidden: overlay.querySelector('#seKisiId'),
@@ -166,6 +188,7 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
     };
     doldur(turAC, overlay.querySelector('#seTur'), record.cigarette_type_id, record.cigarette_type);
     doldur(garsonAC, overlay.querySelector('#seGarson'), record.waiter_id, record.waiter_name);
+    doldur(sigaraciAC, overlay.querySelector('#seSigaraci'), record.user_id, record.username);
     doldur(kisiAC, overlay.querySelector('#seKisi'), record.info_by_id, record.info_by);
     infoAlan.value = record.info || '';
 
@@ -182,6 +205,7 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
          kalmasin (kayit formundaki davranisin aynisi). */
       turAC.commit();
       garsonAC.commit();
+      sigaraciAC.commit();
       kisiAC.commit();
 
       const govde = {};
@@ -214,6 +238,17 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
         else govde.waiter_id = s.id;
       }
 
+      /* --- Sigaraci --- */
+      const sigaraciMetni = overlay.querySelector('#seSigaraci').value.trim();
+      if (sigaraciMetni !== (record.username || '')) {
+        const s = sigaraciAC.selected;
+        if (!s) {
+          overlay.querySelector('#seSigaraci').focus();
+          return toast('Sigaracıyı listeden seçin — kayıtlı bir hesap olmalı.', 'error', 5500);
+        }
+        govde.user_id = s.id;
+      }
+
       /* --- Info: iki alandan biri degistiyse ikisi birden gonderilir --- */
       const kisiMetni = overlay.querySelector('#seKisi').value.trim();
       if (kisiMetni !== (record.info_by || '') || infoAlan.value.trim() !== (record.info || '')) {
@@ -235,22 +270,25 @@ function showSilentEditDialog({ record, turler, garsonlar, kisiler }) {
  * @returns {Promise<boolean>} degisiklik yapildiysa true (liste tazelensin)
  */
 async function handleSilentEdit(record) {
-  let turler = [], garsonlar = [], kisiler = [];
+  let turler = [], garsonlar = [], sigaracilar = [], kisiler = [];
   try {
-    const [t, g, k] = await Promise.all([
+    const [t, g, k, u] = await Promise.all([
       API.get('/api/cigarette-types'),
       API.get('/api/waiters'),
-      API.get('/api/info-providers').catch(() => ({ providers: [] }))
+      API.get('/api/info-providers').catch(() => ({ providers: [] })),
+      API.get('/api/users').catch(() => ({ users: [] }))
     ]);
     turler = t.types || [];
     garsonlar = g.waiters || [];
     kisiler = k.providers || [];
+    // Bilesen {id, name} bekliyor; hesap listesi username tasir.
+    sigaracilar = (u.users || []).map((x) => ({ id: x.id, name: x.username }));
   } catch (err) {
     toast(`Düzeltme ekranı açılamadı: ${err.message}`, 'error', 6000);
     return false;
   }
 
-  const govde = await showSilentEditDialog({ record, turler, garsonlar, kisiler });
+  const govde = await showSilentEditDialog({ record, turler, garsonlar, sigaracilar, kisiler });
   if (!govde) return false;
 
   try {
