@@ -445,6 +445,64 @@ değişir:
   stok hareket geçmişi ise **kalır**, yalnızca kayda olan bağı kopar.
 - `?restock=0` ile iade kapatılabilir (API).
 
+## Kaydı düzeltme — iz bırakmadan (yalnızca kök hesap)
+
+Sistemin geri kalanı her değişikliği kayda geçirir: sigara değişimi yeni kayıt
+açar ve orijinali `DEĞİŞTİRİLDİ` bırakır, ID düzeltmesi iz satırı yazar, info
+düzenlemesi damgalanır. Tezgâhta çalışan herkes için bu böyle kalır.
+
+**Kök hesabın** (`is_root = 1`) ayrı bir yolu vardır: *Son Kayıtlar* ve *Arşiv*
+listelerindeki **Düzelt** düğmesi. Geçmişte yanlış girilmiş bir kayıt, en baştan
+doğru girilmiş gibi görünecek şekilde düzeltilir — **rozet, düzeltme geçmişi ve
+damga yazılmaz.** Düğme diğer hesaplarda görünmez; uç `requireRoot` ile korunur.
+
+Tek diyalogda dört alan birden düzeltilir; yalnızca **değiştirdiğiniz** alanlar
+gönderilir:
+
+| Alan | Etkisi |
+|---|---|
+| **Oyuncu ID** | Kaydın sahibi ve dolayısıyla 4 saat sayacı değişir |
+| **Sigara türü** | Kaydın türü **ve o günkü stok hareketi** değişir (aşağıya bakın) |
+| **Alan garson** | Kayıttaki garson adı ve bağlantısı değişir; liste dışı ad da yazılabilir |
+| **İnfo veren / neden** | İkisi de değiştirilebilir, boş bırakılarak temizlenebilir |
+
+Oyuncu ID ve garson, kayıt bir sigara değişimi zincirindeyse **zincirin tamamına**
+uygulanır: aksi halde aynı sigara iki farklı oyuncuda görünürdü.
+
+### Stok defteri geriye dönük düzeltilir
+
+Sigara türü değişince yeni bir stok hareketi **yazılmaz** — kaydın kendi hareketi
+yeni türe taşınır ve o andan sonraki bakiyeler kaydırılır:
+
+```
+ESKİ TÜR   hareket zincirinden çıkar  →  sonraki bakiyeler +adet
+YENİ TÜR   zincire o ana yerleşir     →  sonraki bakiyeler −adet
+```
+
+Stok kartları da aynı miktarda düzeltilir. Böylece **kapanmış günün mutabakatı ve
+marka dökümü de yeni duruma göre** hesaplanır; defter "hep öyleymiş" gibi tutar.
+
+> ⚠️ Bu, sistemin en sert kuralını (*kapanmış defter değişmez*) bilerek esnetir:
+> kapanmış bir günün raporu o kayıt için geriye dönük değişir. Sigara değişiminin
+> (*Değiştir*) bundan farkı, onun iadeyi **cari döneme** işleyip iz bırakmasıdır.
+
+- **Liste dışı** bir sigara listedeki bir türe çevrilirse o güne ait stok hareketi
+  **oluşturulur** (normal bir satışınkiyle aynı biçimde); tersi durumda **silinir**.
+- **İptal edilmiş veya sigara değişimi yapılmış** kayıtlarda tür düzeltmesi
+  **reddedilir** — bu kayıtların stoğu birden fazla harekete yayılmıştır ve yarım
+  doğru bir defter, yanlış defterden kötüdür. Diğer alanlar düzeltilebilir.
+- Yeni türün stoğu yetmiyorsa işlem reddedilir.
+
+### Diğer düğmeler de kök hesapta iz bırakmaz
+
+**İnfo Düzenle** ve **ID Düzelt** kök hesapta damga yazmaz: `info_edited_at/by`
+güncellenmez, `record_player_edits` satırı açılmaz. Diğer hesaplarda her şey
+eskisi gibi kayda geçer.
+
+> Geçmişte oluşmuş izler (mevcut `DEĞİŞTİRİLDİ` rozetleri, ID düzeltme geçmişi,
+> info damgaları) **olduğu gibi kalır**; bu özellik bundan sonraki düzeltmeler
+> için geçerlidir.
+
 ## İptal Edilenler / Arşiv
 
 Müşteri sigarayı aldıktan sonra iade ederse satış **iptal edilir**: aktif
@@ -519,6 +577,7 @@ sigara/
 │   ├── businessDay.js     Gün değişimi — KAPANIŞ tabanlı dönem hesapları
 │   ├── exchange.js        Sigara değişimi — tek kaynak
 │   ├── cancellation.js    Satış iptali / iade — tek kaynak
+│   ├── silentEdit.js      Kök hesap — iz bırakmayan düzeltme + stok defteri
 │   ├── reconciliation.js  Gün sonu stok sayımı / mutabakat
 │   ├── flags.js           Modül 7 — özel onay / uyarı mantığı
 │   └── stock.js           Modül 8 — stok hareketleri
@@ -548,7 +607,8 @@ sigara/
 │       ├── approval.js    Modül 7 — engel / onay ekranı
 │       ├── degisim.js     Sigara değiştir — onay ekranı
 │       ├── iptal.js       İptal Edilenler sayfası
-│       ├── danger.js      Silme ve sıfırlama onay pencereleri
+│       ├── danger.js      Silme, iptal ve sıfırlama onay pencereleri
+│       ├── duzelt.js      Kök hesap — iz bırakmayan düzeltme ekranı
 │       ├── layout.js      Ortak kabuk: üst bar, gezinme, oturum
 │       ├── login.js  kayit.js  arsiv.js  sorgu.js  yonetim.js
 └── data/                  SQLite dosyaları (git'e girmez)
@@ -1279,6 +1339,7 @@ Tüm uçlar oturum çerezi ister (`/api/auth/login` hariç).
 | `DELETE` | `/api/cigarette-types/:id` | Türü sil *(admin)* |
 | `DELETE` | `/api/flags/:id` | Uyarıyı sil *(admin)* |
 | `DELETE` | `/api/records/:id` | Kaydı **kalıcı** sil, stoğu iade et *(**kök hesap**)* |
+| `POST` | `/api/records/:id/silent-edit` | Kaydı **iz bırakmadan** düzelt *(**kök hesap**)* |
 | `GET` | `/api/admin/overview` | Hangi veriden kaç kayıt var *(admin)* |
 | `POST` | `/api/admin/reset` | Toplu sıfırlama, `confirm: "SIFIRLA"` *(admin)* |
 | `GET` | `/api/flags` | Tanımlı oyuncu uyarıları |

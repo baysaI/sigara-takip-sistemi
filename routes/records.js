@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { db } = require('../db/database');
-const { requireAuth, requireAdmin, requireRoot, asyncHandler } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requireRoot, isRoot, asyncHandler } = require('../middleware/auth');
 const { getCooldownStatus, normalizePlayerId } = require('../services/cooldown');
 const { getFlag, checkApproval } = require('../services/flags');
 const { applyMovement, typeByNameStmt } = require('../services/stock');
@@ -12,6 +12,7 @@ const {
   cancelRecord, uncancelRecord, assertCancellable, assertUncancellable, listCancellations
 } = require('../services/cancellation');
 const { editPlayerId, assertEditable, editsForRecord } = require('../services/playerEdit');
+const { silentEdit } = require('../services/silentEdit');
 const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } = require('../config');
 const { cooldownHours } = require('../services/settings');
 
@@ -408,7 +409,7 @@ function buildArchiveFilter(query) {
 /** Arsiv satirlarinin sutun listesi — liste ve dokum ayni alanlari okur. */
 const ARCHIVE_COLUMNS = `
   id, player_id, cigarette_type, cigarette_type_id, custom_type, quantity,
-  waiter_name, custom_waiter,
+  waiter_id, waiter_name, custom_waiter,
   username, info, info_by, info_by_id, created_at,
   flag_level, flag_note, approved_by, approval_note,
   early_release, early_remaining_ms, early_approved_by, early_note,
@@ -1122,11 +1123,15 @@ router.post('/:id/player-id', asyncHandler((req, res) => {
   // Uygunluk kontrolu islemden ONCE: hata mesaji net olsun
   assertEditable(id, req.body.player_id);
 
+  /* KOK HESAP iz birakmaz: duzeltme satiri yazilmaz, kayit uzerindeki
+     damga da konmaz — kayit en bastan boyleymis gibi gorunur.
+     (bkz. services/silentEdit.js, middleware/auth.js isRoot) */
   const sonuc = editPlayerId({
     recordId: id,
     newPlayerId: req.body.player_id,
     reason,
-    user: req.session.user
+    user: req.session.user,
+    sessiz: isRoot(req)
   });
 
   res.status(201).json({
@@ -1182,11 +1187,16 @@ router.post('/:id/info', asyncHandler((req, res) => {
     return res.status(400).json({ ok: false, error: 'Secilen info veren kisi bulunamadi.' });
   }
 
-  const simdi = new Date().toISOString();
+  /* KOK HESAP iz birakmaz: damga guncellenmez. COALESCE sayesinde ESKI
+     damga da silinmez — gecmiste olusmus izler oldugu gibi kalir. */
+  const sessiz = isRoot(req);
+  const simdi = sessiz ? null : new Date().toISOString();
 
   db.prepare(`
     UPDATE records
-    SET info = ?, info_by = ?, info_by_id = ?, info_edited_at = ?, info_edited_by = ?
+    SET info = ?, info_by = ?, info_by_id = ?,
+        info_edited_at = COALESCE(?, info_edited_at),
+        info_edited_by = COALESCE(?, info_edited_by)
     WHERE id = ?
   `).run(
     info,
@@ -1195,7 +1205,7 @@ router.post('/:id/info', asyncHandler((req, res) => {
     infoVeren ? infoVeren.name : null,
     infoVeren ? infoVeren.id : null,
     simdi,
-    req.session.user.username,
+    sessiz ? null : req.session.user.username,
     id
   );
 
@@ -1239,6 +1249,76 @@ router.post('/:id/exchange', asyncHandler((req, res) => {
     ok: true,
     ...sonuc,
     status: getCooldownStatus(sonuc.replacement.player_id)   // sayac degismemis olmali
+  });
+}));
+
+/* ------------------------------------------------------------------ */
+/* POST /api/records/:id/silent-edit — IZ BIRAKMADAN DUZELT            */
+/*                                                                     */
+/* YALNIZCA KOK HESAP. Gecmiste yanlis girilmis bir kayit, en bastan   */
+/* dogru girilmis gibi gorunecek sekilde duzeltilir: rozet, iz satiri  */
+/* ve damga YAZILMAZ. Sigara turu degisirse kaydin KENDI stok hareketi */
+/* geriye donuk duzeltilir; boylece kapanmis gunun mutabakati da tutar */
+/* (ayrinti: services/silentEdit.js).                                  */
+/*                                                                     */
+/* Govde — yalnizca GONDERILEN alanlar degisir:                        */
+/*   player_id                                                         */
+/*   cigarette_type_id  ya da  cigarette_type + custom_type            */
+/*   waiter_id          ya da  waiter_name    + custom_waiter          */
+/*   info_by_id + info                                                 */
+/* ------------------------------------------------------------------ */
+router.post('/:id/silent-edit', requireRoot, asyncHandler((req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ ok: false, error: 'Gecersiz kayit kimligi.' });
+  }
+
+  const b = req.body || {};
+  const gonderildi = (ad) => Object.prototype.hasOwnProperty.call(b, ad);
+  const degisiklikler = {};
+
+  if (gonderildi('player_id')) degisiklikler.player_id = b.player_id;
+
+  if (gonderildi('cigarette_type_id') || gonderildi('cigarette_type')) {
+    degisiklikler.type = {
+      typeId: Number.isInteger(b.cigarette_type_id) ? b.cigarette_type_id : undefined,
+      typeName: b.cigarette_type,
+      custom: b.custom_type === true
+    };
+  }
+
+  if (gonderildi('waiter_id') || gonderildi('waiter_name')) {
+    degisiklikler.waiter = {
+      waiterId: Number.isInteger(b.waiter_id) ? b.waiter_id : undefined,
+      waiterName: b.waiter_name,
+      custom: b.custom_waiter === true
+    };
+  }
+
+  /* Info iki parcali ve ikisi de bosaltilabilir; bu yuzden alanlardan
+     BIRININ gonderilmis olmasi "info degisiyor" demektir. */
+  if (gonderildi('info') || gonderildi('info_by_id')) {
+    const ham = b.info_by_id;
+    const bos = ham === null || ham === undefined || ham === '';
+    const infoById = bos ? null : Number.parseInt(ham, 10);
+
+    if (!bos && !Number.isInteger(infoById)) {
+      return res.status(400).json({ ok: false, error: 'Gecersiz info veren kimligi.' });
+    }
+    degisiklikler.info = { infoById, info: String(b.info ?? '').trim() };
+  }
+
+  if (!Object.keys(degisiklikler).length) {
+    return res.status(400).json({ ok: false, error: 'Degistirilecek alan gonderilmedi.' });
+  }
+
+  const sonuc = silentEdit({ recordId: id, degisiklikler });
+
+  res.json({
+    ok: true,
+    ...sonuc,
+    // Oyuncu ID degismis olabilir: sayacin yeni durumu
+    status: getCooldownStatus(sonuc.record.player_id)
   });
 }));
 

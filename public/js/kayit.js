@@ -343,6 +343,7 @@ async function loadRecent() {
               : ''}
             <button class="btn-ghost btn-sm" data-pid="${r.id}">ID Düzelt</button>
             <button class="btn-ghost btn-sm" data-info="${r.id}">${r.info_by || r.info ? 'İnfo Düzenle' : 'İnfo Ekle'}</button>
+            ${kokHesap() ? `<button class="btn-ghost btn-sm" data-fix="${r.id}" title="Kaydı iz bırakmadan düzelt — yalnızca kök hesap">Düzelt</button>` : ''}
             ${kokHesap() ? `<button class="btn-danger btn-sm" data-del="${r.id}" title="Kaydı kalıcı olarak siler — yalnızca kök hesap">Sil</button>` : ''}
           </div>
         </td>
@@ -848,6 +849,26 @@ function bindEvents() {
         // Iptal edilen satis hak kullanimi sayilmaz: ekranda o oyuncu
         // aciksa serbest kalan sayaci beklemeden goster.
         if (cd.playerId && cd.playerId === sonuc.record.player_id) applyStatus(sonuc.status);
+      }
+      return;
+    }
+
+    /* IZ BIRAKMADAN DUZELTME — yalnizca kok hesap. Gecmisteki bir kayit
+       en bastan dogru girilmis gibi duzeltilir; tur degisirse o gunun stok
+       hareketi de duzeltilir (bkz. services/silentEdit.js). */
+    const fixBtn = e.target.closest('[data-fix]');
+    if (fixBtn) {
+      const kayit = await kaydiBul(Number(fixBtn.dataset.fix));
+      if (!kayit) return;
+
+      fixBtn.disabled = true;
+      const degisti = await handleSilentEdit(kayit);
+      fixBtn.disabled = false;
+
+      if (degisti) {
+        await Promise.all([loadStats(), loadRecent(), loadTypes()]);
+        // Oyuncu ID degismis olabilir: ekrandaki sayaci tazele
+        if (cd.playerId) checkPlayer(cd.playerId);
       }
       return;
     }

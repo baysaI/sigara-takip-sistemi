@@ -130,7 +130,7 @@ function assertEditable(recordId, rawNewId) {
  * @returns {{records:object[], edits:object[], oldPlayerId:string,
  *            newPlayerId:string, late:boolean, chain:boolean}}
  */
-const editPlayerId = db.transaction(({ recordId, newPlayerId, reason = null, user }) => {
+const editPlayerId = db.transaction(({ recordId, newPlayerId, reason = null, user, sessiz = false }) => {
   const { kayit, zincir, yeniId, gec, satisDonemi } = assertEditable(recordId, newPlayerId);
 
   const simdi = new Date().toISOString();
@@ -142,11 +142,20 @@ const editPlayerId = db.transaction(({ recordId, newPlayerId, reason = null, use
     WHERE id = ?
   `);
 
+  /* SESSIZ (kok hesap): yalnizca sahibi degisir — damga konmaz, iz satiri
+     yazilmaz. Kayit en bastan boyleymis gibi gorunur. */
+  const sessizGuncelle = db.prepare('UPDATE records SET player_id = ? WHERE id = ?');
+
   const izler = [];
 
   /* Zincirin TAMAMI birlikte duzeltilir: yarim duzeltilmis bir zincir,
      ayni sigaranin iki oyuncuya ait gorunmesi demek olurdu. */
   for (const r of zincir) {
+    if (sessiz) {
+      sessizGuncelle.run(yeniId, r.id);
+      continue;
+    }
+
     guncelle.run(yeniId, simdi, user.username, r.id);
 
     const iz = insertEditStmt.run({

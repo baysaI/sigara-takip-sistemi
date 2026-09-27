@@ -27,16 +27,23 @@ function requireAdmin(req, res, next) {
  * degistirilmis olabilir ve bu ucta bayat bilgiyle karar vermek istemeyiz.
  * Nadir cagrilan bir uc oldugu icin ek sorgunun maliyeti onemsiz.
  */
-function requireRoot(req, res, next) {
+function isRoot(req) {
   const id = req.session?.user?.id;
-  if (!id) {
-    return res.status(401).json({ ok: false, error: 'Oturum bulunamadi. Lutfen giris yapin.' });
-  }
+  if (!id) return false;
 
   const { db } = require('../db/database');
-  const satir = db.prepare('SELECT is_root FROM users WHERE id = ?').get(id);
+  return !!db.prepare('SELECT is_root FROM users WHERE id = ?').get(id)?.is_root;
+}
 
-  if (satir?.is_root) return next();
+/**
+ * Kok hesap mi? Middleware bicimi — yetkisi olmayana 401/403 doner.
+ * Veri sifirlama, kalici silme ve iz birakmayan duzeltme bunu kullanir.
+ */
+function requireRoot(req, res, next) {
+  if (!req.session?.user?.id) {
+    return res.status(401).json({ ok: false, error: 'Oturum bulunamadi. Lutfen giris yapin.' });
+  }
+  if (isRoot(req)) return next();
 
   return res.status(403).json({
     ok: false,
@@ -47,4 +54,4 @@ function requireRoot(req, res, next) {
 /** Tum route'lari try/catch ile sarmalamamak icin kucuk yardimci. */
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-module.exports = { requireAuth, requireAdmin, requireRoot, asyncHandler };
+module.exports = { requireAuth, requireAdmin, requireRoot, isRoot, asyncHandler };
