@@ -4,3 +4,5 @@ data/
 *.log
 backups/
 .claude/settings.local.json
+.claude/
+*.db

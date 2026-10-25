@@ -1,9 +1,9 @@
 /**
  * GIRIS DENEMESI SINIRI — kaba kuvvet korumasi.
  *
- * Sistem internete acik bir sunucuda calisiyor ve kurulum sifresi
- * dokumantasyonda yaziyor (admin/ADMIN_SIFRESI). Sinirsiz deneme hakki,
- * sifreyi degistirmeyi unutmus bir kurulumu dakikalar icinde acar.
+ * Sistem internete acik bir sunucuda calisiyor ve yonetici kullanici adi
+ * (admin) herkesce biliniyor. Sinirsiz deneme hakki, zayif sifreli bir
+ * kurulumu dakikalar icinde acar.
  *
  * Bellekte tutulur; yeni bagimlilik istemez. Tek surecli bir uygulama
  * icin yeterli — sunucu yeniden baslayinca sayaclar sifirlanir, bu da
