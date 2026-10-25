@@ -21,8 +21,13 @@ const DEFAULT_CIGARETTE_TYPES = [];
 // Ilk kurulum hesaplari - CANLIDA SIFRELERI MUTLAKA DEGISTIRIN.
 // Yalnizca ilk yonetici hesabi olusturulur. Sigaraci hesaplarini
 // bu hesapla girip Yonetim sayfasindan siz olusturursunuz.
+// Sifre .env icindeki ADMIN_PASSWORD'den alinir; tanimli degilse rastgele
+// bir sifre uretilir ve ilk kurulumda bir kez ekrana yazdirilir.
+const GENERATED_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+  ? null
+  : require('crypto').randomBytes(9).toString('base64url');
 const DEFAULT_USERS = [
-  { username: 'admin', password: 'ADMIN_SIFRESI', full_name: 'Sistem Yoneticisi', role: 'admin' }
+  { username: 'admin', password: process.env.ADMIN_PASSWORD || GENERATED_ADMIN_PASSWORD, full_name: 'Sistem Yoneticisi', role: 'admin' }
 ];
 
 const insertWaiter = db.prepare('INSERT OR IGNORE INTO waiters (name) VALUES (?)');
@@ -50,7 +55,12 @@ if (process.argv.includes('--reset')) {
   console.log('! records tablosu temizlendi.');
 }
 
+const adminVardi = !!db.prepare("SELECT 1 FROM users WHERE username = 'admin'").get();
 seed();
+if (!adminVardi && GENERATED_ADMIN_PASSWORD) {
+  console.log('\n! Yonetici hesabi olusturuldu: admin / ' + GENERATED_ADMIN_PASSWORD);
+  console.log('  Bu sifre bir daha gosterilmeyecek; giris yapip degistirin.');
+}
 
 console.log('Seed tamamlandi.');
 

@@ -38,7 +38,7 @@ eksik olanı adıyla söyler ve yöneticiyi Yönetim sayfasına yönlendirir.
 
 | Kullanıcı | Şifre | Rol |
 |---|---|---|
-| `admin` | `ADMIN_SIFRESI` | yönetici |
+| `admin` | `.env` içindeki `ADMIN_PASSWORD`; tanımlı değilse `npm run seed` rastgele bir şifre üretip bir kez ekrana yazar | yönetici |
 
 > ⚠️ İlk girişten sonra bu şifreyi **Yönetim → Sigaracı Hesapları → Şifre** ile değiştirin
 > ve `.env` içinde uzun rastgele bir `SESSION_SECRET` tanımlayın
