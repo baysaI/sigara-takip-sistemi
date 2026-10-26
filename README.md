@@ -1,6 +1,6 @@
 # 🚬 Sigara Takip Sistemi
 
-Rol yapma sunucusu (veya benzeri işletme) için sigara dağıtım takip uygulaması.
+İşletmeler için sigara dağıtım takip uygulaması.
 Her oyuncu **4 saatte bir** sigara alabilir; kural hem arayüzde canlı geri sayımla,
 hem de sunucu tarafında zorunlu olarak uygulanır.
 
